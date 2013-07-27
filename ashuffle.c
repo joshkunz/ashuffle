@@ -78,7 +78,8 @@ int shuffle_idle(struct mpd_connection * mpd, struct auto_array * songs) {
 
         /* If the player is on its last song *or* not
          * not reporting a song as playing */
-        if (mpd_status_get_next_song_id(status) == -1) {
+        if (mpd_status_get_song_pos(status) == 
+            ((int) mpd_status_get_queue_length(status)) - 1) {
             /* If the player is stopped and doesn't have any songs
              * in its queue, then add a song and start the player,
              * otherwise, leave the queue as it is. */
@@ -111,8 +112,8 @@ int main (int argc, char * argv[]) {
                         getenv("MPD_HOST") : "localhost";
     /* Same thing for the port, use the environment defined port
      * or the default port */
-    unsigned mpd_port = (unsigned) getenv("MPD_PORT") ? 
-                            atoi(getenv("MPD_PORT")) : 6600;
+    unsigned mpd_port = (unsigned) (getenv("MPD_PORT") ? 
+                            atoi(getenv("MPD_PORT")) : 6600);
 
     /* Create a new connection to mpd */
     mpd = mpd_connection_new(mpd_host, mpd_port, TIMEOUT);
