@@ -75,18 +75,23 @@ int shuffle_idle(struct mpd_connection * mpd, struct auto_array * songs) {
     while (true) {
         mpd_send_status(mpd);
         status = mpd_recv_status(mpd);
-        if (mpd_status_get_next_song_id(status) == -1) {
-            queue_random_song(mpd, songs);
-        }
-        
-        /* If the player is stopped, and our song is the only
-         * one on the playlist, then play */
-        if (mpd_status_get_state(status) == MPD_STATE_STOP &&
-            mpd_status_get_queue_length(status) == 1) {
-            mpd_run_play(mpd);
+
+        /* If the player is on its last song *or* not
+         * not reporting a song as playing */
+        if (mpd_status_get_next_song_id(status) -1) {
+            /* If the player is stopped and doesn't have any songs
+             * in its queue, then add a song and start the player,
+             * otherwise, leave the queue as it is. */
+            if (mpd_status_get_state(status) == MPD_STATE_STOP &&
+                mpd_status_get_queue_length(status) == 0) {
+                queue_random_song(mpd, songs);
+                mpd_run_play(mpd);
+            } else {
+                queue_random_song(mpd, songs);
+            }
         }
 
-        /* wait for player events */
+        /* wait till the player state changes */
         mpd_run_idle_mask(mpd, MPD_IDLE_PLAYER);
     }
     return 0;
