@@ -32,7 +32,14 @@ To use the second mode, run ashuffle without any arguments:
 ## dependencies  
 
 The only dependency is 'libmpdclient' which, you can probably
-install via your package manager 
+install via your package manager. For example on debian based
+distribuitions:
+
+    sudo apt-get install libmpdclient-dev
+
+or on OS X using brew:
+
+    brew install libmpdclient
 
 ## building
 
