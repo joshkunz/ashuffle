@@ -1,7 +1,10 @@
 .PHONY: clean
+
+CFLAGS = -std=c99 -Wall -Wextra -pedantic -Werror 
 libs = libmpdclient 
 
-CFLAGS = -std=c99 -Wall -Wextra -pedantic -Werror $(shell pkg-config $(libs) --cflags)
+# For library linkage
+CFLAGS += $(shell pkg-config $(libs) --cflags)
 LDLIBS = $(shell pkg-config $(libs) --libs)
 
 ashuffle:
