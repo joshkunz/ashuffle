@@ -44,6 +44,6 @@ this should generate the 'ashuffle' binary. Drop it anywhere in your
 path and you should be good to go.
 
 Oh, and in the case you're wondering why it's called 'ashuffle' it's
-because it implements 'automatic shuffle' mode.
+because it implements 'automatic shuffle' mode for mpd.
 
-  [1]: https://github.com/Joshkunz/binfiles/blob/master/ashuffle
+  [1]: https://github.com/Joshkunz/binfiles/blob/4a4e9b7c845b59ba1c0b68edc84e6cf1972dbc73/ashuffle
