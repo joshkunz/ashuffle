@@ -78,7 +78,7 @@ int shuffle_idle(struct mpd_connection * mpd, struct auto_array * songs) {
 
         /* If the player is on its last song *or* not
          * not reporting a song as playing */
-        if (mpd_status_get_next_song_id(status) -1) {
+        if (mpd_status_get_next_song_id(status) == -1) {
             /* If the player is stopped and doesn't have any songs
              * in its queue, then add a song and start the player,
              * otherwise, leave the queue as it is. */
