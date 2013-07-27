@@ -43,4 +43,7 @@ First clone the repository into a directory, and then run:
 this should generate the 'ashuffle' binary. Drop it anywhere in your
 path and you should be good to go.
 
+Oh, and in the case you're wondering why it's called 'ashuffle' it's
+because it implements 'automatic shuffle' mode.
+
   [1]: https://github.com/Joshkunz/binfiles/blob/master/ashuffle
