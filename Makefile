@@ -1,6 +1,8 @@
 .PHONY: clean
-CFLAGS = -Wall -Wextra 
-LDLIBS = -lmpdclient
+libs = libmpdclient 
+
+CFLAGS = -Wall -Wextra -pedantic -Werror $(shell pkg-config $(libs) --cflags)
+LDLIBS = $(shell pkg-config $(libs) --libs)
 
 ashuffle:
 
