@@ -170,11 +170,13 @@ int parse_options(struct ashuffle_options * opts, int argc, char * argv[]) {
 void fhelp(FILE * output) {
     fputs(
     "usage: ashuffle [-i PATTERN ...] ...\n"
-    "                [-e PATTERN ...] ...\n"
+    "                [-e PATTERN ...] ... -o NUMBER\n"
     "\n"
     "Optional Arguments:\n"
     "   -i,--include  Specify things include in shuffle (think whitelist).\n"
     "   -e,--exclude  Specify things to remove from shuffle (think blacklist).\n"
+    "   -o,--only     Instead of continuously adding songs, just add 'NUMBER'\n"
+    "                 songs and then exit\n"
     "\n"
     "PATTERN\n"
     "A pattern is made up of two components, a field to check,\n"
