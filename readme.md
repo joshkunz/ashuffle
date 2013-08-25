@@ -1,23 +1,35 @@
 ashuffle
 ========
 
+Table of Contents:
+* features
+    * usage
+    * help text
+    * inclusions and exclusions
+* dependencies
+* building
+
+# features
+
 ashuffle is a C re-implementation of my [ashuffle python script][1],
 an application for automatically shuffling your mpd library in a similar
 way to a more standard music player's "shuffle library" feature.
+
+## usage
 
 ashuffle has two modes. The first one (and the simpler of the two) is
 to simply queue some number of songs randomly selected from your mpd
 library. To do this you simply run:
 
-    $ ashuffle --only 10   # ashuffle <number of songs to add>
+    $ ashuffle --only 10   # ashuffle --only <number of songs to add>
 
 which will add 10 random songs to your queue.
 
 In the second (more interesting) mode, ashuffle will wait
 until the last song in the queue is playing, at which point it will
-add another song to the queue. In practice this creates a 'stream of music'
-experience where songs will be continuously played, at random, to infinity.
-Also, since ashuffle only adds one song at a time, and only adds that song 
+add another song to the queue. In this creates a 'stream of music'
+where songs will be continuously played, at random, to infinity.
+Additionaly, since ashuffle only adds one song at a time, and only adds that song 
 once the last song in the playlist has started playing, you still retain
 control over your queue. This way, you can add some song you want to hear
 to the queue, and the random songs will simply continue afterwards.
@@ -25,9 +37,11 @@ to the queue, and the random songs will simply continue afterwards.
 Additionally, ashuffle uses mpd's idle functionality so it won't
 drain cpu polling to check if the current song has advanced.
 
-To use the second mode, run ashuffle without any arguments:
+To use the second mode, run ashuffle without the `--only` argument.
 
     $ ashuffle
+
+## help text
 
 ## dependencies  
 
@@ -49,8 +63,6 @@ First clone the repository into a directory, and then run:
 
 this should generate the 'ashuffle' binary. Drop it anywhere in your
 path and you should be good to go.
-
-## inclusions and exclusions (TODO)
 
 Oh, and in the case you're wondering why it's called 'ashuffle' it's
 because it implements 'automatic shuffle' mode for mpd.
