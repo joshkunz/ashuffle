@@ -9,7 +9,7 @@ ashuffle has two modes. The first one (and the simpler of the two) is
 to simply queue some number of songs randomly selected from your mpd
 library. To do this you simply run:
 
-    $ ashuffle 10   # ashuffle <number of songs to add>
+    $ ashuffle -only 10   # ashuffle <number of songs to add>
 
 which will add 10 random songs to your queue.
 
@@ -49,6 +49,8 @@ First clone the repository into a directory, and then run:
 
 this should generate the 'ashuffle' binary. Drop it anywhere in your
 path and you should be good to go.
+
+## inclusions and exclusions (TODO)
 
 Oh, and in the case you're wondering why it's called 'ashuffle' it's
 because it implements 'automatic shuffle' mode for mpd.
