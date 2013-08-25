@@ -5,63 +5,10 @@
 #include <stdbool.h>
 #include <time.h>
 
+#include "array.h"
+
 /* 25 seconds is the default timeout */
 #define TIMEOUT 25000
-
-struct auto_array {
-    unsigned length;
-    unsigned alloc_length;
-    char ** array;
-};
-
-/* initialize the auto array */
-int array_init(struct auto_array * ar) {
-    ar->length = 0;
-    ar->alloc_length = 0;
-    ar->array = NULL;
-    return 0;
-}
-
-/* Append the string to the array */
-int array_append(struct auto_array * ar, const char * astr, unsigned astrlen) {
-    /* if this array is full, reallocate it larger */
-    if (ar->length == ar->alloc_length) {
-        ar->alloc_length = ar->length + 1 + (ar->length / 3);
-        ar->array = realloc(ar->array, sizeof(char *) * ar->alloc_length);
-    }
-    ar->array[ar->length] = malloc(sizeof(char) * astrlen);
-    /* Copy the string into the buffer */
-    memcpy(ar->array[ar->length], astr, astrlen);
-    /* Increment the length of the array */
-    ar->length++;
-    return 0;
-}
-
-/* Free the entire array */
-int array_free(struct auto_array * ar) {
-    for (unsigned i = 0; i < ar->length; i++) {
-        free(ar->array[i]);
-    }
-    free(ar->array);
-    array_init(ar);
-    return 0;
-}
-
-/* Trim the auto_allocated array to the minumim size */
-int array_trim(struct auto_array * ar) {
-    if (ar->length == ar->alloc_length) { return 0; }
-    /* save a reference to the array */
-    char ** tmp = ar->array;
-    /* Allocate a minimum sized array */
-    ar->array = malloc(ar->length * sizeof(char *));
-    /* Copy the old contents */
-    memcpy(ar->array, tmp, ar->length * sizeof(char *));
-    /* re-set the allocated length */
-    ar->alloc_length = ar->length;
-    /* free the old array */
-    free(tmp);
-    return 0;
-}
 
 /* Append a random song to the queue */
 void queue_random_song(struct mpd_connection * mpd, 
@@ -117,7 +64,11 @@ int main (int argc, char * argv[]) {
 
     /* Create a new connection to mpd */
     mpd = mpd_connection_new(mpd_host, mpd_port, TIMEOUT);
+    
     if (mpd == NULL) {
+        fputs("Could not connect due to lack of memory.", stderr);
+        return 1;
+    } else if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
         fprintf(stderr, "Could not connect to %s:%u.\n", mpd_host, mpd_port);
         return 1;
     }
@@ -131,7 +82,7 @@ int main (int argc, char * argv[]) {
     struct mpd_pair *pair = mpd_recv_pair(mpd);
     while (pair) {
         if (strcmp("file", pair->name) == 0) {
-            array_append(&songs, pair->value, strlen(pair->value) + 1);
+            array_append_s(&songs, pair->value, strlen(pair->value) + 1);
         }
         mpd_return_pair(mpd, pair); 
         pair = mpd_recv_pair(mpd);
