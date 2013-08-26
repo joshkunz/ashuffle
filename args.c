@@ -79,8 +79,11 @@ int ashuffle_options(struct ashuffle_options * opts,
         if (transable) {
             type_flag = rule_type_from_flag(argv[i]);
         }
-        
-        if (type_flag != -1) {
+
+        /* check we should print the help text */
+        if (check_flags(argv[i], 3, "--help", "-h", "-?")) {
+            return -1;
+        } else if (type_flag != -1) {
             flush_rule(state, opts, &rule);
             rule_init(&rule, type_flag);
             type_flag = -1;
