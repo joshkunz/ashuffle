@@ -1,25 +1,14 @@
-.PHONY: clean
+.PHONY: default clean
 
-CC = clang 
+BIN = ashuffle
 
-CFLAGS = -std=c99 -Wall -Wextra -pedantic
-libs = libmpdclient 
+ashuffle:
+	@cd src && $(MAKE) $(BIN) 
+	@printf ' COPY src/$(BIN) .\n'; cp src/$(BIN) .
 
-# For library linkage
-CFLAGS += $(shell pkg-config $(libs) --cflags)
-LDLIBS = $(shell pkg-config $(libs) --libs)
+clean:
+	@cd src && $(MAKE) clean
+	rm $(BIN)
 
-objects = array.o list.o rule.o args.o shuffle.o
-
-ashuffle: $(objects)
-array.o: array.h
-list.o: list.h
-rule.o: rule.h array.h
-args.o: args.h rule.h array.h
-shuffle.o: shuffle.h list.h
-
-gdb: ashuffle
-	gdb ./ashuffle
-
-clean: 
-	-rm $(objects) ashuffle
+.DEFAULT:
+	cd src && $(MAKE) $@
