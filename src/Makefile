@@ -4,7 +4,7 @@ QUIET_CC = @printf ' CC %b\n' $@;
 CC = $(QUIET_CC)clang 
 
 CFLAGS = -std=c99 -Wall -Wextra -pedantic
-libs = libmpdclient libbsd
+libs = libmpdclient
 
 # For library linkage
 CFLAGS += $(shell pkg-config $(libs) --cflags)

@@ -1,6 +1,5 @@
 #include <mpd/client.h>
 #include <stdlib.h>
-#include <bsd/stdio.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
@@ -58,29 +57,25 @@ int shuffle_idle(struct mpd_connection * mpd,
 /* build the list of songs to shuffle from using
  * the supplied file. */
 int build_songs_file(FILE * input, struct shuffle_chain * songs) {
-    char * uri = NULL, * uri_tmp;
-    size_t length = 0, alloc_length = 0;
-    uri_tmp = fgetln(input, &length);
+    char * uri = NULL;
+    ssize_t length = 0;
+    size_t ignored = 0;
+    length = getline(&uri, &ignored, input);
     while (! feof(input) && ! ferror(input)) {
-        /* If this is the last line, it won't have 
-         * a terminating newline */
-        if (uri_tmp[length - 1] != '\n') { 
-            alloc_length = length + 1;
-        } else {
-            alloc_length = length;
+        /* if this line has terminating newline attached, set it
+         * to null and decrement the length (effectively removing
+         * the newline). */
+        if (uri[length - 1] == '\n') {
+            uri[length - 1] = '\0';
+            length -= 1;
         }
 
-        uri = malloc(alloc_length);
-        memcpy(uri, uri_tmp, length);
-        /* set the last character to a null */
-        uri[alloc_length - 1] = '\0';
-
         /* add the song to the shuffle list */
-        shuffle_add(songs, uri, alloc_length);
+        shuffle_add(songs, uri, length);
 
         /* free the temporary memory */
         free(uri); uri = NULL;
-        uri_tmp = fgetln(input, &length);
+        length = getline(&uri, &ignored, input);
     }
     fclose(input);
     return 0;
