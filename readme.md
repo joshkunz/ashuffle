@@ -44,14 +44,18 @@ To use the second mode, run ashuffle without the `--only` argument.
 ## help text
 
 ```
-usage: ashuffle [-i PATTERN ...] ...
-                [-e PATTERN ...] ... [-o NUMBER]
+usage: ashuffle -h [-i PATTERN ...] [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
 
 Optional Arguments:
    -i,--include  Specify things include in shuffle (think whitelist).
    -e,--exclude  Specify things to remove from shuffle (think blacklist).
    -o,--only     Instead of continuously adding songs, just add 'NUMBER'
-                 songs and then exit
+                 songs and then exit.
+   -h,-?,--help  Display this help message.
+   -f,--file     Use MPD URI's found in 'file' instead of using the entire MPD
+                 library. You can supply `-` instead of a filename to retrive
+                 URI's from standard in. This can be used to pipe song URI's
+                 from another program into ashuffle.
 See included `readme.md` file for PATTERN syntax.
 ```
 
