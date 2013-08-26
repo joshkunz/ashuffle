@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include <mpd/client.h>
 #include <stdlib.h>
 #include <stdio.h>
