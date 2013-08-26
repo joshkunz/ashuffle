@@ -73,7 +73,7 @@ int build_songs_file(FILE * input, struct shuffle_chain * songs) {
         }
 
         /* add the song to the shuffle list */
-        shuffle_add(songs, uri, length);
+        shuffle_add(songs, uri, length + 1);
 
         /* free the temporary memory */
         free(uri); uri = NULL;
