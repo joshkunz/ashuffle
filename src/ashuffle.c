@@ -54,8 +54,40 @@ int shuffle_idle(struct mpd_connection * mpd,
     return 0;
 }
 
-/* build our list of songs to shuffle from */
-int build_song_list(struct mpd_connection * mpd, 
+/* build the list of songs to shuffle from using
+ * the supplied file. */
+int build_songs_file(FILE * input, struct shuffle_chain * songs) {
+    char * uri = NULL, * uri_tmp;
+    size_t length = 0, alloc_length = 0;
+    uri_tmp = fgetln(input, &length);
+    while (! feof(input) && ! ferror(input)) {
+        /* If this is the last line, it won't have 
+         * a terminating newline */
+        if (uri_tmp[length - 1] != '\n') { 
+            alloc_length = length + 1;
+        } else {
+            alloc_length = length;
+        }
+
+        uri = malloc(alloc_length);
+        memcpy(uri, uri_tmp, length);
+        /* set the last character to a null */
+        uri[alloc_length - 1] = '\0';
+
+        /* add the song to the shuffle list */
+        shuffle_add(songs, uri, alloc_length);
+
+        /* free the temporary memory */
+        free(uri); uri = NULL;
+        uri_tmp = fgetln(input, &length);
+    }
+    fclose(input);
+    return 0;
+}
+
+
+/* build the list of songs to shuffle from using MPD */
+int build_songs_mpd(struct mpd_connection * mpd, 
                     struct auto_array * ruleset, 
                     struct shuffle_chain * songs) {
     /* ask for a list of songs */
@@ -93,7 +125,7 @@ int main (int argc, char * argv[]) {
 
     /* attempt to parse out options given on the command line */
     struct ashuffle_options options;
-    array_init(&options.ruleset);
+    ashuffle_init(&options);
     int status = ashuffle_options(&options, argc, argv);
     if (status != 0) { ashuffle_help(stderr); return status; }
 
@@ -123,7 +155,13 @@ int main (int argc, char * argv[]) {
     /* Auto-expanding array to hold songs */
     struct shuffle_chain songs;
     shuffle_init(&songs, 1 - REPEAT_CHANCE);
-    build_song_list(mpd, &options.ruleset, &songs);
+
+    /* build the list of songs to shuffle through */
+    if (options.file_in != NULL) {
+        build_songs_file(options.file_in, &songs);
+    } else {
+        build_songs_mpd(mpd, &options.ruleset, &songs);
+    }
 
     /* dispose of the rules used to build the song-list */
     for (unsigned i = 0; i < options.ruleset.length; i++) {

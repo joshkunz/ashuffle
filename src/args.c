@@ -11,7 +11,7 @@
 
 /* Enum representing the various state of the parser */
 enum parse_state {
-    NO_STATE, RULE, RULE_VALUE, QUEUE
+    NO_STATE, RULE, RULE_VALUE, QUEUE, IFILE
 };
 
 /* check and see if 'to_check' matches any of 'count' given
@@ -62,6 +62,12 @@ int flush_rule(enum parse_state state,
     return 0;
 }
 
+int ashuffle_init(struct ashuffle_options * opts) {
+    opts->queue_only = 0;
+    opts->file_in = NULL;
+    array_init(&opts->ruleset);
+    return 0;
+}
 
 int ashuffle_options(struct ashuffle_options * opts, 
                      int argc, char * argv[]) {
@@ -91,6 +97,9 @@ int ashuffle_options(struct ashuffle_options * opts,
         } else if (transable && opts->queue_only == 0 && check_flags(argv[i], 2, "--only", "-o")) {
             flush_rule(state, opts, &rule);
             state = QUEUE;
+        } else if (transable && opts->file_in == NULL && check_flags(argv[i], 2, "--file", "-f")) {
+            flush_rule(state, opts, &rule);
+            state = IFILE;
         } else if (state == RULE) {
             match_field = argv[i];
             state = RULE_VALUE;
@@ -104,6 +113,13 @@ int ashuffle_options(struct ashuffle_options * opts,
             if (errno == EINVAL || errno == ERANGE) {
                 fputs("Error converting queue length to integer.\n", stderr);
                 return -1;
+            }
+            state = NO_STATE;
+        } else if (state == IFILE) {
+            if (check_flags(argv[i], 1, "-")) {
+                opts->file_in = stdin;
+            } else {
+                opts->file_in = fopen(argv[i], "r");
             }
             state = NO_STATE;
         } else {
@@ -123,14 +139,18 @@ int ashuffle_options(struct ashuffle_options * opts,
 
 void ashuffle_help(FILE * output) {
     fputs(
-    "usage: ashuffle [-i PATTERN ...] ...\n"
-    "                [-e PATTERN ...] ... [-o NUMBER]\n"
+    "usage: ashuffle -h [-i PATTERN ...] [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
     "\n"
     "Optional Arguments:\n"
     "   -i,--include  Specify things include in shuffle (think whitelist).\n"
     "   -e,--exclude  Specify things to remove from shuffle (think blacklist).\n"
     "   -o,--only     Instead of continuously adding songs, just add 'NUMBER'\n"
-    "                 songs and then exit\n"
+    "                 songs and then exit.\n"
+    "   -h,-?,--help  Display this help message.\n"
+    "   -f,--file     Use MPD URI's found in 'file' instead of using the entire MPD\n"
+    "                 library. You can supply `-` instead of a filename to retrive\n"
+    "                 URI's from standard in. This can be used to pipe song URI's\n"
+    "                 from another program into ashuffle.\n"
     "See included `readme.md` file for PATTERN syntax.\n", output);
 }
 

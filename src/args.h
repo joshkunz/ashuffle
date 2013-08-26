@@ -7,7 +7,10 @@
 struct ashuffle_options {
     struct auto_array ruleset;
     unsigned queue_only;
+    FILE * file_in;
 };
+
+int ashuffle_init(struct ashuffle_options *);
 
 /* parse the options in to the 'ashuffle options' structure. 
  * Returns 0 on success, -1 for failure. */
