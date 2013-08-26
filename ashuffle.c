@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <time.h>
 
+#include "shuffle.h"
 #include "array.h"
 #include "rule.h"
 #include "args.h"
@@ -12,15 +13,20 @@
 /* 25 seconds is the default timeout */
 #define TIMEOUT 25000
 
+/* The chance (from 0-1) that a song will be re-drawn
+ * before a song that hasn't been played yet. */
+#define REPEAT_CHANCE 0.013
+
 /* Append a random song fromt the given array of 
  * songs to the queue */
 void queue_random_song(struct mpd_connection * mpd, 
-                       struct auto_array * songs) {
-    mpd_run_add(mpd, songs->array[rand() % songs->length]);
+                       struct shuffle_chain * songs) {
+    mpd_run_add(mpd, shuffle_pick(songs));
 }
 
 /* Keep adding songs when the queue runs out */
-int shuffle_idle(struct mpd_connection * mpd, struct auto_array * songs) {
+int shuffle_idle(struct mpd_connection * mpd, 
+                 struct shuffle_chain * songs) {
     struct mpd_status * status;
     while (true) {
         mpd_send_status(mpd);
@@ -51,7 +57,7 @@ int shuffle_idle(struct mpd_connection * mpd, struct auto_array * songs) {
 /* build our list of songs to shuffle from */
 int build_song_list(struct mpd_connection * mpd, 
                     struct auto_array * ruleset, 
-                    struct auto_array * songs) {
+                    struct shuffle_chain * songs) {
     /* ask for a list of songs */
     mpd_send_list_all_meta(mpd, NULL);
 
@@ -71,15 +77,15 @@ int build_song_list(struct mpd_connection * mpd,
         }
         /* if this song is allowed, add it to the list */
         if (song_ok) {
-            array_append_s(songs, 
-                           mpd_song_get_uri(song), 
-                           strlen(mpd_song_get_uri(song)) + 1);
+            shuffle_add(songs, mpd_song_get_uri(song),
+                        strlen(mpd_song_get_uri(song)) + 1);
         }
+        /* free the current song */
+        mpd_song_free(song);
+
+        /* get the next song from the list */
         song = mpd_recv_song(mpd);
     } 
-
-    /* trim any excess storage */
-    array_trim(songs);
     return 0;
 }
 
@@ -115,9 +121,8 @@ int main (int argc, char * argv[]) {
     }
      
     /* Auto-expanding array to hold songs */
-    struct auto_array songs;
-    array_init(&songs);
-
+    struct shuffle_chain songs;
+    shuffle_init(&songs, 1 - REPEAT_CHANCE);
     build_song_list(mpd, &options.ruleset, &songs);
 
     /* dispose of the rules used to build the song-list */
@@ -131,7 +136,6 @@ int main (int argc, char * argv[]) {
         return -1;
     } 
     printf("Picking random songs out of a pool of %u.\n", songs.length);
-
 
     /* Seed the random number generator */
     srand(time(NULL));
@@ -147,7 +151,7 @@ int main (int argc, char * argv[]) {
     }
 
     /* free-up our songs */
-    array_free(&songs);
+    shuffle_free(&songs);
     mpd_connection_free(mpd);
     return 0;
 }
