@@ -1,7 +1,9 @@
+#define _GNU_SOURCE
+
 #include <mpd/client.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "array.h"
 #include "rule.h"

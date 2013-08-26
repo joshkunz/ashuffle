@@ -1,5 +1,6 @@
 #include <mpd/client.h>
 #include <stdlib.h>
+#include <bsd/stdio.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
