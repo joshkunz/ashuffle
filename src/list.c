@@ -82,19 +82,6 @@ int list_pop(struct list * l, unsigned index) {
     return 0;
 }
 
-int list_push_at(struct list *l, struct node *n, unsigned index) {
-    struct node ** current = &l->list;
-    for (unsigned i = 0; i < index; i++) {
-        if (! *current || ! (*current)->next ) { return -1; }
-        prev = &(*current)->next;
-    }
-    /* set this nodes 'next' element to the current element */
-    n->next = *current;
-    /* set the current element to this node */
-    *current = n;
-    return 0;
-}
-
 /* add an item to the end of the list */
 int list_push(struct list * l, struct node * n) {
     /* allocate a pointer that points to the location we'll

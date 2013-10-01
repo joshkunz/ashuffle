@@ -15,9 +15,8 @@
 /* 25 seconds is the default timeout */
 #define TIMEOUT 25000
 
-/* The chance (from 0-1) that a song will be re-drawn
- * before a song that hasn't been played yet. */
-#define REPEAT_CHANCE 0.013
+/* The size of the rolling shuffle window */
+#define WINDOW_SIZE 7
 
 /* Append a random song fromt the given array of 
  * songs to the queue */
@@ -152,7 +151,7 @@ int main (int argc, char * argv[]) {
      
     /* Auto-expanding array to hold songs */
     struct shuffle_chain songs;
-    shuffle_init(&songs, 1 - REPEAT_CHANCE);
+    shuffle_init(&songs, WINDOW_SIZE);
 
     /* build the list of songs to shuffle through */
     if (options.file_in != NULL) {
@@ -167,11 +166,12 @@ int main (int argc, char * argv[]) {
     }
     array_free(&options.ruleset);
 
-    if (songs.length == 0) {
+    if (shuffle_length(&songs) == 0) {
         puts("Song pool is empty.");
         return -1;
     } 
-    printf("Picking random songs out of a pool of %u.\n", songs.length);
+    printf("Picking random songs out of a pool of %u.\n", 
+           shuffle_length(&songs));
 
     /* Seed the random number generator */
     srand(time(NULL));

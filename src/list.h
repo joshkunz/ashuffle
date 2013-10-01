@@ -27,8 +27,6 @@ int list_pop_push(struct list * from, struct list * to, unsigned index);
 /* Remove the item at 'index' from the list */
 int list_pop(struct list *, unsigned index);
 
-int list_push_at(struct list *, struct node *, unsigned index);
-
 /* add an item to the end of the list */
 int list_push(struct list *, struct node *);
 
