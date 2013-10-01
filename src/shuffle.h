@@ -4,9 +4,8 @@
 #define ASHUFFLE_SHUFFLE_H
 
 struct shuffle_chain {
-    struct list chain_list;
+    struct list song_list;
     unsigned length;
-    double base_chance;
 };
 
 /* initialize this shuffle chain */

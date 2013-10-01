@@ -2,10 +2,19 @@
 #include "list.h"
 #include "shuffle.h"
 
+#include <stdio.h>
+
 #define RAND_REAL() ((double) rand() / (double)RAND_MAX)
+
+struct song_entry {
+    const char * song;
+    double prob;
+};
 
 /* initialize this shuffle chain */
 int shuffle_init(struct shuffle_chain * s, double start_chance) {
+    list_init
+
     if (start_chance < 0 || start_chance > 1) { return -1; }
     s->base_chance = start_chance;
     s->length = 0;
@@ -69,6 +78,8 @@ const void * shuffle_pick(struct shuffle_chain * s) {
         if (current_chance > prob) { break; }
         current_chance += s->base_chance * (1 - current_chance);
     }
+
+    printf("[rolled %.4f Using chain: %u\n", prob, chain);
 
     struct list * list = list_at(&s->chain_list, chain);
     unsigned index = rand() % list->length;
