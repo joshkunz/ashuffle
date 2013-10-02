@@ -29,7 +29,7 @@ In the second (more interesting) mode, ashuffle will wait
 until the last song in the queue is playing, at which point it will
 add another song to the queue. In this creates a 'stream of music'
 where songs will be continuously played, at random, to infinity.
-Additionaly, since ashuffle only adds one song at a time, and only adds that song 
+Additionally, since ashuffle only adds one song at a time, and only adds that song 
 once the last song in the playlist has started playing, you still retain
 control over your queue. This way, you can add some song you want to hear
 to the queue, and the random songs will simply continue afterwards.
@@ -111,7 +111,7 @@ it won't *feel* very random, especially when listening for a long time. I often
 start noticing song order once the random-list wraps around.
 
 ashuffle's approach is an attempt at a happy medium between these two approaches.
-Esentially, it keeps two lists of songs, a 'pool' of the songs it's shuffling,
+Essentially, it keeps two lists of songs, a 'pool' of the songs it's shuffling,
 and a 'window' which is a short, ordered, playlist of songs. When the program
 starts, ashuffle builds the window randomly by taking songs out of the pool, 
 and adding them to the window. When a new random song is added to the MPD
@@ -137,7 +137,7 @@ First clone the repository into a directory, and then run:
 
     make
 
-this should generate the 'ashuffle' binary. Drop it anywhere in your
+This should generate the 'ashuffle' binary. Drop it anywhere in your
 path and you should be good to go.
 
 Oh, and in the case you're wondering why it's called 'ashuffle' it's
