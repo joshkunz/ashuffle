@@ -102,26 +102,22 @@ shuffle. With true random shuffle, no restrictions are placed on what songs
 can be selected for play. It's possible that a single song could be played
 two or even three times in a row because songs are just being draw out
 of a hat. With 'random list' shuffle, songs to be shuffled are organized into
-a list of songs behind the scene, this list is then scrambled, and then played
+a list of songs behind the scenes. This list is then scrambled, and then played
 like a normal playlist. Using this method songs won't be played twice in a row,
 but the once the playlist has been played it will either loop (playing the same
 random set again), or be re-scrambled and played again, so it can still
 get repetitive. Also, since there's no chance that a song can be played again,
-it won't *feel* very random, especially when listening for a long time.
+it won't *feel* very random, especially when listening for a long time. I often
+start noticing song order once the random-list wraps around.
 
 ashuffle's approach is an attempt at a happy medium between these two approaches.
-It often won't play the same song over and over again, but songs that have
-been played previously will bubble back up into shuffle. ashuffle arranges the
-shuffle playlist into 'strings' of songs. All songs start in the first string,
-and as they're played, they are moved into lower strings. The probability
-for a given is string is decided like so: 
-    Take 'base_probability' of the global probability space
-    assign it to string 1
-    and remove 'base_probability' from the probability space.
-    Continue for each string.
-What this ends up giving you is a probability distribution where strings
-containing songs that have been played less are far more likely to get picked than
-songs that have been played more. 
+Esentially, it keeps two lists of songs, a 'pool' of the songs it's shuffling,
+and a 'window' which is a short, ordered, playlist of songs. When the program
+starts, ashuffle builds the window randomly by taking songs out of the pool, 
+and adding them to the window. When a new random song is added to the MPD
+queue, the 'top' song of the window, is taken off, added to the queue, and 
+then put back into the pool. Then another song is added to the window
+so that the next request can be fulfilled.
 
 # dependencies  
 
