@@ -49,16 +49,12 @@ bool rule_match(struct song_rule * rule,
         /* get the first result for this tag */
         tag_value = mpd_song_get_tag(song, current_matcher->tag, 0);
         /* if the tag doesn't exist, we can't match on it. */
-        if (tag_value == NULL) {
-            if (rule->type == RULE_INCLUDE) { return false; }
-            continue;
-        }
+        if (tag_value == NULL) { continue; }
         /* if our match value is at least a substring of the tag's
          * value, we have a match. e.g. de matches 'De La Soul'.
          * If the output of strstr is NULL we don't have a substring
          * match. */
         if (strcasestr(tag_value, current_matcher->value) == NULL) {
-            if (rule->type == RULE_INCLUDE) { return false; }
             continue;
         }
 

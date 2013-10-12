@@ -1,14 +1,16 @@
-.PHONY: default clean
+.PHONY: default clean ashuffle
 
 BIN = ashuffle
+SRC = ./src
+BINPATH = $(SRC)/$(BIN)
 
-ashuffle:
-	@cd src && $(MAKE) $(BIN) 
-	@printf ' COPY src/$(BIN) .\n'; cp src/$(BIN) .
+$(BIN):
+	@cd $(SRC) && $(MAKE) $(BIN) 
+	@printf ' COPY $(BINPATH) .\n'; cp $(BINPATH) .
 
 clean:
-	@cd src && $(MAKE) clean
+	@cd $(SRC) && $(MAKE) clean
 	rm $(BIN)
 
 .DEFAULT:
-	cd src && $(MAKE) $@
+	cd $(SRC) && $(MAKE) $@

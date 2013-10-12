@@ -35,9 +35,7 @@ bool check_flags(const char * to_check, unsigned count, ...) {
 /* get the enum rule_type type from the option if possible.
  * Otherwise, return -1 */
 int rule_type_from_flag(char * option) {
-    if (check_flags(option, 2, "--include", "-i")) {
-        return RULE_INCLUDE;
-    } else if (check_flags(option, 2, "--exclude", "-e")) {
+   if (check_flags(option, 2, "--exclude", "-e")) {
         return RULE_EXCLUDE;
     } else {
         return -1;
@@ -140,10 +138,9 @@ int ashuffle_options(struct ashuffle_options * opts,
 
 void ashuffle_help(FILE * output) {
     fputs(
-    "usage: ashuffle -h [-i PATTERN ...] [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
+    "usage: ashuffle -h [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
     "\n"
     "Optional Arguments:\n"
-    "   -i,--include  Specify things include in shuffle (think whitelist).\n"
     "   -e,--exclude  Specify things to remove from shuffle (think blacklist).\n"
     "   -o,--only     Instead of continuously adding songs, just add 'NUMBER'\n"
     "                 songs and then exit.\n"

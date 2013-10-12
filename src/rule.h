@@ -5,9 +5,7 @@
 #ifndef ASHUFFLE_RULE_H
 #define ASHUFFLE_RULE_H
 
-enum rule_type {
-    RULE_INCLUDE, RULE_EXCLUDE
-};
+enum rule_type { RULE_EXCLUDE };
 
 struct song_rule {
     enum rule_type type;
