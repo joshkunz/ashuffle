@@ -44,10 +44,9 @@ To use the second mode, run ashuffle without the `--only` argument.
 ## help text
 
 ```
-usage: ashuffle -h [-i PATTERN ...] [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
+usage: ashuffle -h [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
 
 Optional Arguments:
-   -i,--include  Specify things include in shuffle (think whitelist).
    -e,--exclude  Specify things to remove from shuffle (think blacklist).
    -o,--only     Instead of continuously adding songs, just add 'NUMBER'
                  songs and then exit.
@@ -61,38 +60,28 @@ See included `readme.md` file for PATTERN syntax.
 
 ## patterns
 
-Patterns are a list of key-value pairs given to the `--include` and `--exclude`
-flags. A pair is composed of a 'field' and a 'value'. A field is the name 
+Patterns are a list of key-value pairs given to the `--exclude` flag. A pair is 
+composed of a 'field' and a 'value'. A field is the name 
 of an MPD tag (e.g. artist, title, album) to match on (case insensitive) and
-'value' is a string to match against that field. So, if I wanted to only 
-include MGMT's album 'Congratulations' in  the shuffle I could supply a command
+'value' is a string to match against that field. So, if I wanted to exclude
+MGMT's album 'Congratulations' in  the shuffle I could supply a command
 line like the following:
 
-    $ ashuffle --include artist MGMT album "Congratulations"
+    $ ashuffle --exclude artist MGMT album "Congratulations"
 
 Since typing in an exact match for all songs could become quite cumbersome, the 
 'value' field will match on substrings, so you only have to specify part of the
 search string. For example, if we wanted to match Arctic Monkeys album
 'Whatever People Say I Am, That's What I'm Not' we could shorten that to this:
 
-    $ ashuffle --include artist arctic album whatever
+    $ ashuffle --exclude artist arctic album whatever
 
-Multiple `--include` and `--exclude` flags can be given, the AND result 
-of all flags will be used to match a given song. This may give unexpected
-results. For example, if we wanted to include only songs by MGMT and 
-the Arctic Monkeys, one might write a command like so:
+Multiple `--exclude` flags can be given, the AND result 
+of all flags will be used to match a given song. For example, if we wanted to 
+exclude songs by MGMT and songs by the Arctic Monkeys, we 
+could write:
 
-    $ ashuffle --include artist MGMT --include artist arctic
-
-However, this would match zero songs. Since two include statements are
-given, ashuffle will on match song that have both MGMT and Arctic Monkeys
-as the artist.
-
-Chaining exclude statements is still useful though. Say I only want to listen
-to songs by Girl Talk, but I don't want to listen to his 'Secret Diary' album,
-I could use the command:
-
-    $ ashuffle --include artist "Girl Talk" --exclude album "secret diary"
+    $ ashuffle --exclude artist MGMT --exclude artist arctic
 
 ## shuffle algorithm
 
