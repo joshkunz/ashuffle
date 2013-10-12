@@ -26,11 +26,11 @@ library. To do this you simply run:
 which will add 10 random songs to your queue.
 
 In the second (more interesting) mode, ashuffle will wait
-until the last song in the queue is playing, at which point it will
+until the last song in the queue has finished playing, at which point it will
 add another song to the queue. In this creates a 'stream of music'
 where songs will be continuously played, at random, to infinity.
 Additionally, since ashuffle only adds one song at a time, and only adds that song 
-once the last song in the playlist has started playing, you still retain
+once the last song in the playlist has finished playing, you still retain
 control over your queue. This way, you can add some song you want to hear
 to the queue, and the random songs will simply continue afterwards.
 
