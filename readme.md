@@ -53,8 +53,8 @@ Optional Arguments:
    -h,-?,--help  Display this help message.
    -f,--file     Use MPD URI's found in 'file' instead of using the entire MPD
                  library. You can supply `-` instead of a filename to retrive
-                 URI's from standard in. This can be used to pipe song URI's
-                 from another program into ashuffle.
+                 URI's from standard in. This can be used to shuffle over songs
+                 piped in from an external matching program.
 See included `readme.md` file for PATTERN syntax.
 ```
 
@@ -82,6 +82,13 @@ exclude songs by MGMT and songs by the Arctic Monkeys, we
 could write:
 
     $ ashuffle --exclude artist MGMT --exclude artist arctic
+
+Additionally, the `-f` flag can be used to shuffle over more complex matches. For
+example, if we wanted to listen to only songs by Girl Talk *except* the Secret
+Diary album, we could use `mpc` to generate a list of Girl Talk songs and then
+use a `--exclude` statement to filter out the Secret Diary album:
+
+    $ mpc search artist "Girl Talk" | ashuffle --exclude album "Secret Diary" --file -
 
 ## shuffle algorithm
 
