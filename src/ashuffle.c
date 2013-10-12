@@ -29,25 +29,41 @@ void queue_random_song(struct mpd_connection * mpd,
 int shuffle_idle(struct mpd_connection * mpd, 
                  struct shuffle_chain * songs) {
     struct mpd_status * status;
+
+    /* whether or not we should queue a song */
+    bool queue_enabled = false;
     while (true) {
         mpd_send_status(mpd);
         status = mpd_recv_status(mpd);
 
-        /* If the player is on its last song *or* not
-         * not reporting a song as playing */
-        if (mpd_status_get_song_pos(status) == 
-            ((int) mpd_status_get_queue_length(status)) - 1) {
-            /* If the player is stopped and doesn't have any songs
-             * in its queue, then add a song and start the player,
-             * otherwise, leave the queue as it is. */
-            if (mpd_status_get_state(status) == MPD_STATE_STOP &&
-                mpd_status_get_queue_length(status) == 0) {
-                queue_random_song(mpd, songs);
-                mpd_run_play(mpd);
-            } else {
-                queue_random_song(mpd, songs);
-            }
+        /* Check for error while fetching the status */
+        if (status == NULL) { 
+            /* print the error message from the server */
+            puts(mpd_connection_get_error_message(mpd));
+            /* kill the loop */
+            break;
         }
+
+        /* If the currently playing song is the last song in the list,
+         * then when MPD stops playing, add another song to the list and
+         * restart the player */
+        if (mpd_status_get_song_pos(status) ==
+            (int) (mpd_status_get_queue_length(status) - 1)) {
+            queue_enabled = true;
+        } 
+
+        /* if MPD has stoppped playing and the last playing song was the last song
+         * in the list, then add another song and keep playing */
+        if (queue_enabled && mpd_status_get_state(status) == MPD_STATE_STOP) {
+            queue_random_song(mpd, songs);
+            /* Since the 'status' was before we added our song, and the queue
+             * is zero-indexed, the length will be the position of the song we
+             * just added. Play that song */
+            mpd_run_play_pos(mpd, mpd_status_get_queue_length(status));
+        } 
+
+        /* free the status we retrieved */
+        mpd_status_free(status);
 
         /* wait till the player state changes */
         mpd_run_idle_mask(mpd, MPD_IDLE_PLAYER);
