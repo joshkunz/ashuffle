@@ -5,7 +5,7 @@ Table of Contents:
 * features
     * usage
     * help text
-    * inclusions and exclusions
+    * patterns 
 * dependencies
 * building
 
