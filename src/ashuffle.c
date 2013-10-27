@@ -83,10 +83,40 @@ bool ruleset_accepts_song(struct auto_array * ruleset, struct mpd_song * song) {
     return true;
 }
 
+bool ruleset_accepts_uri(struct mpd_connection * mpd, 
+                         struct auto_array * ruleset, char * uri) {
+
+    bool accepted = false;
+    /* search for the song URI in MPD */
+    mpd_search_db_songs(mpd, true);
+    mpd_search_add_uri_constraint(mpd, MPD_OPERATOR_DEFAULT, uri);
+    mpd_search_commit(mpd);
+
+    struct mpd_song * song = mpd_recv_song(mpd);
+    if (song != NULL) {
+        if (ruleset_accepts_song(ruleset, song)) {
+            accepted = true;
+        }
+
+        /* free the song we got from MPD */
+        mpd_song_free(song);
+
+        /* even though we're searching for a single song, libmpdclient
+         * still acts like we're reading a song list. We read an aditional
+         * element to convince MPD this is the end of the song list. */
+        song = mpd_recv_song(mpd);
+    } else {
+        fprintf(stderr, "Song uri '%s' not found.\n", uri);
+    }
+
+    return accepted;
+}
+
+
 /* build the list of songs to shuffle from using
  * the supplied file. */
 int build_songs_file(struct mpd_connection * mpd, struct auto_array * ruleset,
-                     FILE * input, struct shuffle_chain * songs) {
+                     FILE * input, struct shuffle_chain * songs, bool check) {
     char * uri = NULL;
     ssize_t length = 0;
     size_t ignored = 0;
@@ -100,27 +130,8 @@ int build_songs_file(struct mpd_connection * mpd, struct auto_array * ruleset,
             length -= 1;
         }
 
-        /* search for the song URI in MPD */
-        mpd_search_db_songs(mpd, true);
-        mpd_search_add_uri_constraint(mpd, MPD_OPERATOR_DEFAULT, uri);
-        mpd_search_commit(mpd);
-
-        struct mpd_song * song = mpd_recv_song(mpd);
-        if (song != NULL) {
-            if (ruleset_accepts_song(ruleset, song)) {
-                /* add the song to the shuffle list */
-                shuffle_add(songs, uri, length + 1);
-            }
-
-            /* free the song we got from MPD */
-            mpd_song_free(song);
-
-            /* even though we're searching for a single song, libmpdclient
-             * still acts like we're reading a song list. We read an aditional
-             * element to convince MPD this is the end of the song list. */
-            song = mpd_recv_song(mpd);
-        } else {
-            fprintf(stderr, "Song uri '%s' not found.\n", uri);
+        if ((check && ruleset_accepts_uri(mpd, ruleset, uri)) || (! check)) {
+            shuffle_add(songs, uri, length + 1);
         }
 
         /* free the temporary memory */
@@ -195,7 +206,8 @@ int main (int argc, char * argv[]) {
 
     /* build the list of songs to shuffle through */
     if (options.file_in != NULL) {
-        build_songs_file(mpd, &options.ruleset, options.file_in, &songs);
+        build_songs_file(mpd, &options.ruleset, options.file_in, 
+                         &songs, options.check_uris);
     } else {
         build_songs_mpd(mpd, &options.ruleset, &songs);
     }

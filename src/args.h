@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include "array.h"
 
 #ifndef ASHUFFLE_ARGS_H
@@ -8,6 +9,7 @@ struct ashuffle_options {
     struct auto_array ruleset;
     unsigned queue_only;
     FILE * file_in;
+    bool check_uris;
 };
 
 int ashuffle_init(struct ashuffle_options *);

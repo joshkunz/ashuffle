@@ -41,10 +41,27 @@ To use the second mode, run ashuffle without the `--only` argument.
 
     $ ashuffle
 
+### shuffling from files and `--nocheck`
+
+By supplying the `-f` option and a file containing a list of song URIs to
+shuffle, you can make ashuffle shuffle and arbitrary list of songs. For
+example, by passing `-f -` to ashuffle, you can have it shuffle over songs
+passed to it via standard in:
+
+    $ mpc search artist "Girl Talk" | ashuffle -f -
+
+As explained in more detail below, if song URIs are passed to ashuffle using
+this mechanism, ashuffle will still try to apply exclusion rules to these
+songs. If the song URIs you want ashuffle to shuffle over do not exist
+in your MPD library (for example if you are trying to shuffle URIs with the
+`file://` schema), ashuffle will exclude them by default. If you pass the
+`--nocheck` option to ashuffle, it will not apply the filtering rules, allowing
+you to shuffle over songs that are not in your library.
+
 ## help text
 
 ```
-usage: ashuffle -h [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
+usage: ashuffle -h -n [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
 
 Optional Arguments:
    -e,--exclude  Specify things to remove from shuffle (think blacklist).
@@ -53,8 +70,12 @@ Optional Arguments:
    -h,-?,--help  Display this help message.
    -f,--file     Use MPD URI's found in 'file' instead of using the entire MPD
                  library. You can supply `-` instead of a filename to retrive
-                 URI's from standard in. This can be used to shuffle over songs
-                 piped in from an external matching program.
+                 URI's from standard in. This can be used to pipe song URI's
+                 from another program into ashuffle.
+   -n,--nocheck  When reading URIs from a file, don't check to ensure that
+                 the URIs match the given exclude rules. This option is most
+                 helpful when shuffling songs with -f, that aren't in the
+                 MPD library.
 See included `readme.md` file for PATTERN syntax.
 ```
 

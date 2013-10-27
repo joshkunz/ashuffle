@@ -64,6 +64,7 @@ int flush_rule(enum parse_state state,
 int ashuffle_init(struct ashuffle_options * opts) {
     opts->queue_only = 0;
     opts->file_in = NULL;
+    opts->check_uris = true;
     array_init(&opts->ruleset);
     return 0;
 }
@@ -93,6 +94,10 @@ int ashuffle_options(struct ashuffle_options * opts,
             rule_init(&rule, type_flag);
             type_flag = -1;
             state = RULE;
+        } else if (transable && check_flags(argv[i], 2, "--nocheck", "-n")) {
+            flush_rule(state, opts, &rule);
+            opts->check_uris = false;
+            state = NO_STATE;
         } else if (transable && opts->queue_only == 0 && check_flags(argv[i], 2, "--only", "-o")) {
             flush_rule(state, opts, &rule);
             state = QUEUE;
@@ -138,7 +143,7 @@ int ashuffle_options(struct ashuffle_options * opts,
 
 void ashuffle_help(FILE * output) {
     fputs(
-    "usage: ashuffle -h [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
+    "usage: ashuffle -h -n [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
     "\n"
     "Optional Arguments:\n"
     "   -e,--exclude  Specify things to remove from shuffle (think blacklist).\n"
@@ -149,6 +154,10 @@ void ashuffle_help(FILE * output) {
     "                 library. You can supply `-` instead of a filename to retrive\n"
     "                 URI's from standard in. This can be used to pipe song URI's\n"
     "                 from another program into ashuffle.\n"
+    "   -n,--nocheck  When reading URIs from a file, don't check to ensure that\n"
+    "                 the URIs match the given exclude rules. This option is most\n"
+    "                 helpful when shuffling songs with -f, that aren't in the\n"
+    "                 MPD library.\n"
     "See included `readme.md` file for PATTERN syntax.\n", output);
 }
 
