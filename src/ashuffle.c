@@ -17,60 +17,6 @@
 
 /* The size of the rolling shuffle window */
 #define WINDOW_SIZE 7
-
-/* Append a random song fromt the given array of 
- * songs to the queue */
-void queue_random_song(struct mpd_connection * mpd, 
-                       struct shuffle_chain * songs) {
-    mpd_run_add(mpd, shuffle_pick(songs));
-}
-
-/* Keep adding songs when the queue runs out */
-int shuffle_idle(struct mpd_connection * mpd, 
-                 struct shuffle_chain * songs) {
-    struct mpd_status * status;
-
-    /* whether or not we should queue a song */
-    bool queue_enabled = false;
-    while (true) {
-        mpd_send_status(mpd);
-        status = mpd_recv_status(mpd);
-
-        /* Check for error while fetching the status */
-        if (status == NULL) { 
-            /* print the error message from the server */
-            puts(mpd_connection_get_error_message(mpd));
-            /* kill the loop */
-            break;
-        }
-
-        /* If the currently playing song is the last song in the list,
-         * then when MPD stops playing, add another song to the list and
-         * restart the player */
-        if (mpd_status_get_song_pos(status) ==
-            (int) (mpd_status_get_queue_length(status) - 1)) {
-            queue_enabled = true;
-        } 
-
-        /* if MPD has stoppped playing and the last playing song was the last song
-         * in the list, then add another song and keep playing */
-        if (queue_enabled && mpd_status_get_state(status) == MPD_STATE_STOP) {
-            queue_random_song(mpd, songs);
-            /* Since the 'status' was before we added our song, and the queue
-             * is zero-indexed, the length will be the position of the song we
-             * just added. Play that song */
-            mpd_run_play_pos(mpd, mpd_status_get_queue_length(status));
-        } 
-
-        /* free the status we retrieved */
-        mpd_status_free(status);
-
-        /* wait till the player state changes */
-        mpd_run_idle_mask(mpd, MPD_IDLE_PLAYER);
-    }
-    return 0;
-}
-
 /* check wheter a song is allowed by the given ruleset */
 bool ruleset_accepts_song(struct auto_array * ruleset, struct mpd_song * song) {
     struct song_rule * rule = NULL;
@@ -169,6 +115,79 @@ int build_songs_mpd(struct mpd_connection * mpd,
     return 0;
 }
 
+/* Append a random song fromt the given array of 
+ * songs to the queue */
+void queue_random_song(struct mpd_connection * mpd, 
+                       struct shuffle_chain * songs) {
+    mpd_run_add(mpd, shuffle_pick(songs));
+}
+
+int try_enqueue(struct mpd_connection * mpd, 
+                struct shuffle_chain * songs,
+                bool *queue_enabled) {
+    struct mpd_status * status;
+    mpd_send_status(mpd);
+    status = mpd_recv_status(mpd);
+
+    /* Check for error while fetching the status */
+    if (status == NULL) { 
+        /* print the error message from the server */
+        puts(mpd_connection_get_error_message(mpd));
+        return -1;
+    }
+
+    /* If the currently playing song is the last song in the list,
+     * then when MPD stops playing, add another song to the list and
+     * restart the player */
+    if (mpd_status_get_song_pos(status) ==
+        (int) (mpd_status_get_queue_length(status) - 1)) {
+        *queue_enabled = true;
+    } 
+
+    /* if MPD has stoppped playing and the last playing song was the last song
+     * in the list, then add another song and keep playing */
+    if (*queue_enabled && mpd_status_get_state(status) == MPD_STATE_STOP) {
+        queue_random_song(mpd, songs);
+        /* Since the 'status' was before we added our song, and the queue
+         * is zero-indexed, the length will be the position of the song we
+         * just added. Play that song */
+        mpd_run_play_pos(mpd, mpd_status_get_queue_length(status));
+    } 
+
+    /* free the status we retrieved */
+    mpd_status_free(status);
+    return 0;
+}
+
+/* Keep adding songs when the queue runs out */
+int shuffle_idle(struct mpd_connection * mpd, 
+                 struct shuffle_chain * songs,
+                 struct auto_array * ruleset) {
+    /* whether or not we should queue a song */
+    bool queue_enabled = false;
+
+    /* wait till the player state changes */
+    if (try_enqueue(mpd, songs, &queue_enabled) != 0) {
+        return -1; 
+    }
+    while (true) {
+        enum mpd_idle event = mpd_run_idle(mpd);
+        switch (event) {
+            case MPD_IDLE_UPDATE: {
+                if (ruleset != NULL) {
+                    shuffle_free(songs);
+                    build_songs_mpd(mpd, ruleset, songs); }
+                break; }
+            case MPD_IDLE_PLAYER: {
+                if (try_enqueue(mpd, songs, &queue_enabled) != 0) { 
+                    return -1; }
+                break; }
+            default: break;
+        }
+    }
+    return 0;
+}
+
 int main (int argc, char * argv[]) {
 
     /* attempt to parse out options given on the command line */
@@ -212,12 +231,6 @@ int main (int argc, char * argv[]) {
         build_songs_mpd(mpd, &options.ruleset, &songs);
     }
 
-    /* dispose of the rules used to build the song-list */
-    for (unsigned i = 0; i < options.ruleset.length; i++) {
-        rule_free(options.ruleset.array[i]);
-    }
-    array_free(&options.ruleset);
-
     if (shuffle_length(&songs) == 0) {
         puts("Song pool is empty.");
         return -1;
@@ -235,8 +248,14 @@ int main (int argc, char * argv[]) {
         }
         printf("Added %u songs.\n", options.queue_only);
     } else {
-        shuffle_idle(mpd, &songs);
+        shuffle_idle(mpd, &songs, &options.ruleset);
     }
+
+    /* dispose of the rules used to build the song-list */
+    for (unsigned i = 0; i < options.ruleset.length; i++) {
+        rule_free(options.ruleset.array[i]);
+    }
+    array_free(&options.ruleset);
 
     /* free-up our songs */
     shuffle_free(&songs);
