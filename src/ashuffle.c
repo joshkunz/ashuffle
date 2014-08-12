@@ -177,6 +177,8 @@ int shuffle_idle(struct mpd_connection * mpd,
                 if (ruleset != NULL) {
                     shuffle_free(songs);
                     build_songs_mpd(mpd, ruleset, songs); }
+                    printf("Picking random songs out of a pool of %u.\n", 
+                           shuffle_length(songs));
                 break; }
             case MPD_IDLE_PLAYER: {
                 if (try_enqueue(mpd, songs, &queue_enabled) != 0) { 
