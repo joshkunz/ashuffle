@@ -1,6 +1,6 @@
 #include <mpd/client.h>
 #include <stdbool.h>
-#include "array.h"
+#include "list.h"
 
 #ifndef ASHUFFLE_RULE_H
 #define ASHUFFLE_RULE_H
@@ -9,7 +9,7 @@ enum rule_type { RULE_EXCLUDE };
 
 struct song_rule {
     enum rule_type type;
-    struct auto_array matchers;
+    struct list matchers;
 };
 
 /* Initialize a rule */

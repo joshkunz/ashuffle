@@ -7,7 +7,7 @@
 #include <errno.h>
 
 #include "args.h"
-#include "array.h"
+#include "list.h"
 #include "rule.h"
 
 /* Enum representing the various state of the parser */
@@ -55,8 +55,8 @@ int flush_rule(enum parse_state state,
                struct ashuffle_options * opts, 
                struct song_rule * rule) {
     if (state == RULE && rule->matchers.length > 0) {
-        /* add the rule to the array */
-        array_append(&opts->ruleset, rule, sizeof(struct song_rule));
+        /* add the rule to the ruleset */
+        list_push(&opts->ruleset, node_from(rule, sizeof(struct song_rule)));
     }
     return 0;
 }
@@ -65,7 +65,7 @@ int ashuffle_init(struct ashuffle_options * opts) {
     opts->queue_only = 0;
     opts->file_in = NULL;
     opts->check_uris = true;
-    array_init(&opts->ruleset);
+    list_init(&opts->ruleset);
     return 0;
 }
 

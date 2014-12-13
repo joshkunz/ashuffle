@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdbool.h>
-#include "array.h"
+#include "list.h"
 
 #ifndef ASHUFFLE_ARGS_H
 #define ASHUFFLE_ARGS_H
 
 struct ashuffle_options {
-    struct auto_array ruleset;
+    struct list ruleset;
     unsigned queue_only;
     FILE * file_in;
     bool check_uris;

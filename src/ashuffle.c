@@ -8,7 +8,7 @@
 #include <time.h>
 
 #include "shuffle.h"
-#include "array.h"
+#include "list.h"
 #include "rule.h"
 #include "args.h"
 
@@ -18,10 +18,10 @@
 /* The size of the rolling shuffle window */
 #define WINDOW_SIZE 7
 /* check wheter a song is allowed by the given ruleset */
-bool ruleset_accepts_song(struct auto_array * ruleset, struct mpd_song * song) {
+bool ruleset_accepts_song(struct list * ruleset, struct mpd_song * song) {
     struct song_rule * rule = NULL;
     for (unsigned i = 0; i < ruleset->length; i++) {
-        rule = ruleset->array[i];
+        rule = list_at(ruleset, i);
         if (! rule_match(rule, song)) {
             return false;
         }
@@ -30,7 +30,7 @@ bool ruleset_accepts_song(struct auto_array * ruleset, struct mpd_song * song) {
 }
 
 bool ruleset_accepts_uri(struct mpd_connection * mpd, 
-                         struct auto_array * ruleset, char * uri) {
+                         struct list * ruleset, char * uri) {
 
     bool accepted = false;
     /* search for the song URI in MPD */
@@ -61,7 +61,7 @@ bool ruleset_accepts_uri(struct mpd_connection * mpd,
 
 /* build the list of songs to shuffle from using
  * the supplied file. */
-int build_songs_file(struct mpd_connection * mpd, struct auto_array * ruleset,
+int build_songs_file(struct mpd_connection * mpd, struct list * ruleset,
                      FILE * input, struct shuffle_chain * songs, bool check) {
     char * uri = NULL;
     ssize_t length = 0;
@@ -93,7 +93,7 @@ int build_songs_file(struct mpd_connection * mpd, struct auto_array * ruleset,
 
 /* build the list of songs to shuffle from using MPD */
 int build_songs_mpd(struct mpd_connection * mpd, 
-                    struct auto_array * ruleset, 
+                    struct list * ruleset, 
                     struct shuffle_chain * songs) {
     /* ask for a list of songs */
     mpd_send_list_all_meta(mpd, NULL);
@@ -115,7 +115,7 @@ int build_songs_mpd(struct mpd_connection * mpd,
     return 0;
 }
 
-/* Append a random song fromt the given array of 
+/* Append a random song from the given list of 
  * songs to the queue */
 void queue_random_song(struct mpd_connection * mpd, 
                        struct shuffle_chain * songs) {
@@ -162,7 +162,7 @@ int try_enqueue(struct mpd_connection * mpd,
 /* Keep adding songs when the queue runs out */
 int shuffle_idle(struct mpd_connection * mpd, 
                  struct shuffle_chain * songs,
-                 struct auto_array * ruleset) {
+                 struct list * ruleset) {
     /* whether or not we should queue a song */
     bool queue_enabled = false;
 
@@ -221,7 +221,6 @@ int main (int argc, char * argv[]) {
         return 1;
     }
      
-    /* Auto-expanding array to hold songs */
     struct shuffle_chain songs;
     shuffle_init(&songs, WINDOW_SIZE);
 
@@ -255,9 +254,9 @@ int main (int argc, char * argv[]) {
 
     /* dispose of the rules used to build the song-list */
     for (unsigned i = 0; i < options.ruleset.length; i++) {
-        rule_free(options.ruleset.array[i]);
+        rule_free(list_at(&options.ruleset, i));
     }
-    array_free(&options.ruleset);
+    list_free(&options.ruleset);
 
     /* free-up our songs */
     shuffle_free(&songs);
