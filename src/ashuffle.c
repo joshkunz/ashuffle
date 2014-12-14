@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <time.h>
+#include <assert.h>
 
 #include "shuffle.h"
 #include "list.h"
@@ -176,7 +177,8 @@ int shuffle_idle(struct mpd_connection * mpd,
                  struct shuffle_chain * songs,
                  struct list * ruleset) {
 
-    int idle_mask = MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER;
+    assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST && "QUEUE Now different signal.");
+    int idle_mask = MPD_IDLE_DATABASE | MPD_IDLE_QUEUE |  MPD_IDLE_PLAYER;
 
     if (try_first(mpd, songs) != 0) { return -1; }
     if (try_enqueue(mpd, songs) != 0) { return -1; }
