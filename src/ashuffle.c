@@ -152,10 +152,13 @@ int try_enqueue(struct mpd_connection * mpd,
         return -1;
     }
 
+    bool past_last = mpd_status_get_song_pos(status) == -1;
+    bool queue_empty = mpd_status_get_queue_length(status) == 0;
+
     /* If the currently playing song is the last song in the list,
      * then when MPD stops playing, add another song to the list and
      * restart the player */
-    if (mpd_status_get_song_pos(status) == -1) {
+    if (past_last || queue_empty) {
         queue_random_song(mpd, songs);
         /* Since the 'status' was before we added our song, and the queue
          * is zero-indexed, the length will be the position of the song we
@@ -173,20 +176,23 @@ int shuffle_idle(struct mpd_connection * mpd,
                  struct shuffle_chain * songs,
                  struct list * ruleset) {
 
+    int idle_mask = MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER;
+
     if (try_first(mpd, songs) != 0) { return -1; }
     if (try_enqueue(mpd, songs) != 0) { return -1; }
 
     while (true) {
         /* wait till the player state changes */
-        enum mpd_idle event = mpd_run_idle(mpd);
+        enum mpd_idle event = mpd_run_idle_mask(mpd, idle_mask);
         switch (event) {
-            case MPD_IDLE_UPDATE: {
+            case MPD_IDLE_DATABASE: {
                 if (ruleset != NULL) {
                     shuffle_free(songs);
                     build_songs_mpd(mpd, ruleset, songs); }
                     printf("Picking random songs out of a pool of %u.\n", 
                            shuffle_length(songs));
                 break; }
+            case MPD_IDLE_QUEUE:
             case MPD_IDLE_PLAYER: {
                 if (try_enqueue(mpd, songs) != 0) { return -1; }
                 break; }
