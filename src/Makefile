@@ -1,7 +1,8 @@
 .PHONY: clean
 
 QUIET_CC = @printf ' CC %b\n' $@;
-CC = $(QUIET_CC)clang 
+old_cc := $(CC)
+CC = $(QUIET_CC)$(old_cc)
 
 CFLAGS = -std=c99 -Wall -Wextra -pedantic
 libs = libmpdclient
