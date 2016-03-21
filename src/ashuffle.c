@@ -186,19 +186,18 @@ int shuffle_idle(struct mpd_connection * mpd,
     while (true) {
         /* wait till the player state changes */
         enum mpd_idle event = mpd_run_idle_mask(mpd, idle_mask);
-        switch (event) {
-            case MPD_IDLE_DATABASE: {
-                if (ruleset != NULL) {
-                    shuffle_free(songs);
-                    build_songs_mpd(mpd, ruleset, songs); }
-                    printf("Picking random songs out of a pool of %u.\n", 
-                           shuffle_length(songs));
-                break; }
-            case MPD_IDLE_QUEUE:
-            case MPD_IDLE_PLAYER: {
-                if (try_enqueue(mpd, songs) != 0) { return -1; }
-                break; }
-            default: break;
+        bool idle_db = !!(event & MPD_IDLE_DATABASE);
+        bool idle_queue = !!(event & MPD_IDLE_QUEUE);
+        bool idle_player = !!(event & MPD_IDLE_PLAYER);
+        if (idle_db) {
+            if (ruleset != NULL) {
+                shuffle_free(songs);
+                build_songs_mpd(mpd, ruleset, songs); 
+            }
+            printf("Picking random songs out of a pool of %u.\n", 
+                   shuffle_length(songs));
+        } else if (idle_queue || idle_player) {
+            if (try_enqueue(mpd, songs) != 0) { return -1; }
         }
     }
     return 0;
