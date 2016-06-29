@@ -165,6 +165,10 @@ int try_enqueue(struct mpd_connection * mpd,
          * is zero-indexed, the length will be the position of the song we
          * just added. Play that song */
         mpd_run_play_pos(mpd, mpd_status_get_queue_length(status));
+        /* Immediately pause playback if mpd single mode is on */
+        if (mpd_status_get_single(status)) {
+            mpd_run_pause(mpd, true);
+        }
     }
 
     /* free the status we retrieved */
