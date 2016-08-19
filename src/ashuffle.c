@@ -8,6 +8,7 @@
 #include <time.h>
 #include <assert.h>
 
+#include "getpass.h"
 #include "shuffle.h"
 #include "list.h"
 #include "rule.h"
@@ -229,8 +230,48 @@ int shuffle_idle(struct mpd_connection * mpd,
     return 0;
 }
 
-int main (int argc, char * argv[]) {
+void get_mpd_password(struct mpd_connection * mpd) {
+    /* keep looping till we get a bad error, or we get a good password. */
+    while (true) {
+        char * pass = getpass(stdin, stdout, "mpd password: ");
+        mpd_run_password(mpd, pass);
+        const enum mpd_error err = mpd_connection_get_error(mpd);
+        if (err == MPD_ERROR_SUCCESS) {
+            return;
+        } else if (err == MPD_ERROR_SERVER) {
+            enum mpd_server_error server_err = mpd_connection_get_server_error(mpd);
+            if (server_err == MPD_SERVER_ERROR_PASSWORD) {
+                mpd_connection_clear_error(mpd);
+                fprintf(stderr, "incorrect password.\n");
+                continue;
+            } else {
+                mpd_perror(mpd);
+            }
+        } else {
+            mpd_perror(mpd);
+        }
+    }
+}
 
+void check_mpd_password(struct mpd_connection *mpd) {
+    struct mpd_stats * stats =  mpd_run_stats(mpd);
+    enum mpd_error err = mpd_connection_get_error(mpd);
+    if (err == MPD_ERROR_SUCCESS) { 
+        mpd_stats_free(stats);
+        return;
+    } else if (err == MPD_ERROR_SERVER) {
+        enum mpd_server_error server_err = mpd_connection_get_server_error(mpd);
+        if (server_err == MPD_SERVER_ERROR_PERMISSION) {
+            mpd_connection_clear_error(mpd);
+            get_mpd_password(mpd);
+            return;
+        }
+    }
+    /* if the problem wasn't a simple password issue abort */
+    mpd_perror(mpd);
+}
+
+int main (int argc, char * argv[]) {
     /* attempt to parse out options given on the command line */
     struct ashuffle_options options;
     ashuffle_init(&options);
@@ -259,6 +300,8 @@ int main (int argc, char * argv[]) {
         fprintf(stderr, "Could not connect to %s:%u.\n", mpd_host, mpd_port);
         return 1;
     }
+
+    check_mpd_password(mpd);
      
     struct shuffle_chain songs;
     shuffle_init(&songs, WINDOW_SIZE);
