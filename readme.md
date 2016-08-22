@@ -190,4 +190,4 @@ Oh, and in the case you're wondering why it's called 'ashuffle' it's
 because it implements 'automatic shuffle' mode for mpd.
 
   [1]: https://github.com/Joshkunz/binfiles/blob/4a4e9b7c845b59ba1c0b68edc84e6cf1972dbc73/ashuffle
-  [latest]: https://github.com/Joshkunz/ashuffle/releases/tag/v1.0.0
+  [latest]: https://github.com/Joshkunz/ashuffle/releases/tag/v1.0.1
