@@ -253,7 +253,9 @@ void get_mpd_password(struct mpd_connection * mpd) {
     }
 }
 
-void check_mpd_password(struct mpd_connection *mpd) {
+/* If a password is required, "password" is used if not null, otherwise
+ * a password is obtained from stdin. */
+void check_mpd_password(struct mpd_connection *mpd, char * password) {
     struct mpd_stats * stats =  mpd_run_stats(mpd);
     enum mpd_error err = mpd_connection_get_error(mpd);
     if (err == MPD_ERROR_SUCCESS) { 
@@ -263,12 +265,34 @@ void check_mpd_password(struct mpd_connection *mpd) {
         enum mpd_server_error server_err = mpd_connection_get_server_error(mpd);
         if (server_err == MPD_SERVER_ERROR_PERMISSION) {
             mpd_connection_clear_error(mpd);
-            get_mpd_password(mpd);
+            if (password != NULL) {
+                mpd_run_password(mpd, password);
+                mpd_perror_if_error(mpd);
+            } else {
+                get_mpd_password(mpd);
+            }
             return;
         }
     }
     /* if the problem wasn't a simple password issue abort */
     mpd_perror(mpd);
+}
+
+struct mpd_host {
+    char * host;
+    char * password;
+};
+
+void parse_mpd_host(char * mpd_host, struct mpd_host * o_mpd_host) {
+    char * at = strrchr(mpd_host, '@');
+    if (at != NULL) {
+        o_mpd_host->host = &at[1];
+        o_mpd_host->password = mpd_host;
+        *at = '\0';
+    } else {
+        o_mpd_host->host = mpd_host;
+        o_mpd_host->password = NULL;
+    }
 }
 
 int main (int argc, char * argv[]) {
@@ -283,25 +307,28 @@ int main (int argc, char * argv[]) {
 
     /* Attempt to use MPD_HOST variable if available.
      * Otherwise use 'localhost'. */
-    char * mpd_host = getenv("MPD_HOST") ? 
-                        getenv("MPD_HOST") : "localhost";
+    char * mpd_host_raw = getenv("MPD_HOST") ? 
+                            getenv("MPD_HOST") : "localhost";
+    struct mpd_host mpd_host;
+    parse_mpd_host(mpd_host_raw, &mpd_host);
+
     /* Same thing for the port, use the environment defined port
      * or the default port */
     unsigned mpd_port = (unsigned) (getenv("MPD_PORT") ? 
                             atoi(getenv("MPD_PORT")) : 6600);
 
     /* Create a new connection to mpd */
-    mpd = mpd_connection_new(mpd_host, mpd_port, TIMEOUT);
+    mpd = mpd_connection_new(mpd_host.host, mpd_port, TIMEOUT);
     
     if (mpd == NULL) {
         fputs("Could not connect due to lack of memory.", stderr);
         return 1;
     } else if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        fprintf(stderr, "Could not connect to %s:%u.\n", mpd_host, mpd_port);
+        fprintf(stderr, "Could not connect to %s:%u.\n", mpd_host.host, mpd_port);
         return 1;
     }
 
-    check_mpd_password(mpd);
+    check_mpd_password(mpd, mpd_host.password);
      
     struct shuffle_chain songs;
     shuffle_init(&songs, WINDOW_SIZE);
