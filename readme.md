@@ -2,12 +2,12 @@ ashuffle
 ========
 
 Table of Contents:
-* features
-    * usage
-    * help text
-    * patterns 
-* dependencies
-* building
+* [features](#features)
+    * [usage](#usage)
+    * [help text](#help-text)
+    * [patterns](#patterns)
+* [dependencies](#dependencies)
+* [building](#building)
 
 # features
 
