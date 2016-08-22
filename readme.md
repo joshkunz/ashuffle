@@ -166,14 +166,28 @@ or on OS X using brew:
 
 # building
 
-First clone the repository into a directory, and then run:
+Download the [latest release][latest], untar/unzip it and then cd into the
+directory and run:
 
     make
 
-This should generate the 'ashuffle' binary. Drop it anywhere in your
-path and you should be good to go.
+Then run
+
+    sudo make install
+
+to install the binary. If you want to use a prefix other than `/usr/local` you
+can supply an alternate by running `make install` like so:
+
+    sudo make prefix=<prefix> install
+
+You can uninstall the program later by running
+
+    sudo make uninstall
+
+**Note:**  You'll have to supply the prefix again if you used a custom prefix.
 
 Oh, and in the case you're wondering why it's called 'ashuffle' it's
 because it implements 'automatic shuffle' mode for mpd.
 
   [1]: https://github.com/Joshkunz/binfiles/blob/4a4e9b7c845b59ba1c0b68edc84e6cf1972dbc73/ashuffle
+  [latest]: https://github.com/Joshkunz/ashuffle/releases/tag/v1.0.0

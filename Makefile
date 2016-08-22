@@ -1,4 +1,4 @@
-.PHONY: default clean ashuffle
+.PHONY: default clean ashuffle install uninstall
 
 BIN = ashuffle
 SRC = ./src
@@ -11,6 +11,14 @@ $(BIN):
 clean:
 	@cd $(SRC) && $(MAKE) clean
 	rm $(BIN)
+
+prefix = /usr/local
+
+install: $(BIN)
+	install -t $(prefix)/bin $(BIN)
+
+uninstall:
+	rm $(prefix)/bin/$(BIN)
 
 .DEFAULT:
 	cd $(SRC) && $(MAKE) $@
