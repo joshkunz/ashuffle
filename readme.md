@@ -41,6 +41,22 @@ To use the second mode, run ashuffle without the `--only` argument.
 
     $ ashuffle
 
+### running in a non-standard configuration
+
+If you're running MPD on a non-standard port or on a different machine, ashuffle
+will respect the standard `MPD_HOST` and `MPD_PORT` environment variables to
+set the host and port mpd is listening on respectively.
+
+Also following standard MPD tools, a password can be supplied in the `MPD_HOST`
+environment variable by putting an `@` between the password and the hostname.
+
+For example, one can run ashuffle as follows:
+
+    $ env MPD_HOST="<password>@<hostname>" MPD_PORT="<port>" ashuffle ...
+
+Or without the password by just omitting the `<password>` and `@` from the
+`MPD_HOST` variable.
+
 ### shuffling from files and `--nocheck`
 
 By supplying the `-f` option and a file containing a list of song URIs to
