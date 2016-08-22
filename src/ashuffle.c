@@ -8,6 +8,7 @@
 #include <time.h>
 #include <assert.h>
 
+#include "getpass.h"
 #include "shuffle.h"
 #include "list.h"
 #include "rule.h"
@@ -18,6 +19,19 @@
 
 /* The size of the rolling shuffle window */
 #define WINDOW_SIZE 7
+
+void mpd_perror(struct mpd_connection * mpd) {
+    assert(mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS
+            && "must be an error present");
+    fprintf(stderr, "MPD error: %s\n", mpd_connection_get_error_message(mpd));
+    exit(1);
+}
+
+void mpd_perror_if_error(struct mpd_connection * mpd) {
+    if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
+        mpd_perror(mpd);
+    }
+}
 
 /* check wheter a song is allowed by the given ruleset */
 bool ruleset_accepts_song(struct list * ruleset, struct mpd_song * song) {
@@ -38,9 +52,10 @@ bool ruleset_accepts_uri(struct mpd_connection * mpd,
     /* search for the song URI in MPD */
     mpd_search_db_songs(mpd, true);
     mpd_search_add_uri_constraint(mpd, MPD_OPERATOR_DEFAULT, uri);
-    mpd_search_commit(mpd);
+    if (mpd_search_commit(mpd) != true) { mpd_perror(mpd); }
 
     struct mpd_song * song = mpd_recv_song(mpd);
+    mpd_perror_if_error(mpd);
     if (song != NULL) {
         if (ruleset_accepts_song(ruleset, song)) {
             accepted = true;
@@ -98,10 +113,11 @@ int build_songs_mpd(struct mpd_connection * mpd,
                     struct list * ruleset, 
                     struct shuffle_chain * songs) {
     /* ask for a list of songs */
-    mpd_send_list_all_meta(mpd, NULL);
+    if (mpd_send_list_all_meta(mpd, NULL) != true) { mpd_perror(mpd); }
 
     /* parse out the pairs */
     struct mpd_song * song = mpd_recv_song(mpd);
+    mpd_perror_if_error(mpd);
     while (song) {
         /* if this song is allowed, add it to the list */
         if (ruleset_accepts_song(ruleset, song)) {
@@ -121,7 +137,7 @@ int build_songs_mpd(struct mpd_connection * mpd,
  * songs to the queue */
 void queue_random_song(struct mpd_connection * mpd, 
                        struct shuffle_chain * songs) {
-    mpd_run_add(mpd, shuffle_pick(songs));
+    if (mpd_run_add(mpd, shuffle_pick(songs)) != true) { mpd_perror(mpd); }
 }
 
 int try_first(struct mpd_connection * mpd, struct shuffle_chain * songs) {
@@ -134,7 +150,9 @@ int try_first(struct mpd_connection * mpd, struct shuffle_chain * songs) {
 
     if (mpd_status_get_state(status) != MPD_STATE_PLAY) {
         queue_random_song(mpd, songs);
-        mpd_run_play_pos(mpd, mpd_status_get_queue_length(status));
+        if (mpd_run_play_pos(mpd, mpd_status_get_queue_length(status)) != true) {
+            mpd_perror(mpd);
+        }
     }
 
     mpd_status_free(status);
@@ -164,10 +182,14 @@ int try_enqueue(struct mpd_connection * mpd,
         /* Since the 'status' was before we added our song, and the queue
          * is zero-indexed, the length will be the position of the song we
          * just added. Play that song */
-        mpd_run_play_pos(mpd, mpd_status_get_queue_length(status));
+        if (mpd_run_play_pos(mpd, mpd_status_get_queue_length(status)) != true) {
+            mpd_perror(mpd);
+        }
         /* Immediately pause playback if mpd single mode is on */
         if (mpd_status_get_single(status)) {
-            mpd_run_pause(mpd, true);
+            if (mpd_run_pause(mpd, true) != true) {
+                mpd_perror(mpd);
+            }
         }
     }
 
@@ -190,6 +212,7 @@ int shuffle_idle(struct mpd_connection * mpd,
     while (true) {
         /* wait till the player state changes */
         enum mpd_idle event = mpd_run_idle_mask(mpd, idle_mask);
+        mpd_perror_if_error(mpd);
         bool idle_db = !!(event & MPD_IDLE_DATABASE);
         bool idle_queue = !!(event & MPD_IDLE_QUEUE);
         bool idle_player = !!(event & MPD_IDLE_PLAYER);
@@ -207,8 +230,72 @@ int shuffle_idle(struct mpd_connection * mpd,
     return 0;
 }
 
-int main (int argc, char * argv[]) {
+void get_mpd_password(struct mpd_connection * mpd) {
+    /* keep looping till we get a bad error, or we get a good password. */
+    while (true) {
+        char * pass = getpass(stdin, stdout, "mpd password: ");
+        mpd_run_password(mpd, pass);
+        const enum mpd_error err = mpd_connection_get_error(mpd);
+        if (err == MPD_ERROR_SUCCESS) {
+            return;
+        } else if (err == MPD_ERROR_SERVER) {
+            enum mpd_server_error server_err = mpd_connection_get_server_error(mpd);
+            if (server_err == MPD_SERVER_ERROR_PASSWORD) {
+                mpd_connection_clear_error(mpd);
+                fprintf(stderr, "incorrect password.\n");
+                continue;
+            } else {
+                mpd_perror(mpd);
+            }
+        } else {
+            mpd_perror(mpd);
+        }
+    }
+}
 
+/* If a password is required, "password" is used if not null, otherwise
+ * a password is obtained from stdin. */
+void check_mpd_password(struct mpd_connection *mpd, char * password) {
+    struct mpd_stats * stats =  mpd_run_stats(mpd);
+    enum mpd_error err = mpd_connection_get_error(mpd);
+    if (err == MPD_ERROR_SUCCESS) { 
+        mpd_stats_free(stats);
+        return;
+    } else if (err == MPD_ERROR_SERVER) {
+        enum mpd_server_error server_err = mpd_connection_get_server_error(mpd);
+        if (server_err == MPD_SERVER_ERROR_PERMISSION) {
+            mpd_connection_clear_error(mpd);
+            if (password != NULL) {
+                mpd_run_password(mpd, password);
+                mpd_perror_if_error(mpd);
+            } else {
+                get_mpd_password(mpd);
+            }
+            return;
+        }
+    }
+    /* if the problem wasn't a simple password issue abort */
+    mpd_perror(mpd);
+}
+
+struct mpd_host {
+    char * host;
+    char * password;
+};
+
+void parse_mpd_host(char * mpd_host, struct mpd_host * o_mpd_host) {
+    char * at = strrchr(mpd_host, '@');
+    if (at != NULL) {
+        o_mpd_host->host = &at[1];
+        o_mpd_host->password = mpd_host;
+        *at = '\0';
+    } else {
+        o_mpd_host->host = mpd_host;
+        o_mpd_host->password = NULL;
+    }
+}
+
+int main (int argc, char * argv[]) {
     /* attempt to parse out options given on the command line */
     struct ashuffle_options options;
     ashuffle_init(&options);
@@ -220,23 +307,28 @@ int main (int argc, char * argv[]) {
 
     /* Attempt to use MPD_HOST variable if available.
      * Otherwise use 'localhost'. */
-    char * mpd_host = getenv("MPD_HOST") ? 
-                        getenv("MPD_HOST") : "localhost";
+    char * mpd_host_raw = getenv("MPD_HOST") ? 
+                            getenv("MPD_HOST") : "localhost";
+    struct mpd_host mpd_host;
+    parse_mpd_host(mpd_host_raw, &mpd_host);
+
     /* Same thing for the port, use the environment defined port
      * or the default port */
     unsigned mpd_port = (unsigned) (getenv("MPD_PORT") ? 
                             atoi(getenv("MPD_PORT")) : 6600);
 
     /* Create a new connection to mpd */
-    mpd = mpd_connection_new(mpd_host, mpd_port, TIMEOUT);
+    mpd = mpd_connection_new(mpd_host.host, mpd_port, TIMEOUT);
     
     if (mpd == NULL) {
         fputs("Could not connect due to lack of memory.", stderr);
         return 1;
     } else if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        fprintf(stderr, "Could not connect to %s:%u.\n", mpd_host, mpd_port);
+        fprintf(stderr, "Could not connect to %s:%u.\n", mpd_host.host, mpd_port);
         return 1;
     }
+
+    check_mpd_password(mpd, mpd_host.password);
      
     struct shuffle_chain songs;
     shuffle_init(&songs, WINDOW_SIZE);
