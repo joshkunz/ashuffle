@@ -3,6 +3,6 @@
 
 #include <stdio.h>
 
-char * getpass(FILE * in_stream, FILE * out_stream, const char *prompt);
+char * as_getpass(FILE * in_stream, FILE * out_stream, const char *prompt);
 
 #endif

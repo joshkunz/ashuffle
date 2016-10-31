@@ -1,4 +1,4 @@
-#define _POSIX_SOURCE
+#define _GNU_SOURCE
 #include <termios.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -10,50 +10,6 @@
 #include "getpass.h"
 
 #define DEFAULT_GETLINE_BUFSIZE 100
-
-static void * xmalloc(size_t size) {
-    void * mem = malloc(size);
-    if (mem == NULL) {
-        perror("xmalloc");
-        exit(1);
-    }
-    return mem;
-}
-
-static void getline(char ** lineptr, size_t *n, FILE *stream) {
-    char * buf = *lineptr;
-    size_t bufsize = *n;
-    if (bufsize == 0) { 
-        assert(buf == NULL && "got zero bufsize, but non-null buffer");
-    }
-
-    size_t read = 0;
-    char c;
-    do {
-        if (read == bufsize) {
-            char * tmp_buf = buf;
-            size_t tmp_bufsize = bufsize;
-            /* +1 so I don't have to special-case when bufsize = 0 */
-            bufsize = (bufsize + 1) * 2;
-            buf = xmalloc(bufsize);
-            memcpy(buf, tmp_buf, tmp_bufsize);
-        }
-        if (fread(&c, 1, 1, stream) != 1) {
-            perror("getline");
-            exit(1);
-        }
-        if (c == '\n') { break; }
-        buf[read] = c;
-        read += 1;
-    } while (true);
-
-
-    buf = realloc(buf, read);
-    if (buf == NULL) { perror("getline"); exit(1); }
-    buf[read] = '\0';
-    *lineptr = buf;
-    *n = read;
-}
 
 #define set_flag(field, flag, state) \
     do { \
@@ -80,7 +36,7 @@ static void set_echo(FILE *stream, bool echo_state, bool echo_nl_state) {
     }
 }
 
-char * getpass(FILE * in_stream, FILE * out_stream, const char *prompt) {
+char * as_getpass(FILE * in_stream, FILE * out_stream, const char *prompt) {
     if (fwrite(prompt, strlen(prompt), 1, out_stream) != 1) {
         perror("getpass (fwrite)");
         exit(1);
@@ -90,7 +46,11 @@ char * getpass(FILE * in_stream, FILE * out_stream, const char *prompt) {
 
     char * result = NULL;
     size_t result_size = 0;
-    getline(&result, &result_size, in_stream);
+    ssize_t result_len = getline(&result, &result_size, in_stream);
+    if (result_len < 0) {
+        perror("getline (getpass)");
+        exit(1);
+    }
 
     set_echo(out_stream, true, true);
 

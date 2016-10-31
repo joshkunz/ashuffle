@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
-
 #include <mpd/client.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -85,6 +85,11 @@ int build_songs_file(struct mpd_connection * mpd, struct list * ruleset,
     size_t ignored = 0;
     length = getline(&uri, &ignored, input);
     while (! feof(input) && ! ferror(input)) {
+        if (length < 1) {
+            fprintf(stderr, "invalid URI in input stream\n");
+            exit(1);
+        }
+
         /* if this line has terminating newline attached, set it
          * to null and decrement the length (effectively removing
          * the newline). */
@@ -233,7 +238,7 @@ int shuffle_idle(struct mpd_connection * mpd,
 void get_mpd_password(struct mpd_connection * mpd) {
     /* keep looping till we get a bad error, or we get a good password. */
     while (true) {
-        char * pass = getpass(stdin, stdout, "mpd password: ");
+        char * pass = as_getpass(stdin, stdout, "mpd password: ");
         mpd_run_password(mpd, pass);
         const enum mpd_error err = mpd_connection_get_error(mpd);
         if (err == MPD_ERROR_SUCCESS) {
