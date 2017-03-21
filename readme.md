@@ -1,6 +1,8 @@
 ashuffle
 ========
 
+> __Maintainer's Note:__ Even though there have been no new commits on this repo in over a year, it is not dead, it just isn't broken yet. I actively maintain this repo, and use this software daily. If you find any bugs, please open an issue.
+
 Table of Contents:
 * [features](#features)
     * [usage](#usage)
