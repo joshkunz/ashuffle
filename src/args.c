@@ -10,9 +10,16 @@
 #include "list.h"
 #include "rule.h"
 
+const unsigned ARGS_QUEUE_BUFFER_NONE = 0;
+
 /* Enum representing the various state of the parser */
 enum parse_state {
-    NO_STATE, RULE, RULE_VALUE, QUEUE, IFILE
+    NO_STATE,     // Ready for anything!
+    RULE,         // expecting a rule matcher (like "artist")
+    RULE_VALUE,   // expecting rule value (like "modest mouse")
+    QUEUE,        // expecting "queue_only" int value
+    IFILE,        // expecting song list input file
+    QUEUE_BUFFER  // expecting queue buffer value
 };
 
 /* check and see if 'to_check' matches any of 'count' given
@@ -66,6 +73,7 @@ int ashuffle_init(struct ashuffle_options * opts) {
     opts->file_in = NULL;
     opts->check_uris = true;
     list_init(&opts->ruleset);
+    opts->queue_buffer = ARGS_QUEUE_BUFFER_NONE; // 0
     return 0;
 }
 
@@ -75,7 +83,7 @@ int ashuffle_options(struct ashuffle_options * opts,
     enum parse_state state = NO_STATE;
     bool transable = false;
 
-    char * match_field;
+    char * match_field = NULL;
     struct song_rule rule;
 
     int type_flag = -1;
@@ -98,6 +106,9 @@ int ashuffle_options(struct ashuffle_options * opts,
             flush_rule(state, opts, &rule);
             opts->check_uris = false;
             state = NO_STATE;
+        } else if (transable && check_flags(argv[i], 1, "--queue_buffer")) {
+            flush_rule(state, opts, &rule);
+            state = QUEUE_BUFFER;
         } else if (transable && opts->queue_only == 0 && check_flags(argv[i], 2, "--only", "-o")) {
             flush_rule(state, opts, &rule);
             state = QUEUE;
@@ -126,6 +137,13 @@ int ashuffle_options(struct ashuffle_options * opts,
                 opts->file_in = fopen(argv[i], "r");
             }
             state = NO_STATE;
+        } else if (state == QUEUE_BUFFER) {
+            opts->queue_buffer = (unsigned) strtoul(argv[i], NULL, 10);
+            if (errno == EINVAL || errno == ERANGE) {
+                fputs("Error converting queue buffer length to integer.\n", stderr);
+                return -1;
+            }
+            state = NO_STATE;
         } else {
             fprintf(stderr, "Invalid option: %s.\n", argv[i]);
             return -1;
@@ -143,21 +161,25 @@ int ashuffle_options(struct ashuffle_options * opts,
 
 void ashuffle_help(FILE * output) {
     fputs(
-    "usage: ashuffle -h -n [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
+    "usage: ashuffle -h -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
     "\n"
     "Optional Arguments:\n"
-    "   -e,--exclude  Specify things to remove from shuffle (think blacklist).\n"
-    "   -o,--only     Instead of continuously adding songs, just add 'NUMBER'\n"
-    "                 songs and then exit.\n"
-    "   -h,-?,--help  Display this help message.\n"
-    "   -f,--file     Use MPD URI's found in 'file' instead of using the entire MPD\n"
-    "                 library. You can supply `-` instead of a filename to retrive\n"
-    "                 URI's from standard in. This can be used to pipe song URI's\n"
-    "                 from another program into ashuffle.\n"
-    "   -n,--nocheck  When reading URIs from a file, don't check to ensure that\n"
-    "                 the URIs match the given exclude rules. This option is most\n"
-    "                 helpful when shuffling songs with -f, that aren't in the\n"
-    "                 MPD library.\n"
+    "   -e,--exclude   Specify things to remove from shuffle (think blacklist).\n"
+    "   -o,--only      Instead of continuously adding songs, just add 'NUMBER'\n"
+    "                  songs and then exit.\n"
+    "   -h,-?,--help   Display this help message.\n"
+    "   -f,--file      Use MPD URI's found in 'file' instead of using the entire MPD\n"
+    "                  library. You can supply `-` instead of a filename to retrive\n"
+    "                  URI's from standard in. This can be used to pipe song URI's\n"
+    "                  from another program into ashuffle.\n"
+    "   -n,--nocheck   When reading URIs from a file, don't check to ensure that\n"
+    "                  the URIs match the given exclude rules. This option is most\n"
+    "                  helpful when shuffling songs with -f, that aren't in the\n"
+    "                  MPD library.\n"
+    "   --queue_buffer Specify to keep a buffer of `n` songs queued after the\n"
+    "                  currently playing song. This is to support MPD features\n"
+    "                  like crossfade that don't work if there are no more\n"
+    "                  songs in the queue.\n"
     "See included `readme.md` file for PATTERN syntax.\n", output);
 }
 

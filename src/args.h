@@ -5,11 +5,14 @@
 #ifndef ASHUFFLE_ARGS_H
 #define ASHUFFLE_ARGS_H
 
+const unsigned ARGS_QUEUE_BUFFER_NONE; // 0
+
 struct ashuffle_options {
     struct list ruleset;
     unsigned queue_only;
     FILE * file_in;
     bool check_uris;
+    unsigned queue_buffer;
 };
 
 int ashuffle_init(struct ashuffle_options *);
