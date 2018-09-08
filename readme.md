@@ -76,24 +76,41 @@ in your MPD library (for example if you are trying to shuffle URIs with the
 `--nocheck` option to ashuffle, it will not apply the filtering rules, allowing
 you to shuffle over songs that are not in your library.
 
+### crossfade support and the `--queue_buffer`
+
+By default, ashuffle will only enqueue another song once the current queue
+has ended. This gives the user a lot of control over what will be playing next.
+One unfortunate side-effect of this is that it breaks MPD's built-in crossfade
+support. If the next song is only added once the previous song has finished
+playing, MPD doesn't know how to crossfade between the two songs. As a tradeoff
+between queue control and cross-fade support, you can supply the
+`--queue_buffer n` flag. This flag will have ashuffle ensure that there are
+always `n` songs in the queue after the currently playing song. This way you
+still retain some queue control, while making sure that MPD can crossfade
+effectively. 
+
 ## help text
 
 ```
-usage: ashuffle -h -n [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
+usage: ashuffle -h -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
 
 Optional Arguments:
-   -e,--exclude  Specify things to remove from shuffle (think blacklist).
-   -o,--only     Instead of continuously adding songs, just add 'NUMBER'
-                 songs and then exit.
-   -h,-?,--help  Display this help message.
-   -f,--file     Use MPD URI's found in 'file' instead of using the entire MPD
-                 library. You can supply `-` instead of a filename to retrive
-                 URI's from standard in. This can be used to pipe song URI's
-                 from another program into ashuffle.
-   -n,--nocheck  When reading URIs from a file, don't check to ensure that
-                 the URIs match the given exclude rules. This option is most
-                 helpful when shuffling songs with -f, that aren't in the
-                 MPD library.
+   -e,--exclude   Specify things to remove from shuffle (think blacklist).
+   -o,--only      Instead of continuously adding songs, just add 'NUMBER'
+                  songs and then exit.
+   -h,-?,--help   Display this help message.
+   -f,--file      Use MPD URI's found in 'file' instead of using the entire MPD
+                  library. You can supply `-` instead of a filename to retrive
+                  URI's from standard in. This can be used to pipe song URI's
+                  from another program into ashuffle.
+   -n,--nocheck   When reading URIs from a file, don't check to ensure that
+                  the URIs match the given exclude rules. This option is most
+                  helpful when shuffling songs with -f, that aren't in the
+                  MPD library.
+   --queue_buffer Specify to keep a buffer of `n` songs queued after the
+                  currently playing song. This is to support MPD features
+                  like crossfade that don't work if there are no more
+                  songs in the queue.
 See included `readme.md` file for PATTERN syntax.
 ```
 
