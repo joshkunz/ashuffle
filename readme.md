@@ -132,10 +132,9 @@ search string. For example, if we wanted to match Arctic Monkeys album
 
     $ ashuffle --exclude artist arctic album whatever
 
-Multiple `--exclude` flags can be given, the AND result 
-of all flags will be used to match a given song. For example, if we wanted to 
-exclude songs by MGMT and songs by the Arctic Monkeys, we 
-could write:
+Multiple `--exclude` flags can be given. If a song matches any exlude pattern,
+it will be excluded. For example, if we wanted to  exclude songs by MGMT and
+songs by the Arctic Monkeys, we could write:
 
     $ ashuffle --exclude artist MGMT --exclude artist arctic
 
