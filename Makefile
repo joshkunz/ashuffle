@@ -15,7 +15,8 @@ clean:
 prefix = /usr/local
 
 install: $(BIN)
-	install -t $(prefix)/bin $(BIN)
+	-mkdir -p $(prefix)/bin
+	install $< $(prefix)/bin/$<
 
 uninstall:
 	rm $(prefix)/bin/$(BIN)
