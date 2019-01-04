@@ -19,10 +19,9 @@ struct node * node_from(const void * data, size_t size) {
 }
 
 /* initialize the received list structure */
-int list_init(struct list * list) {
+void list_init(struct list * list) {
     list->length = 0;
     list->list = NULL;
-    return 0;
 }
 
 /* get the low-level node at a given index */
@@ -70,7 +69,8 @@ void * list_at(const struct list * l, unsigned index) {
 int list_pop_push(struct list * from, struct list * to, unsigned index) {
     struct node * extracted = list_node_extract(from, index);
     if (extracted == NULL) { return -1; }
-    return list_push(to, extracted);
+    list_push(to, extracted);
+    return 0;
 }
 
 /* Remove the item at 'index' from the list, free-ing its contents */
@@ -83,7 +83,7 @@ int list_pop(struct list * l, unsigned index) {
 }
 
 /* add an item to the end of the list */
-int list_push(struct list * l, struct node * n) {
+void list_push(struct list * l, struct node * n) {
     /* allocate a pointer that points to the location we'll
      * eventually store our node into */
     struct node ** next = &l->list;
@@ -92,11 +92,10 @@ int list_push(struct list * l, struct node * n) {
     }
     *next = n;
     l->length++;
-    return 0;
 }
 
 /* free all elements of the list */
-int list_free(struct list * l) {
+void list_free(struct list * l) {
     struct node * current = l->list, * tmp = NULL;
     while (current != NULL) {
         free(current->data);
@@ -105,5 +104,4 @@ int list_free(struct list * l) {
         free(tmp);
     }
     list_init(l);
-    return 0;
 }

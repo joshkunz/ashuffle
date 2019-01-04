@@ -41,6 +41,10 @@ char * as_getpass(FILE * in_stream, FILE * out_stream, const char *prompt) {
         perror("getpass (fwrite)");
         exit(1);
     }
+    if (fflush(out_stream) != 0) {
+        perror("getpass (fflush)");
+        exit(1);
+    }
 
     set_echo(out_stream, false, true);
 
@@ -50,6 +54,10 @@ char * as_getpass(FILE * in_stream, FILE * out_stream, const char *prompt) {
     if (result_len < 0) {
         perror("getline (getpass)");
         exit(1);
+    }
+    // Trim off the trailing newline, if it exists
+    if (result[result_len-1] == '\n') {
+        result[result_len-1] = '\0';
     }
 
     set_echo(out_stream, true, true);

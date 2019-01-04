@@ -20,6 +20,16 @@
 /* The size of the rolling shuffle window */
 #define WINDOW_SIZE 7
 
+/* These MPD commands are required for ashuffle to run */
+const char* REQUIRED_COMMANDS[] = {
+    "add",
+    "status",
+    "play",
+    "pause",
+    "idle",
+    NULL, // sentinel, do not remove
+};
+
 void mpd_perror(struct mpd_connection * mpd) {
     assert(mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS
             && "must be an error present");
@@ -287,29 +297,51 @@ void get_mpd_password(struct mpd_connection * mpd) {
     }
 }
 
-/* If a password is required, "password" is used if not null, otherwise
- * a password is obtained from stdin. */
-void check_mpd_password(struct mpd_connection *mpd, char * password) {
-    struct mpd_stats * stats =  mpd_run_stats(mpd);
-    enum mpd_error err = mpd_connection_get_error(mpd);
-    if (err == MPD_ERROR_SUCCESS) {
-        mpd_stats_free(stats);
-        return;
-    } else if (err == MPD_ERROR_SERVER) {
-        enum mpd_server_error server_err = mpd_connection_get_server_error(mpd);
-        if (server_err == MPD_SERVER_ERROR_PERMISSION) {
-            mpd_connection_clear_error(mpd);
-            if (password != NULL) {
-                mpd_run_password(mpd, password);
-                mpd_perror_if_error(mpd);
-            } else {
-                get_mpd_password(mpd);
-            }
-            return;
+/* Check if string "s" is contained in the list 'l'. */
+bool list_contains_string(struct list * l, const char * s) {
+    for (size_t i = 0; i < l->length; i++) {
+        char * val = list_at(l, i);
+        assert(val != NULL && "all items in the list should have values");
+        if (strcmp(s, val) == 0) {
+            return true;
         }
     }
-    /* if the problem wasn't a simple password issue abort */
-    mpd_perror(mpd);
+    return false;
+}
+
+/* If a password is required, "password" is used if not null, otherwise
+ * a password is obtained from stdin. */
+bool is_mpd_password_needed(struct mpd_connection *mpd) {
+    // Fetch a list of the commands we're not allowed to run. In most
+    // installs, this should be empty.
+    if (!mpd_send_disallowed_commands(mpd)) {
+        mpd_perror(mpd);
+    }
+    struct list disallowed_commands;
+    list_init(&disallowed_commands);
+    struct mpd_pair * command = mpd_recv_command_pair(mpd);
+    while (command != NULL) {
+        struct node * command_node = node_from(command->value,
+                                               strlen(command->value) + 1);
+        list_push(&disallowed_commands, command_node);
+        mpd_return_pair(mpd, command);
+        command = mpd_recv_command_pair(mpd);
+    }
+    mpd_perror_if_error(mpd);
+
+    bool password_needed = false;
+    for (size_t i = 0; REQUIRED_COMMANDS[i] != NULL; i++) {
+        const char * cmd = REQUIRED_COMMANDS[i];
+        if (list_contains_string(&disallowed_commands, cmd)) {
+            fprintf(stderr,
+                    "required MPD command \"%s\" not allowed by MPD.\n",
+                    cmd);
+            password_needed = true;
+            break;
+        }
+    }
+    list_free(&disallowed_commands);
+    return password_needed;
 }
 
 struct mpd_host {
@@ -362,7 +394,30 @@ int main (int argc, char * argv[]) {
         return 1;
     }
 
-    check_mpd_password(mpd, mpd_host.password);
+    /* Password Workflow:
+     * 1. If the user supplied a password, then apply it. No matter what.
+     * 2. Check if we can execute all required commands. If not then:
+     *  2.a Fail if the user gave us a password that didn't work.
+     *  2.b Prompt the user to enter a password, and try again.
+     * 3. If the user successfully entered a password, then check that all
+     *    required commands can be executed again. If we still can't execute
+     *    all required commands, then fail. */
+    if (mpd_host.password != NULL) {
+            mpd_run_password(mpd, mpd_host.password);
+            mpd_perror_if_error(mpd);
+    }
+    bool need_mpd_password = is_mpd_password_needed(mpd);
+    if (mpd_host.password != NULL && need_mpd_password) {
+        fprintf(stderr, "password applied, but required command still not allowed.\n");
+        exit(1);
+    }
+    if (need_mpd_password) {
+        get_mpd_password(mpd);
+    }
+    if (is_mpd_password_needed(mpd)) {
+        fprintf(stderr, "password applied, but required command still not allowed.\n");
+        exit(1);
+    }
 
     struct shuffle_chain songs;
     shuffle_init(&songs, WINDOW_SIZE);

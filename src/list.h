@@ -14,7 +14,7 @@ struct list {
 struct node * node_from(const void * data, size_t size);
 
 /* initialize the received list structure */
-int list_init(struct list *);
+void list_init(struct list *);
 
 /* Return a pointer to the data at 'index'. Returns NULL
  * if there's not data at that index */
@@ -28,10 +28,10 @@ int list_pop_push(struct list * from, struct list * to, unsigned index);
 int list_pop(struct list *, unsigned index);
 
 /* add an item to the end of the list */
-int list_push(struct list *, struct node *);
+void list_push(struct list *, struct node *);
 
 /* free all elements of the list */
-int list_free(struct list *);
+void list_free(struct list *);
 
 int print_list(struct list *);
 
