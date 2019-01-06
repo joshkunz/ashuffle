@@ -3,36 +3,48 @@
 
 struct node;
 
-struct list {
-    unsigned length;
-    struct node * list;
+struct datum {
+    size_t length;
+    void * data;
 };
 
-/* create a new node from the given data (can be used
- * in conjunction with list_push to add an element to
- * the list) */
-struct node * node_from(const void * data, size_t size);
+struct list {
+    unsigned length;
+    struct node * _list;
+};
 
 /* initialize the received list structure */
 void list_init(struct list *);
 
-/* Return a pointer to the data at 'index'. Returns NULL
- * if there's not data at that index */
-void * list_at(const struct list *, unsigned index);
+/* Push the given datum onto the end of the given list. The given datum
+ * (and its contained data) is copied and appended to the list. The given
+ * datum is still owned by the caller.
+ *
+ * The copied datum and its contents will be free'd upon pop, or when the list
+ * is free'd. If a NULL datum is given, then no data will be pushed onto
+ * the list. */
+void list_push(struct list *, struct datum *);
 
-/* Pop item at index 'index' in list 'from' and push
- * it onto the end of list 'to' */
-int list_pop_push(struct list * from, struct list * to, unsigned index);
+/* Push the given null-terminated string onto the list. A new datum is
+ * created automatically. */
+void list_push_str(struct list *, char *);
 
-/* Remove the item at 'index' from the list */
-int list_pop(struct list *, unsigned index);
+/* Return a pointer to the datum at 'index'. Returns NULL if there is no
+ * datum at that index. */
+struct datum * list_at(const struct list *, unsigned index);
 
-/* add an item to the end of the list */
-void list_push(struct list *, struct node *);
+/* Same as list_at, but assumes the datum contains a null-terminated string. */
+char * list_at_str(const struct list *, unsigned index);
 
-/* free all elements of the list */
+/* Pop item at index 'index' in list 'from' and push it onto the end of
+ * list 'to'. If 'index' is out of bounds, the program will crash. */
+void list_pop_push(struct list * from, struct list * to, unsigned index);
+
+/* Remove the datum at 'index' from the list. If index is out of bounds,
+ * the program will crash. */
+void list_pop(struct list *, unsigned index);
+
+/* Free all elements of the list, and their datums. */
 void list_free(struct list *);
-
-int print_list(struct list *);
 
 #endif 

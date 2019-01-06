@@ -47,7 +47,7 @@ void mpd_perror_if_error(struct mpd_connection * mpd) {
 bool ruleset_accepts_song(struct list * ruleset, struct mpd_song * song) {
     struct song_rule * rule = NULL;
     for (unsigned i = 0; i < ruleset->length; i++) {
-        rule = list_at(ruleset, i);
+        rule = list_at(ruleset, i)->data;
         if (! rule_match(rule, song)) {
             return false;
         }
@@ -57,7 +57,6 @@ bool ruleset_accepts_song(struct list * ruleset, struct mpd_song * song) {
 
 bool ruleset_accepts_uri(struct mpd_connection * mpd,
                          struct list * ruleset, char * uri) {
-
     bool accepted = false;
     /* search for the song URI in MPD */
     mpd_search_db_songs(mpd, true);
@@ -109,7 +108,7 @@ int build_songs_file(struct mpd_connection * mpd, struct list * ruleset,
         }
 
         if ((check && ruleset_accepts_uri(mpd, ruleset, uri)) || (! check)) {
-            shuffle_add(songs, uri, length + 1);
+            shuffle_add(songs, uri);
         }
 
         /* free the temporary memory */
@@ -145,8 +144,7 @@ int build_songs_mpd(struct mpd_connection * mpd,
     while (song) {
         /* if this song is allowed, add it to the list */
         if (ruleset_accepts_song(ruleset, song)) {
-            shuffle_add(songs, mpd_song_get_uri(song),
-                        strlen(mpd_song_get_uri(song)) + 1);
+            shuffle_add(songs, mpd_song_get_uri(song));
         }
         /* free the current song */
         mpd_song_free(song);
@@ -271,7 +269,9 @@ int shuffle_idle(struct mpd_connection * mpd,
         bool idle_db = !!(event & MPD_IDLE_DATABASE);
         bool idle_queue = !!(event & MPD_IDLE_QUEUE);
         bool idle_player = !!(event & MPD_IDLE_PLAYER);
-        if (idle_db) {
+        /* Only update the database if our original list was built from
+         * MPD. */
+        if (idle_db && options.file_in == NULL) {
             shuffle_free(songs);
             build_songs_mpd(mpd, &options->ruleset, songs);
             printf("Picking random songs out of a pool of %u.\n",
@@ -309,7 +309,7 @@ void get_mpd_password(struct mpd_connection * mpd) {
 /* Check if string "s" is contained in the list 'l'. */
 bool list_contains_string(struct list * l, const char * s) {
     for (size_t i = 0; i < l->length; i++) {
-        char * val = list_at(l, i);
+        char * val = list_at_str(l, i);
         assert(val != NULL && "all items in the list should have values");
         if (strcmp(s, val) == 0) {
             return true;
@@ -330,9 +330,7 @@ bool is_mpd_password_needed(struct mpd_connection *mpd) {
     list_init(&disallowed_commands);
     struct mpd_pair * command = mpd_recv_command_pair(mpd);
     while (command != NULL) {
-        struct node * command_node = node_from(command->value,
-                                               strlen(command->value) + 1);
-        list_push(&disallowed_commands, command_node);
+        list_push_str(&disallowed_commands, command->value);
         mpd_return_pair(mpd, command);
         command = mpd_recv_command_pair(mpd);
     }

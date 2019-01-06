@@ -30,7 +30,7 @@ enum parse_state {
 
 /* check and see if 'to_check' matches any of 'count' given
  * arguments */
-bool check_flags(const char * to_check, unsigned count, ...) {
+static bool check_flags(const char * to_check, unsigned count, ...) {
     va_list args;
     const char * current;
     va_start(args, count);
@@ -47,7 +47,7 @@ bool check_flags(const char * to_check, unsigned count, ...) {
 
 /* get the enum rule_type type from the option if possible.
  * Otherwise, return -1 */
-int rule_type_from_flag(char * option) {
+static int rule_type_from_flag(char * option) {
    if (check_flags(option, 2, "--exclude", "-e")) {
         return RULE_EXCLUDE;
     } else {
@@ -57,24 +57,27 @@ int rule_type_from_flag(char * option) {
 
 /* check and see if we can transition to a new top-level
  * state from our current state */
-bool state_can_trans(enum parse_state state) {
+static bool state_can_trans(enum parse_state state) {
     if (state == NO_STATE || state == RULE) { return true; }
     return false;
 }
 
 /* if we're in a correct state, then add the rule to the
  * ruleset in the list of options */
-int flush_rule(enum parse_state state, 
-               struct ashuffle_options * opts, 
-               struct song_rule * rule) {
+static void flush_rule(enum parse_state state,
+                       struct ashuffle_options * opts,
+                       struct song_rule * rule) {
     if (state == RULE && rule->matchers.length > 0) {
         /* add the rule to the ruleset */
-        list_push(&opts->ruleset, node_from(rule, sizeof(struct song_rule)));
+        struct datum rule_datum = {
+            .data = rule,
+            .length = sizeof(struct song_rule),
+        };
+        list_push(&opts->ruleset, &rule_datum);
     }
-    return 0;
 }
 
-int ashuffle_init(struct ashuffle_options * opts) {
+void ashuffle_init(struct ashuffle_options * opts) {
     opts->queue_only = 0;
     opts->file_in = NULL;
     opts->check_uris = true;
@@ -82,7 +85,6 @@ int ashuffle_init(struct ashuffle_options * opts) {
     opts->queue_buffer = ARGS_QUEUE_BUFFER_NONE; // 0
     opts->host = NULL;
     opts->port = 0;
-    return 0;
 }
 
 /* "safe" string to unsigned conversion

@@ -17,7 +17,7 @@ struct ashuffle_options {
     unsigned port;
 };
 
-int ashuffle_init(struct ashuffle_options *);
+void ashuffle_init(struct ashuffle_options *);
 
 /* parse the options in to the 'ashuffle options' structure. 
  * Returns 0 on success, -1 for failure. */

@@ -13,7 +13,7 @@ struct song_rule {
 };
 
 /* Initialize a rule */
-int rule_init(struct song_rule * rule, enum rule_type);
+void rule_init(struct song_rule * rule, enum rule_type);
 
 /* Add some criteria for this rule to match on */
 int rule_add_criteria(struct song_rule * rule, 
@@ -28,6 +28,6 @@ bool rule_match(struct song_rule *rule,
                 const struct mpd_song * song);
 
 /* Free the memory used to store this rule */
-int rule_free(struct song_rule * rule);
+void rule_free(struct song_rule * rule);
 
 #endif

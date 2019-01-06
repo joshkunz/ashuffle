@@ -13,14 +13,13 @@ struct rule_field {
     char * value;
 };
 
-int rule_init(struct song_rule * rule, 
-              enum rule_type type) {
+void rule_init(struct song_rule * rule, 
+               enum rule_type type) {
     /* set the type */
     rule->type = type;
 
     /* allocate the field list */
     list_init(&rule->matchers);
-    return 0;
 }
 
 int rule_add_criteria(struct song_rule * rule,
@@ -36,8 +35,11 @@ int rule_add_criteria(struct song_rule * rule,
     /* copy the string to match on */
     matcher.value = strdup(expected_value);
     /* add our matcher to the array */
-    list_push(&rule->matchers, 
-              node_from(&matcher, sizeof(struct rule_field)));
+    struct datum rule_datum = {
+        .data = &matcher,
+        .length = sizeof(matcher),
+    };
+    list_push(&rule->matchers, &rule_datum);
     return 0;
 }
 
@@ -46,7 +48,7 @@ bool rule_match(struct song_rule * rule,
     struct rule_field * current_matcher = NULL;
     const char * tag_value = NULL;
     for (unsigned i = 0; i < rule->matchers.length; i++) {
-        current_matcher = list_at(&rule->matchers, i);
+        current_matcher = list_at(&rule->matchers, i)->data;
         /* get the first result for this tag */
         tag_value = mpd_song_get_tag(song, current_matcher->tag, 0);
         /* if the tag doesn't exist, we can't match on it. */
@@ -69,12 +71,11 @@ bool rule_match(struct song_rule * rule,
     return true;
 }
 
-int rule_free(struct song_rule * rule) {
+void rule_free(struct song_rule * rule) {
     struct rule_field * field;
     for (unsigned i = 0; i < rule->matchers.length; i++) {
         field = list_at(&rule->matchers, i);
         free(field->value);
     }
     list_free(&rule->matchers);
-    return 0;
 }
