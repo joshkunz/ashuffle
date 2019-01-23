@@ -31,7 +31,7 @@ In the second (more interesting) mode, ashuffle will wait
 until the last song in the queue has finished playing, at which point it will
 add another song to the queue. In this creates a 'stream of music'
 where songs will be continuously played, at random, to infinity.
-Additionally, since ashuffle only adds one song at a time, and only adds that song 
+Additionally, since ashuffle only adds one song at a time, and only adds that song
 once the last song in the playlist has finished playing, you still retain
 control over your queue. This way, you can add some song you want to hear
 to the queue, and the random songs will simply continue afterwards.
@@ -87,7 +87,7 @@ between queue control and cross-fade support, you can supply the
 `--queue_buffer n` flag. This flag will have ashuffle ensure that there are
 always `n` songs in the queue after the currently playing song. This way you
 still retain some queue control, while making sure that MPD can crossfade
-effectively. 
+effectively.
 
 ## help text
 
@@ -116,8 +116,8 @@ See included `readme.md` file for PATTERN syntax.
 
 ## patterns
 
-Patterns are a list of key-value pairs given to the `--exclude` flag. A pair is 
-composed of a 'field' and a 'value'. A field is the name 
+Patterns are a list of key-value pairs given to the `--exclude` flag. A pair is
+composed of a 'field' and a 'value'. A field is the name
 of an MPD tag (e.g. artist, title, album) to match on (case insensitive) and
 'value' is a string to match against that field. So, if I wanted to exclude
 MGMT's album 'Congratulations' in  the shuffle I could supply a command
@@ -125,7 +125,7 @@ line like the following:
 
     $ ashuffle --exclude artist MGMT album "Congratulations"
 
-Since typing in an exact match for all songs could become quite cumbersome, the 
+Since typing in an exact match for all songs could become quite cumbersome, the
 'value' field will match on substrings, so you only have to specify part of the
 search string. For example, if we wanted to match Arctic Monkeys album
 'Whatever People Say I Am, That's What I'm Not' we could shorten that to this:
@@ -164,13 +164,13 @@ start noticing song order once the random-list wraps around.
 ashuffle's approach is an attempt at a happy medium between these two approaches.
 Essentially, it keeps two lists of songs, a 'pool' of the songs it's shuffling,
 and a 'window' which is a short, ordered, playlist of songs. When the program
-starts, ashuffle builds the window randomly by taking songs out of the pool, 
+starts, ashuffle builds the window randomly by taking songs out of the pool,
 and adding them to the window. When a new random song is added to the MPD
-queue, the 'top' song of the window, is taken off, added to the queue, and 
+queue, the 'top' song of the window, is taken off, added to the queue, and
 then put back into the pool. Then another song is added to the window
 so that the next request can be fulfilled.
 
-# dependencies  
+# dependencies
 
 The only dependency is 'libmpdclient' which, you can probably
 install via your package manager. For example on debian based
@@ -187,25 +187,32 @@ or on OS X using brew:
 Download the [latest release][latest], untar/unzip it and then cd into the
 directory and run:
 
-    make
+    meson builddir
 
 Then run
 
-    sudo make install
+    cd builddir
+    sudo ninja install
 
 to install the binary. If you want to use a prefix other than `/usr/local` you
-can supply an alternate by running `make install` like so:
+can supply an alternate by running `meson` like so:
 
-    sudo make prefix=<prefix> install
+    meson builddir --prefix <prefix>
+
+Or, if you already ran meson:
+
+    cd builddir
+    meson configure --prefix <prefix>
 
 You can uninstall the program later by running
 
-    sudo make uninstall
+    sudo ninja uninstall
 
-**Note:**  You'll have to supply the prefix again if you used a custom prefix.
+**Note:** See mesons [documentation][2] for more information.
 
 Oh, and in the case you're wondering why it's called 'ashuffle' it's
 because it implements 'automatic shuffle' mode for mpd.
 
   [1]: https://github.com/Joshkunz/binfiles/blob/4a4e9b7c845b59ba1c0b68edc84e6cf1972dbc73/ashuffle
+  [2]: https://mesonbuild.com/Quick-guide.html
   [latest]: https://github.com/Joshkunz/ashuffle/releases/tag/v1.0.1
