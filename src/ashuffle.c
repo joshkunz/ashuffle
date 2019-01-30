@@ -132,7 +132,16 @@ int build_songs_mpd(struct mpd_connection * mpd,
 
     /* parse out the pairs */
     struct mpd_song * song = mpd_recv_song(mpd);
-    mpd_perror_if_error(mpd);
+    const enum mpd_error err = mpd_connection_get_error(mpd);
+    if (err == MPD_ERROR_CLOSED) {
+        fprintf(stderr,
+                "mpd server closed the connection while getting the list of all songs.\n"
+                "If mpd logs error on \"Output buffer is full\", consider setting\n"
+                "max_output_buffer_size to a higher value (e.g. 32768).\n");
+	exit(1);
+    } else if (err != MPD_ERROR_SUCCESS) {
+        mpd_perror(mpd);
+    }
     while (song) {
         /* if this song is allowed, add it to the list */
         if (ruleset_accepts_song(ruleset, song)) {
