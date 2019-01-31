@@ -135,9 +135,9 @@ int build_songs_mpd(struct mpd_connection * mpd,
     const enum mpd_error err = mpd_connection_get_error(mpd);
     if (err == MPD_ERROR_CLOSED) {
         fprintf(stderr,
-                "mpd server closed the connection while getting the list of all songs.\n"
-                "If mpd logs error on \"Output buffer is full\", consider setting\n"
-                "max_output_buffer_size to a higher value (e.g. 32768).\n");
+                "MPD server closed the connection while getting the list of all songs.\n"
+                "If MPD error logs say \"Output buffer is full\", consider setting\n"
+                "max_output_buffer_size to a higher value (e.g. 32768) in your MPD config.\n");
 	exit(1);
     } else if (err != MPD_ERROR_SUCCESS) {
         mpd_perror(mpd);
