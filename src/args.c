@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <limits.h>
 
 #include "args.h"
 #include "list.h"
@@ -77,6 +78,29 @@ int ashuffle_init(struct ashuffle_options * opts) {
     return 0;
 }
 
+/* "safe" string to unsigned conversion
+ * unlike strtoul, considers partial matches e.g. "42foo" or "" as errors.
+ * returns UINT_MAX and sets errno on error.
+ */
+unsigned strtou(char * str) {
+    char * endptr;
+    unsigned long value;
+
+    value = strtoul(str, &endptr, 10);
+
+    if (endptr == str || endptr[0] != '\0') {
+        errno = EINVAL;
+        return UINT_MAX;
+    }
+
+    if (value > UINT_MAX) {
+        errno = ERANGE;
+        return UINT_MAX;
+    }
+
+    return (unsigned) value;
+}
+
 int ashuffle_options(struct ashuffle_options * opts, 
                      int argc, char * argv[]) {
     /* State for the state machine */
@@ -123,10 +147,10 @@ int ashuffle_options(struct ashuffle_options * opts,
             match_field = NULL;
             state = RULE;
         } else if (state == QUEUE) {
-            opts->queue_only = (unsigned) strtoul(argv[i], NULL, 10);
-            /* Make sure we got a valid queue number */
-            if (errno == EINVAL || errno == ERANGE) {
-                fputs("Error converting queue length to integer.\n", stderr);
+            opts->queue_only = strtou(argv[i]);
+            if (opts->queue_only == UINT_MAX) {
+                fprintf(stderr, "Error converting queue length '%s' to integer.\n",
+                        argv[i]);
                 return -1;
             }
             state = NO_STATE;
@@ -138,9 +162,10 @@ int ashuffle_options(struct ashuffle_options * opts,
             }
             state = NO_STATE;
         } else if (state == QUEUE_BUFFER) {
-            opts->queue_buffer = (unsigned) strtoul(argv[i], NULL, 10);
-            if (errno == EINVAL || errno == ERANGE) {
-                fputs("Error converting queue buffer length to integer.\n", stderr);
+            opts->queue_buffer = strtou(argv[i]);
+            if (opts->queue_buffer == UINT_MAX) {
+                fprintf(stderr, "Error converting queue buffer length '%s' to integer.\n",
+                        argv[i]);
                 return -1;
             }
             state = NO_STATE;
@@ -152,6 +177,9 @@ int ashuffle_options(struct ashuffle_options * opts,
 
     if (state == RULE_VALUE) {
         fprintf(stderr, "No value supplied for match '%s'.\n", match_field);
+        return -1;
+    } else if (!state_can_trans(state)) {
+        fprintf(stderr, "No argument supplied for '%s'.\n", argv[argc - 1]);
         return -1;
     }
     /* if we're provisioning a rule right now, flush it */
