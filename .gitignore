@@ -2,3 +2,4 @@ ashuffle
 ashuffle.dSYM
 *.o
 *.swp
+src/t/*_test

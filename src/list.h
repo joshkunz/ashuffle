@@ -23,18 +23,18 @@ void list_init(struct list *);
  * The copied datum and its contents will be free'd upon pop, or when the list
  * is free'd. If a NULL datum is given, then no data will be pushed onto
  * the list. */
-void list_push(struct list *, struct datum *);
+void list_push(struct list *, const struct datum *);
 
 /* Push the given null-terminated string onto the list. A new datum is
  * created automatically. */
-void list_push_str(struct list *, char *);
+void list_push_str(struct list *, const char *);
 
 /* Return a pointer to the datum at 'index'. Returns NULL if there is no
  * datum at that index. */
-struct datum * list_at(const struct list *, unsigned index);
+const struct datum * list_at(const struct list *, unsigned index);
 
 /* Same as list_at, but assumes the datum contains a null-terminated string. */
-char * list_at_str(const struct list *, unsigned index);
+const char * list_at_str(const struct list *, unsigned index);
 
 /* Pop item at index 'index' in list 'from' and push it onto the end of
  * list 'to'. If 'index' is out of bounds, the program will crash. */

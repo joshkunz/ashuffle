@@ -5,9 +5,7 @@
 
 #include "list.h"
 
-int main() {
-    plan(NO_PLAN);
-
+void test_basic() {
     struct list test_list;
     list_init(&test_list);
     cmp_ok(test_list.length, "==", 0, "new list length is zero");
@@ -30,29 +28,38 @@ int main() {
     list_free(&test_list);
     list_free(&test_list2);
     cmp_ok(test_list2.length, "==", 0, "list empty after free");
+}
 
-    struct list test_list3;
-    list_init(&test_list3);
+void test_multi_push_pop() {
+    struct list test_list;
+    list_init(&test_list);
     char * sa = "test str A"; char * sb = "test str B"; char * sc = "test str C";
-    list_push_str(&test_list3, sa);
-    list_push_str(&test_list3, sb);
-    list_push_str(&test_list3, sc);
-    cmp_ok(test_list3.length, "==", 3, "length 3 after appending 3 strings");
-    is(list_at_str(&test_list3, 0), sa,
+    list_push_str(&test_list, sa);
+    list_push_str(&test_list, sb);
+    list_push_str(&test_list, sc);
+    cmp_ok(test_list.length, "==", 3, "length 3 after appending 3 strings");
+    is(list_at_str(&test_list, 0), sa,
        "list 3 has sa in 0 after push");
-    is(list_at_str(&test_list3, 1), sb,
+    is(list_at_str(&test_list, 1), sb,
        "list 3 has sb in 1 after push");
-    is(list_at_str(&test_list3, 2), sc,
+    is(list_at_str(&test_list, 2), sc,
        "list 3 has sc in 2 after push");
-    list_pop(&test_list3, 1);
-    cmp_ok(test_list3.length, "==", 2, "length 2 after pop(1)");
-    is(list_at_str(&test_list3, 0), sa,
+    list_pop(&test_list, 1);
+    cmp_ok(test_list.length, "==", 2, "length 2 after pop(1)");
+    is(list_at_str(&test_list, 0), sa,
        "list 3 has sa in 0 after push");
-    is(list_at_str(&test_list3, 1), sc,
+    is(list_at_str(&test_list, 1), sc,
        "list 3 has sc in 1 after push");
-    dies_ok({ list_pop(&test_list3, 2); }, "out of bound pop non-empty");
+    dies_ok({ list_pop(&test_list, 2); }, "out of bound pop non-empty");
 
-    list_free(&test_list3);
+    list_free(&test_list);
+}
+
+int main() {
+    plan(NO_PLAN);
+
+    test_basic();
+    test_multi_push_pop();
 
     done_testing();
 }

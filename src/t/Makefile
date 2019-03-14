@@ -14,3 +14,4 @@ libtap:
 	make -C .. $*.o
 
 list_test: list_test.c ../list.o
+shuffle_test: shuffle_test.c ../list.o ../shuffle.o

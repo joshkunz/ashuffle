@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <stdio.h>
+
 #include "list.h"
 #include "shuffle.h"
 
@@ -11,12 +13,12 @@ void shuffle_init(struct shuffle_chain * s, unsigned window_size) {
 }
 
 /* get then number of songs in the shuffle chain */
-int shuffle_length(struct shuffle_chain *s) {
+unsigned shuffle_length(struct shuffle_chain *s) {
     return s->pool.length + s->window.length;
 }
 
 /* add an item to the chain by pushing it into the pool */
-void shuffle_add(struct shuffle_chain * s, char * item) {
+void shuffle_add(struct shuffle_chain * s, const char * item) {
     list_push_str(&s->pool, item);
 }
 
@@ -33,9 +35,13 @@ static void fill_window(struct shuffle_chain *s) {
  * a pointer to it. */
 const char * shuffle_pick(struct shuffle_chain * s) {
     const void * data = NULL;
+    if (shuffle_length(s) == 0) {
+        fprintf(stderr, "shuffle_pick: cannot pick from empty chain.");
+        exit(1);
+    }
     fill_window(s);
     /* get the first element off the window */
-    data = list_at(&s->window, 0);
+    data = list_at_str(&s->window, 0);
     /* push the retrived element back into the pool */
     list_pop_push(&s->window, &s->pool, 0);
     return data;

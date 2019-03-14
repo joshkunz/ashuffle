@@ -79,13 +79,13 @@ struct node * list_node_extract(struct list * l, unsigned index) {
     return n;
 }
 
-static void datum_copy_into(struct datum * dst, struct datum * src) {
+static void datum_copy_into(struct datum * dst, const struct datum * src) {
     dst->length = src->length;
     dst->data = xmalloc(src->length);
     memcpy(dst->data, src->data, src->length);
 }
 
-void list_push(struct list * l, struct datum * d) {
+void list_push(struct list * l, const struct datum * d) {
     if (d == NULL) {
         return;
     }
@@ -96,15 +96,15 @@ void list_push(struct list * l, struct datum * d) {
 
 /* Push the given null-terminated string onto the list. A new datum is
  * created automatically. */
-void list_push_str(struct list * l, char * s) {
-    struct datum s_datum = {
-        .data = s,
-        .length = strlen(s) + 1,
-    };
-    list_push(l, &s_datum);
+void list_push_str(struct list * l, const char * s) {
+    struct node * node = xmalloc(sizeof(struct node));
+    node->data.length = strlen(s) + 1;
+    node->data.data = xmalloc(node->data.length);
+    memcpy(node->data.data, s, node->data.length);
+    list_node_push(l, node);
 }
 
-struct datum * list_at(const struct list * l, unsigned index) {
+const struct datum * list_at(const struct list * l, unsigned index) {
     struct node * found = list_node_at(l, index, NULL);
     if (found == NULL) {
         exit_oob(l, index);
@@ -112,8 +112,8 @@ struct datum * list_at(const struct list * l, unsigned index) {
     return &found->data;
 }
 
-char * list_at_str(const struct list * l, unsigned index) {
-    return (char *)(list_at(l, index)->data);
+const char * list_at_str(const struct list * l, unsigned index) {
+    return (const char *)(list_at(l, index)->data);
 }
 
 /* extract the item from the source list and push it onto the

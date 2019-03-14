@@ -17,7 +17,7 @@ void shuffle_init(struct shuffle_chain *, unsigned window_size);
 void shuffle_add(struct shuffle_chain *, const char * data);
 
 /* return the number of songs in the shuffle chain */
-int shuffle_length(struct shuffle_chain *);
+unsigned shuffle_length(struct shuffle_chain *);
 
 /* Randomly pick an element added via 'shuffle_add' and return
  * a pointer to it. */
