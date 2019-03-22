@@ -23,3 +23,33 @@ ashuffle = executable(
 	dependencies: clientlib,
 	install: true
 )
+
+subdir('t')
+
+test_c_args = [
+    '-Wall', '-Wextra', '-pedantic',
+]
+
+test_options = [
+    'werror=true',
+    'b_sanitize=address',
+    'b_sanitize=undefined',
+]
+
+src_inc = include_directories('src')
+list_test = executable('list_test',
+                       ['src/list.c', 't/list_test.c'],
+                       include_directories : src_inc,
+                       dependencies : libtap_dep,
+                       c_args : test_c_args,
+                       override_options : test_options)
+test('list', list_test)
+
+shuffle_test = executable('shuffle_test',
+                          ['src/list.c', 'src/shuffle.c', 't/shuffle_test.c'],
+                          include_directories : src_inc,
+                          dependencies : libtap_dep,
+                          c_args : test_c_args,
+                          override_options : test_options)
+test('shuffle', shuffle_test)
+
