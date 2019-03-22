@@ -130,12 +130,38 @@ void test_windowing() {
     test_window_of_size(100);
 }
 
+// In this test we seed rand (srand) with a known value so we have
+// deterministic randomness from `rand`. These values are known to be
+// random according to `rand()` so we're just validating that `shuffle` is
+// actually picking according to rand.
+// Note: This test may break if we change how we store items in the list, or
+//  how we index the song list when picking randomly. It's hard to test
+//  that something is random :/.
+void test_random() {
+    srand(4);
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 2);
+
+    shuffle_add(&chain, "test a");
+    shuffle_add(&chain, "test b");
+    shuffle_add(&chain, "test c");
+
+    is(shuffle_pick(&chain), "test b", "pick 1 is random");
+    is(shuffle_pick(&chain), "test c", "pick 2 is random");
+    is(shuffle_pick(&chain), "test a", "pick 3 is random");
+    is(shuffle_pick(&chain), "test b", "pick 4 is random");
+
+    shuffle_free(&chain);
+}
+
 int main() {
     plan(NO_PLAN);
 
     test_basic();
     test_multi();
     test_windowing();
+    test_random();
 
     done_testing();
 }
