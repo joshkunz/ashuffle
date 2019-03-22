@@ -53,3 +53,12 @@ shuffle_test = executable('shuffle_test',
                           override_options : test_options)
 test('shuffle', shuffle_test)
 
+clientlib_inc = clientlib.partial_dependency(includes : true)
+rule_test = executable('rule_test',
+                       ['src/list.c', 'src/rule.c', 't/mpdclient_fake.c', 't/rule_test.c'],
+                       include_directories : src_inc,
+                       dependencies : [libtap_dep, clientlib_inc],
+                       c_args : test_c_args,
+                       override_options : test_options)
+test('shuffle', shuffle_test)
+

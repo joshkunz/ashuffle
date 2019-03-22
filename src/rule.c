@@ -1,8 +1,9 @@
 #define _GNU_SOURCE
 
 #include <mpd/client.h>
-#include <stdlib.h>
+#include <assert.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "list.h"
@@ -74,7 +75,9 @@ bool rule_match(struct song_rule * rule,
 void rule_free(struct song_rule * rule) {
     struct rule_field * field;
     for (unsigned i = 0; i < rule->matchers.length; i++) {
-        field = list_at(&rule->matchers, i);
+        const struct datum * item = list_at(&rule->matchers, i);
+        assert(item != NULL && "in-bound matcher should never be NULL");
+        field = (struct rule_field *) item->data;
         free(field->value);
     }
     list_free(&rule->matchers);
