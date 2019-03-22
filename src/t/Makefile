@@ -2,10 +2,13 @@
 
 libtap = libtap
 
-LDFLAGS += -static -L $(libtap)
+CC = clang
+LD = clang
+LDFLAGS += -L $(libtap)
 LDLIBS += -ltap
-CFLAGS += -std=c99 -Wall -Wextra -pedantic
+CFLAGS += -std=c99 -Wall -Wextra -pedantic -Werror -g -O0
 CFLAGS += -I $(libtap) -I ../
+CFLAGS += -fsanitize=address -fsanitize=undefined
 
 libtap:
 	make -C $(libtap)
