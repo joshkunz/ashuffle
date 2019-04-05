@@ -14,10 +14,9 @@ struct rule_field {
     char * value;
 };
 
-void rule_init(struct song_rule * rule, 
-               enum rule_type type) {
+void rule_init(struct song_rule * rule) {
     /* set the type */
-    rule->type = type;
+    rule->type = RULE_EXCLUDE;
 
     /* allocate the field list */
     list_init(&rule->matchers);

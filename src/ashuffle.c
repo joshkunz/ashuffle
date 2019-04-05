@@ -271,7 +271,7 @@ int shuffle_idle(struct mpd_connection * mpd,
         bool idle_player = !!(event & MPD_IDLE_PLAYER);
         /* Only update the database if our original list was built from
          * MPD. */
-        if (idle_db && options.file_in == NULL) {
+        if (idle_db && options->file_in == NULL) {
             shuffle_free(songs);
             build_songs_mpd(mpd, &options->ruleset, songs);
             printf("Picking random songs out of a pool of %u.\n",
@@ -309,7 +309,7 @@ void get_mpd_password(struct mpd_connection * mpd) {
 /* Check if string "s" is contained in the list 'l'. */
 bool list_contains_string(struct list * l, const char * s) {
     for (size_t i = 0; i < l->length; i++) {
-        char * val = list_at_str(l, i);
+        const char * val = list_at_str(l, i);
         assert(val != NULL && "all items in the list should have values");
         if (strcmp(s, val) == 0) {
             return true;
@@ -461,7 +461,7 @@ int main (int argc, char * argv[]) {
 
     /* dispose of the rules used to build the song-list */
     for (unsigned i = 0; i < options.ruleset.length; i++) {
-        rule_free(list_at(&options.ruleset, i));
+        rule_free(list_at(&options.ruleset, i)->data);
     }
     list_free(&options.ruleset);
 

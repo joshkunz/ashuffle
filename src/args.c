@@ -132,7 +132,7 @@ int ashuffle_options(struct ashuffle_options * opts,
             return -1;
         } else if (type_flag != -1) {
             flush_rule(state, opts, &rule);
-            rule_init(&rule, type_flag);
+            rule_init(&rule);
             type_flag = -1;
             state = RULE;
         } else if (transable && check_flags(argv[i], 2, "--nocheck", "-n")) {

@@ -40,7 +40,7 @@ src_inc = include_directories('src')
 list_test = executable('list_test',
                        ['src/list.c', 't/list_test.c'],
                        include_directories : src_inc,
-                       dependencies : libtap_dep,
+                       dependencies : [libtap_dep, testhelpers_dep],
                        c_args : test_c_args,
                        override_options : test_options)
 test('list', list_test)
@@ -48,17 +48,16 @@ test('list', list_test)
 shuffle_test = executable('shuffle_test',
                           ['src/list.c', 'src/shuffle.c', 't/shuffle_test.c'],
                           include_directories : src_inc,
-                          dependencies : libtap_dep,
+                          dependencies : [libtap_dep, testhelpers_dep],
                           c_args : test_c_args,
                           override_options : test_options)
 test('shuffle', shuffle_test)
 
-clientlib_inc = clientlib.partial_dependency(includes : true)
 rule_test = executable('rule_test',
-                       ['src/list.c', 'src/rule.c', 't/mpdclient_fake.c', 't/rule_test.c'],
+                       ['src/list.c', 'src/rule.c', 't/rule_test.c'],
                        include_directories : src_inc,
-                       dependencies : [libtap_dep, clientlib_inc],
+                       dependencies : [libtap_dep, testhelpers_dep, clientfake_dep],
                        c_args : test_c_args,
                        override_options : test_options)
-test('shuffle', shuffle_test)
+test('rule', rule_test)
 
