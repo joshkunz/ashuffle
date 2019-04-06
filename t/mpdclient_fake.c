@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 201904L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,10 +9,18 @@
 
 /* Fake interface to match MPD */
 
-static enum mpd_tag_type _MPD_IPARSE_TAG_TYPE;
+static struct {
+    const char * field_name;
+    enum mpd_tag_type tag;
+} _MPD_IPARSE_EXPECTED;
 
-enum mpd_tag_type mpd_tag_name_iparse(const char * field __attribute__((unused))) {
-    return _MPD_IPARSE_TAG_TYPE;
+enum mpd_tag_type mpd_tag_name_iparse(const char * field) {
+    if (strcmp(_MPD_IPARSE_EXPECTED.field_name, field) != 0) {
+        fprintf(stderr, "%s does not match expected value %s\n",
+                        field, _MPD_IPARSE_EXPECTED.field_name);
+        return MPD_TAG_UNKNOWN;
+    }
+    return _MPD_IPARSE_EXPECTED.tag;
 }
 
 const char * mpd_song_get_tag(const struct mpd_song * song, enum mpd_tag_type type, unsigned idx) {
@@ -21,8 +30,16 @@ const char * mpd_song_get_tag(const struct mpd_song * song, enum mpd_tag_type ty
 
 /* Test helpers */
 
-void set_tag_name_iparse_result(enum mpd_tag_type t) {
-    _MPD_IPARSE_TAG_TYPE = t;
+void set_tag_name_iparse_result(const char * check_name, enum mpd_tag_type t) {
+    if (_MPD_IPARSE_EXPECTED.field_name != NULL) {
+        free((void *) _MPD_IPARSE_EXPECTED.field_name);
+    }
+    _MPD_IPARSE_EXPECTED.field_name = strdup(check_name);
+    if (_MPD_IPARSE_EXPECTED.field_name == NULL) {
+        perror("failed to strdup");
+        exit(1);
+    }
+    _MPD_IPARSE_EXPECTED.tag = t;
 }
 
 struct mpd_song test_build_song(test_tag_value_t * vals, size_t len) {

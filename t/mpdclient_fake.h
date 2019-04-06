@@ -20,6 +20,6 @@ typedef struct {
 struct mpd_song test_build_song(test_tag_value_t * vals, size_t len);
 
 /* Set the value returned by mpd_tag_name_iparse */
-void set_tag_name_iparse_result(enum mpd_tag_type wanted);
+void set_tag_name_iparse_result(const char * name, enum mpd_tag_type wanted);
 
 #endif
