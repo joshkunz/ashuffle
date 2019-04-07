@@ -68,7 +68,7 @@ For example:
 
 Once again, the password can be omitted.
 
-### shuffling from files and `--nocheck`
+### shuffling from files and `--no-check`
 
 By supplying the `-f` option and a file containing a list of song URIs to
 shuffle, you can make ashuffle shuffle and arbitrary list of songs. For
@@ -82,10 +82,10 @@ this mechanism, ashuffle will still try to apply exclusion rules to these
 songs. If the song URIs you want ashuffle to shuffle over do not exist
 in your MPD library (for example if you are trying to shuffle URIs with the
 `file://` schema), ashuffle will exclude them by default. If you pass the
-`--nocheck` option to ashuffle, it will not apply the filtering rules, allowing
+`--no=check` option to ashuffle, it will not apply the filtering rules, allowing
 you to shuffle over songs that are not in your library.
 
-### crossfade support and the `--queue_buffer`
+### crossfade support and the `--queue-buffer`
 
 By default, ashuffle will only enqueue another song once the current queue
 has ended. This gives the user a lot of control over what will be playing next.
@@ -93,7 +93,7 @@ One unfortunate side-effect of this is that it breaks MPD's built-in crossfade
 support. If the next song is only added once the previous song has finished
 playing, MPD doesn't know how to crossfade between the two songs. As a tradeoff
 between queue control and cross-fade support, you can supply the
-`--queue_buffer n` flag. This flag will have ashuffle ensure that there are
+`--queue-buffer n` flag. This flag will have ashuffle ensure that there are
 always `n` songs in the queue after the currently playing song. This way you
 still retain some queue control, while making sure that MPD can crossfade
 effectively.
@@ -101,28 +101,28 @@ effectively.
 ## help text
 
 ```
-usage: ashuffle -h -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
+usage: ashuffle [-h] [-n] [-e PATTERN ...] [-o NUMBER] [-f FILENAME] [-q NUMBER]
 
 Optional Arguments:
-   -e,--exclude   Specify things to remove from shuffle (think blacklist).
-   -o,--only      Instead of continuously adding songs, just add 'NUMBER'
-                  songs and then exit.
-   -h,-?,--help   Display this help message.
-   -f,--file      Use MPD URI's found in 'file' instead of using the entire MPD
-                  library. You can supply `-` instead of a filename to retrive
-                  URI's from standard in. This can be used to pipe song URI's
-                  from another program into ashuffle.
-   -n,--nocheck   When reading URIs from a file, don't check to ensure that
-                  the URIs match the given exclude rules. This option is most
-                  helpful when shuffling songs with -f, that aren't in the
-                  MPD library.
-   --queue_buffer Specify to keep a buffer of `n` songs queued after the
-                  currently playing song. This is to support MPD features
-                  like crossfade that don't work if there are no more
-                  songs in the queue.
-   --host         Specify a hostname or IP address to connect to. Defaults to
-                  to `localhost`.
-   -p,--port      Specify a port number to connect to. Defaults to `6600`.
+   -h,-?,--help      Display this help message.
+   -e,--exclude      Specify things to remove from shuffle (think blacklist).
+   -f,--file         Use MPD URI's found in 'file' instead of using the entire
+                     MPD library. You can supply `-` instead of a filename to
+                     retrive URI's from standard in. This can be used to pipe
+                     song URI's from another program into ashuffle.
+   --host            Specify a hostname or IP address to connect to. Defaults
+                     to `localhost`.
+   -n,--no-check     When reading URIs from a file, don't check to ensure that
+                     the URIs match the given exclude rules. This option is most
+                     helpful when shuffling songs with -f, that aren't in the
+                     MPD library.
+   -o,--only         Instead of continuously adding songs, just add 'NUMBER'
+                     songs and then exit.
+   -p,--port         Specify a port number to connect to. Defaults to `6600`.
+   -q,--queue-buffer Specify to keep a buffer of `n` songs queued after the
+                     currently playing song. This is to support MPD features
+                     like crossfade that don't work if there are no more
+                     songs in the queue.
 See included `readme.md` file for PATTERN syntax.
 ```
 
@@ -220,7 +220,7 @@ You can uninstall the program later by running
 
     sudo ninja uninstall
 
-**Note:** See mesons [documentation][2] for more information.
+**Note:** See meson's [documentation][2] for more information.
 
 Oh, and in the case you're wondering why it's called 'ashuffle' it's
 because it implements 'automatic shuffle' mode for mpd.

@@ -13,13 +13,6 @@
 #include "t/mpdclient_fake.h"
 #include "t/helpers.h"
 
-#define TAG(name, value) {(name), (value)}
-
-#define TEST_SONG(name, ...) \
-    test_tag_value_t __tags_ ## name[] = { __VA_ARGS__ }; \
-    struct mpd_song name = test_build_song(__tags_ ## name, \
-                                           STATIC_ARRAY_LEN(__tags_ ## name))
-
 static void test_basic() {
     struct song_rule rule;
     rule_init(&rule);

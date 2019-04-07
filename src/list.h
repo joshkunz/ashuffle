@@ -29,8 +29,8 @@ void list_push(struct list *, const struct datum *);
  * created automatically. */
 void list_push_str(struct list *, const char *);
 
-/* Return a pointer to the datum at 'index'. Returns NULL if there is no
- * datum at that index. */
+/* Return a pointer to the datum at 'index'. Panics if `index` is outside
+ * of the range [0, list->length). */
 const struct datum * list_at(const struct list *, unsigned index);
 
 /* Same as list_at, but assumes the datum contains a null-terminated string. */

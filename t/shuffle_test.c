@@ -7,6 +7,7 @@
 #include <tap.h>
 
 #include "shuffle.h"
+#include "util.h"
 
 void test_basic() {
     struct shuffle_chain chain;
@@ -21,23 +22,6 @@ void test_basic() {
     lives_ok({ (void) shuffle_pick(&chain); }, "double-pick 1-item chain");
     is(shuffle_pick(&chain), test_str, "double-pick on 1-item chain matches");
     shuffle_free(&chain);
-}
-
-// sprintf, but we crash if we can't allocate a buffer big enough to store
-// the string we build. Caller must free the returned string.
-char * xsprintf(const char * fmt, ...) {
-    va_list l;
-    va_start(l, fmt);
-
-    char * out;
-    if (vasprintf(&out, fmt, l) == -1) {
-        perror("failed to asprintf");
-        exit(1);
-    }
-
-    va_end(l);
-
-    return out;
 }
 
 // Returns true if the list `lst` contains the string `a`.

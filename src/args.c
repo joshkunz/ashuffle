@@ -18,6 +18,8 @@ static const unsigned PORTLEN = 6;
 /* Enum representing the various state of the parser */
 enum parse_state {
     NO_STATE,     // Ready for anything!
+    RULE_FIRST,   // expecting first rule matcher (see RULE). This is needed
+                  // so that a bare `-e` or `--exclude` is not matched.
     RULE,         // expecting a rule matcher (like "artist")
     RULE_VALUE,   // expecting rule value (like "modest mouse")
     QUEUE,        // expecting "queue_only" int value
@@ -125,7 +127,7 @@ struct options_parse_result options_parse(struct ashuffle_options * opts,
     struct song_rule rule;
 
     int type_flag = -1;
-    
+
     for (int i = 1; i < argc; i++) {
         transable = state_can_trans(state);
         if (transable) {
@@ -142,12 +144,12 @@ struct options_parse_result options_parse(struct ashuffle_options * opts,
             flush_rule(state, opts, &rule);
             rule_init(&rule);
             type_flag = -1;
-            state = RULE;
-        } else if (transable && check_flags(argv[i], 2, "--nocheck", "-n")) {
+            state = RULE_FIRST;
+        } else if (transable && check_flags(argv[i], 2, "--no-check", "-n")) {
             flush_rule(state, opts, &rule);
             opts->check_uris = false;
             state = NO_STATE;
-        } else if (transable && check_flags(argv[i], 1, "--queue_buffer")) {
+        } else if (transable && check_flags(argv[i], 2, "--queue-buffer", "-q")) {
             flush_rule(state, opts, &rule);
             state = QUEUE_BUFFER;
         } else if (transable && opts->queue_only == 0 && check_flags(argv[i], 2, "--only", "-o")) {
@@ -162,7 +164,7 @@ struct options_parse_result options_parse(struct ashuffle_options * opts,
         } else if (transable && check_flags(argv[i], 2, "--port", "-p")) {
             flush_rule(state, opts, &rule);
             state = PORT;
-        } else if (state == RULE) {
+        } else if (state == RULE || state == RULE_FIRST) {
             match_field = argv[i];
             state = RULE_VALUE;
         } else if (state == RULE_VALUE) {
@@ -226,27 +228,27 @@ void options_parse_result_free(struct options_parse_result * r) {
 
 void options_help(FILE * output) {
     fputs(
-    "usage: ashuffle -h -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
-    "\n"
-    "Optional Arguments:\n"
-    "   -e,--exclude   Specify things to remove from shuffle (think blacklist).\n"
-    "   -o,--only      Instead of continuously adding songs, just add 'NUMBER'\n"
-    "                  songs and then exit.\n"
-    "   -h,-?,--help   Display this help message.\n"
-    "   -f,--file      Use MPD URI's found in 'file' instead of using the entire MPD\n"
-    "                  library. You can supply `-` instead of a filename to retrive\n"
-    "                  URI's from standard in. This can be used to pipe song URI's\n"
-    "                  from another program into ashuffle.\n"
-    "   -n,--nocheck   When reading URIs from a file, don't check to ensure that\n"
-    "                  the URIs match the given exclude rules. This option is most\n"
-    "                  helpful when shuffling songs with -f, that aren't in the\n"
-    "                  MPD library.\n"
-    "   --queue_buffer Specify to keep a buffer of `n` songs queued after the\n"
-    "                  currently playing song. This is to support MPD features\n"
-    "                  like crossfade that don't work if there are no more\n"
-    "                  songs in the queue.\n"
-    "   --host         Specify a hostname or IP address to connect to. Defaults\n"
-    "                  to `localhost`.\n"
-    "   -p,--port      Specify a port number to connect to. Defaults to `6600`.\n"
-    "See included `readme.md` file for PATTERN syntax.\n", output);
+"usage: ashuffle [-h] [-n] [-e PATTERN ...] [-o NUMBER] [-f FILENAME] [-q NUMBER]\n"
+"\n"
+"Optional Arguments:\n"
+"   -h,-?,--help      Display this help message.\n"
+"   -e,--exclude      Specify things to remove from shuffle (think blacklist).\n"
+"   -f,--file         Use MPD URI's found in 'file' instead of using the entire\n"
+"                     MPD library. You can supply `-` instead of a filename to\n"
+"                     retrive URI's from standard in. This can be used to pipe\n"
+"                     song URI's from another program into ashuffle.\n"
+"   --host            Specify a hostname or IP address to connect to. Defaults\n"
+"                     to `localhost`.\n"
+"   -n,--no-check     When reading URIs from a file, don't check to ensure that\n"
+"                     the URIs match the given exclude rules. This option is most\n"
+"                     helpful when shuffling songs with -f, that aren't in the\n"
+"                     MPD library.\n"
+"   -o,--only         Instead of continuously adding songs, just add 'NUMBER'\n"
+"                     songs and then exit.\n"
+"   -p,--port         Specify a port number to connect to. Defaults to `6600`.\n"
+"   -q,--queue-buffer Specify to keep a buffer of `n` songs queued after the\n"
+"                     currently playing song. This is to support MPD features\n"
+"                     like crossfade that don't work if there are no more\n"
+"                     songs in the queue.\n"
+"See included `readme.md` file for PATTERN syntax.\n", output);
 }
