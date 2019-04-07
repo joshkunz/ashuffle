@@ -17,13 +17,28 @@ struct ashuffle_options {
     unsigned port;
 };
 
-void ashuffle_init(struct ashuffle_options *);
+typedef enum {
+    PARSE_FAILURE,  // We failed to parse the input args.
+    PARSE_HELP,     // The user requested help text to be printed.
+    PARSE_OK,       // Options fully parsed.
+} parse_status_t;
 
-/* parse the options in to the 'ashuffle options' structure. 
- * Returns 0 on success, -1 for failure. */
-int ashuffle_options(struct ashuffle_options *, 
-                     int argc, char * argv[]);
+struct options_parse_result {
+    parse_status_t status;
+    char * msg;
+};
 
-void ashuffle_help(FILE * output_stream);
+void options_parse_result_free(struct options_parse_result *);
+
+void options_init(struct ashuffle_options *);
+
+/* parse the options in to the 'ashuffle options' structure. The returned
+ * parse result describes the results of the parse.
+ * options_parse_result_free *must* be called reguardless of the status
+ * of the parse. */
+struct options_parse_result options_parse(struct ashuffle_options *, 
+                                          int argc, const char * argv[]);
+
+void options_help(FILE * output_stream);
 
 #endif

@@ -37,7 +37,7 @@ const char * shuffle_pick(struct shuffle_chain * s) {
     const void * data = NULL;
     if (shuffle_length(s) == 0) {
         fprintf(stderr, "shuffle_pick: cannot pick from empty chain.");
-        exit(1);
+        abort();
     }
     fill_window(s);
     /* get the first element off the window */

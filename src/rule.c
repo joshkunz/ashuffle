@@ -9,6 +9,7 @@
 
 #include "list.h"
 #include "rule.h"
+#include "util.h"
 
 struct rule_field {
     enum mpd_tag_type tag;
@@ -34,7 +35,7 @@ int rule_add_criteria(struct song_rule * rule,
     }
 
     /* copy the string to match on */
-    matcher.value = strdup(expected_value);
+    matcher.value = xstrdup(expected_value);
     /* add our matcher to the array */
     struct datum rule_datum = {
         .data = &matcher,

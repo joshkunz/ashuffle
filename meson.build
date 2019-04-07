@@ -8,18 +8,18 @@ add_global_arguments([
 
 sources = [
 	'src/args.c',
-	'src/ashuffle.c',
 	'src/getpass.c',
 	'src/list.c',
 	'src/rule.c',
-	'src/shuffle.c'
+	'src/shuffle.c',
+    'src/util.c',
 ]
 
 clientlib = dependency('libmpdclient')
 
 ashuffle = executable(
 	'ashuffle',
-	sources,
+	sources + ['src/ashuffle.c'],
 	dependencies: clientlib,
 	install: true
 )
@@ -37,27 +37,22 @@ test_options = [
 ]
 
 src_inc = include_directories('src')
-list_test = executable('list_test',
-                       ['src/list.c', 't/list_test.c'],
-                       include_directories : src_inc,
-                       dependencies : [libtap_dep, testhelpers_dep],
-                       c_args : test_c_args,
-                       override_options : test_options)
-test('list', list_test)
 
-shuffle_test = executable('shuffle_test',
-                          ['src/list.c', 'src/shuffle.c', 't/shuffle_test.c'],
-                          include_directories : src_inc,
-                          dependencies : [libtap_dep, testhelpers_dep],
-                          c_args : test_c_args,
-                          override_options : test_options)
-test('shuffle', shuffle_test)
+tests = {
+    'list': ['t/list_test.c'],
+    'shuffle': ['t/shuffle_test.c'],
+    'rule': ['t/rule_test.c'],
+    'args': ['t/args_test.c'],
+}
 
-rule_test = executable('rule_test',
-                       ['src/list.c', 'src/rule.c', 't/rule_test.c'],
-                       include_directories : src_inc,
-                       dependencies : [libtap_dep, testhelpers_dep, clientfake_dep],
-                       c_args : test_c_args,
-                       override_options : test_options)
-test('rule', rule_test)
-
+foreach test_name, test_sources : tests
+    test_exe = executable(
+        test_name + '_test',
+        sources + test_sources,
+        include_directories : src_inc,
+        dependencies : [libtap_dep, testhelpers_dep, clientfake_dep],
+        c_args : test_c_args,
+        override_options : test_options,
+    )
+    test(test_name, test_exe)
+endforeach

@@ -368,12 +368,19 @@ void parse_mpd_host(char * mpd_host, struct mpd_host * o_mpd_host) {
     }
 }
 
-int main (int argc, char * argv[]) {
+int main (int argc, const char * argv[]) {
     /* attempt to parse out options given on the command line */
     struct ashuffle_options options;
-    ashuffle_init(&options);
-    int status = ashuffle_options(&options, argc, argv);
-    if (status != 0) { ashuffle_help(stderr); return status; }
+    options_init(&options);
+    struct options_parse_result parse_r = options_parse(&options, argc, argv);
+    if (parse_r.status != PARSE_OK) {
+        if (parse_r.msg != NULL) {
+            fprintf(stderr, "error: %s\n", parse_r.msg);
+        }
+        options_help(stderr);
+        exit(1);
+    }
+    options_parse_result_free(&parse_r);
 
     /* attempt to connect to MPD */
     struct mpd_connection *mpd;

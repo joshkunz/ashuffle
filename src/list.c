@@ -4,20 +4,12 @@
 #include <assert.h>
 
 #include "list.h"
+#include "util.h"
 
 struct node {
     struct datum data;
     struct node * next;
 };
-
-static void * xmalloc(size_t size) {
-    void * res = calloc(1, size);
-    if (res == NULL) {
-        perror("list alloc");
-        exit(1);
-    }
-    return res;
-}
 
 static void exit_oob(const struct list * l, unsigned index) {
     fprintf(stderr, "index %d is out of bounds in list %p\n", index, (void *)l);

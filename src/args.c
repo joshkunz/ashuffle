@@ -1,17 +1,16 @@
 #define _GNU_SOURCE
-#include <stdio.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "args.h"
 #include "list.h"
 #include "rule.h"
-
-const unsigned ARGS_QUEUE_BUFFER_NONE = 0;
+#include "util.h"
 
 // Maximum string length for a port option.
 static const unsigned PORTLEN = 6;
@@ -47,7 +46,7 @@ static bool check_flags(const char * to_check, unsigned count, ...) {
 
 /* get the enum rule_type type from the option if possible.
  * Otherwise, return -1 */
-static int rule_type_from_flag(char * option) {
+static int rule_type_from_flag(const char * option) {
    if (check_flags(option, 2, "--exclude", "-e")) {
         return RULE_EXCLUDE;
     } else {
@@ -77,7 +76,7 @@ static void flush_rule(enum parse_state state,
     }
 }
 
-void ashuffle_init(struct ashuffle_options * opts) {
+void options_init(struct ashuffle_options * opts) {
     opts->queue_only = 0;
     opts->file_in = NULL;
     opts->check_uris = true;
@@ -91,7 +90,7 @@ void ashuffle_init(struct ashuffle_options * opts) {
  * unlike strtoul, considers partial matches e.g. "42foo" or "" as errors.
  * returns UINT_MAX and sets errno on error.
  */
-unsigned strtou(char * str) {
+static unsigned strtou(const char * str) {
     char * endptr;
     unsigned long value;
 
@@ -110,13 +109,19 @@ unsigned strtou(char * str) {
     return (unsigned) value;
 }
 
-int ashuffle_options(struct ashuffle_options * opts, 
-                     int argc, char * argv[]) {
+#define PARSE_FAIL(fmt, ...) \
+    return (struct options_parse_result){ \
+        .status = PARSE_FAILURE, \
+        .msg = xsprintf(fmt, __VA_ARGS__), \
+    }
+
+struct options_parse_result options_parse(struct ashuffle_options * opts, 
+                                          int argc, const char * argv[]) {
     /* State for the state machine */
     enum parse_state state = NO_STATE;
     bool transable = false;
 
-    char * match_field = NULL;
+    const char * match_field = NULL;
     struct song_rule rule;
 
     int type_flag = -1;
@@ -129,7 +134,10 @@ int ashuffle_options(struct ashuffle_options * opts,
 
         /* check we should print the help text */
         if (check_flags(argv[i], 3, "--help", "-h", "-?")) {
-            return -1;
+            return (struct options_parse_result){
+                .status = PARSE_HELP,
+                .msg = NULL,
+            };
         } else if (type_flag != -1) {
             flush_rule(state, opts, &rule);
             rule_init(&rule);
@@ -164,9 +172,7 @@ int ashuffle_options(struct ashuffle_options * opts,
         } else if (state == QUEUE) {
             opts->queue_only = strtou(argv[i]);
             if (opts->queue_only == UINT_MAX) {
-                fprintf(stderr, "Error converting queue length '%s' to integer.\n",
-                        argv[i]);
-                return -1;
+                PARSE_FAIL("couldn't convert queue length '%s' to integer.", argv[i]);
             }
             state = NO_STATE;
         } else if (state == IFILE) {
@@ -179,49 +185,46 @@ int ashuffle_options(struct ashuffle_options * opts,
         } else if (state == QUEUE_BUFFER) {
             opts->queue_buffer = strtou(argv[i]);
             if (opts->queue_buffer == UINT_MAX) {
-                fprintf(stderr, "Error converting queue buffer length '%s' to integer.\n",
-                        argv[i]);
-                return -1;
+                PARSE_FAIL("couldn't convert queue buffer length '%s' to integer.", argv[i]);
             }
             state = NO_STATE;
         } else if (state == HOST) {
-            opts->host = strdup(argv[i]);
-            if (opts->host == NULL) {
-                perror("Error processing host");
-                return -1;
-            }
+            opts->host = xstrdup(argv[i]);
             state = NO_STATE;
         } else if (state == PORT) {
             if (strlen(argv[i]) >= PORTLEN) {
-                fputs("Error processing port: number too large.\n", stderr);
-                return -1;
+                PARSE_FAIL("port value '%s' too large.", argv[i]);
             }
             opts->port = strtou(argv[i]);
             if (opts->port == UINT_MAX) {
-                fprintf(stderr, "Error converting port number '%s' to integer.\n",
-                        argv[i]);
-                return -1;
+                PARSE_FAIL("couldn't convert port '%s' to integer.", argv[i]);
             }
             state = NO_STATE;
         } else {
-            fprintf(stderr, "Invalid option: %s.\n", argv[i]);
-            return -1;
+            PARSE_FAIL("bad option '%s'", argv[i]);
         }
     }
 
     if (state == RULE_VALUE) {
-        fprintf(stderr, "No value supplied for match '%s'.\n", match_field);
-        return -1;
+        PARSE_FAIL("no value supplied for match '%s'", match_field);
     } else if (!state_can_trans(state)) {
-        fprintf(stderr, "No argument supplied for '%s'.\n", argv[argc - 1]);
-        return -1;
+        PARSE_FAIL("no argument supplied for '%s'", argv[argc - 1]);
     }
     /* if we're provisioning a rule right now, flush it */
     flush_rule(state, opts, &rule);
-    return 0;
+    return (struct options_parse_result){
+        .status = PARSE_OK,
+        .msg = NULL,
+    };
 }
 
-void ashuffle_help(FILE * output) {
+void options_parse_result_free(struct options_parse_result * r) {
+    if (r->msg != NULL) {
+        free(r->msg);
+    }
+}
+
+void options_help(FILE * output) {
     fputs(
     "usage: ashuffle -h -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
     "\n"
