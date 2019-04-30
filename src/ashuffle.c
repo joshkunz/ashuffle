@@ -161,7 +161,22 @@ int build_songs_mpd(struct mpd_connection * mpd,
  * songs to the queue */
 void queue_random_song(struct mpd_connection * mpd,
                        struct shuffle_chain * songs) {
-    if (mpd_run_add(mpd, shuffle_pick(songs)) != true) { mpd_perror(mpd); }
+    const char * item = shuffle_pick(songs);
+    const char * suffix = item;
+    /* find last dot */
+    for(int n = 0; item[n]; n++) {
+        if(item[n] == '.') {
+            suffix = &item[n+1];
+        }
+    }
+    bool is_playlist = ( \
+            strcmp(suffix, "m3u") == 0 ? 1 : \
+            strcmp(suffix, "cue") == 0 ? 1 : \
+            strcmp(suffix, "pls") == 0 ? 1 : \
+            strcmp(suffix, "xspf") == 0 ? 1 : 0 );
+    if ( (is_playlist ? mpd_run_load(mpd, item) : mpd_run_add(mpd, item)) != true) {
+        mpd_perror(mpd);
+    }
 }
 
 int try_first(struct mpd_connection * mpd, struct shuffle_chain * songs) {
