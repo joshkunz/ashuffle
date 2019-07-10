@@ -20,7 +20,9 @@ enum parse_state {
     RULE_VALUE,   // expecting rule value (like "modest mouse")
     QUEUE,        // expecting "queue_only" int value
     IFILE,        // expecting song list input file
-    QUEUE_BUFFER  // expecting queue buffer value
+    QUEUE_BUFFER, // expecting queue buffer value
+    HOST,         // expecting a hostname or ip address
+    PORT          // expecting a port number
 };
 
 /* check and see if 'to_check' matches any of 'count' given
@@ -75,6 +77,8 @@ int ashuffle_init(struct ashuffle_options * opts) {
     opts->check_uris = true;
     list_init(&opts->ruleset);
     opts->queue_buffer = ARGS_QUEUE_BUFFER_NONE; // 0
+    opts->host = NULL;
+    opts->port[0] = '\0';
     return 0;
 }
 
@@ -119,7 +123,7 @@ int ashuffle_options(struct ashuffle_options * opts,
         }
 
         /* check we should print the help text */
-        if (check_flags(argv[i], 3, "--help", "-h", "-?")) {
+        if (check_flags(argv[i], 2, "--help", "-?")) {
             return -1;
         } else if (type_flag != -1) {
             flush_rule(state, opts, &rule);
@@ -139,6 +143,12 @@ int ashuffle_options(struct ashuffle_options * opts,
         } else if (transable && opts->file_in == NULL && check_flags(argv[i], 2, "--file", "-f")) {
             flush_rule(state, opts, &rule);
             state = IFILE;
+        } else if (transable && check_flags(argv[i], 2, "--host", "-h")) {
+            flush_rule(state, opts, &rule);
+            state = HOST;
+        } else if (transable && check_flags(argv[i], 2, "--port", "-p")) {
+            flush_rule(state, opts, &rule);
+            state = PORT;
         } else if (state == RULE) {
             match_field = argv[i];
             state = RULE_VALUE;
@@ -169,6 +179,21 @@ int ashuffle_options(struct ashuffle_options * opts,
                 return -1;
             }
             state = NO_STATE;
+        } else if (state == HOST) {
+            opts->host = malloc(strlen(argv[i]) + 1);
+            if (opts->host == NULL) {
+                fputs("Error processing host\n", stderr);
+                return -1;
+            }
+            snprintf(opts->host, strlen(argv[i]) + 1, "%s", argv[i]);
+            state = NO_STATE;
+        } else if (state == PORT) {
+            if (strlen(argv[i]) >= PORTLEN) {
+                fputs("Error processing port\n", stderr);
+                return -1;
+            }
+            snprintf(opts->port, PORTLEN, "%s", argv[i]);
+            state = NO_STATE;
         } else {
             fprintf(stderr, "Invalid option: %s.\n", argv[i]);
             return -1;
@@ -189,13 +214,13 @@ int ashuffle_options(struct ashuffle_options * opts,
 
 void ashuffle_help(FILE * output) {
     fputs(
-    "usage: ashuffle -h -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
+    "usage: ashuffle -? -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]\n"
     "\n"
     "Optional Arguments:\n"
     "   -e,--exclude   Specify things to remove from shuffle (think blacklist).\n"
     "   -o,--only      Instead of continuously adding songs, just add 'NUMBER'\n"
     "                  songs and then exit.\n"
-    "   -h,-?,--help   Display this help message.\n"
+    "   -?,--help      Display this help message.\n"
     "   -f,--file      Use MPD URI's found in 'file' instead of using the entire MPD\n"
     "                  library. You can supply `-` instead of a filename to retrive\n"
     "                  URI's from standard in. This can be used to pipe song URI's\n"
@@ -208,6 +233,8 @@ void ashuffle_help(FILE * output) {
     "                  currently playing song. This is to support MPD features\n"
     "                  like crossfade that don't work if there are no more\n"
     "                  songs in the queue.\n"
+    "   -h,--host      Specify a hostname or IP address to connect to. Defaults\n"
+    "                  to `localhost`.\n"
+    "   -p,--port      Specify a port number to connect to. Defaults to `6600`.\n"
     "See included `readme.md` file for PATTERN syntax.\n", output);
 }
-
