@@ -13,6 +13,8 @@ struct ashuffle_options {
     FILE * file_in;
     bool check_uris;
     unsigned queue_buffer;
+    char * host;
+    unsigned port;
 };
 
 int ashuffle_init(struct ashuffle_options *);

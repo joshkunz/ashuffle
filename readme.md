@@ -59,6 +59,15 @@ For example, one can run ashuffle as follows:
 Or without the password by just omitting the `<password>` and `@` from the
 `MPD_HOST` variable.
 
+You can now also specify an alternate host or port with the --host and --port
+options on the command line.
+
+For example:
+
+    $ ashuffle --host <password>@<hostname> --port <port>
+
+Once again, the password can be omitted.
+
 ### shuffling from files and `--nocheck`
 
 By supplying the `-f` option and a file containing a list of song URIs to
@@ -111,6 +120,9 @@ Optional Arguments:
                   currently playing song. This is to support MPD features
                   like crossfade that don't work if there are no more
                   songs in the queue.
+   --host         Specify a hostname or IP address to connect to. Defaults to
+                  to `localhost`.
+   -p,--port      Specify a port number to connect to. Defaults to `6600`.
 See included `readme.md` file for PATTERN syntax.
 ```
 

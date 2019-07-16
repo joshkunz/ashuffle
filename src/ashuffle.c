@@ -380,16 +380,18 @@ int main (int argc, char * argv[]) {
     /* attempt to connect to MPD */
     struct mpd_connection *mpd;
 
-    /* Attempt to use MPD_HOST variable if available.
-     * Otherwise use 'localhost'. */
-    char * mpd_host_raw = getenv("MPD_HOST") ?
+    /* Attempt to get host from command line if available. Otherwise use
+     * MPD_HOST variable if available. Otherwise use 'localhost'. */
+    char * mpd_host_raw = options.host ?
+                            options.host : getenv("MPD_HOST") ?
                             getenv("MPD_HOST") : "localhost";
     struct mpd_host mpd_host;
     parse_mpd_host(mpd_host_raw, &mpd_host);
 
-    /* Same thing for the port, use the environment defined port
-     * or the default port */
-    unsigned mpd_port = (unsigned) (getenv("MPD_PORT") ?
+    /* Same thing for the port, use the command line defined port, environment
+     * defined, or the default port */
+    unsigned mpd_port = options.port ?
+                            options.port : (unsigned) (getenv("MPD_PORT") ?
                             atoi(getenv("MPD_PORT")) : 6600);
 
     /* Create a new connection to mpd */
@@ -464,6 +466,8 @@ int main (int argc, char * argv[]) {
         rule_free(list_at(&options.ruleset, i));
     }
     list_free(&options.ruleset);
+
+    free(options.host);
 
     /* free-up our songs */
     shuffle_free(&songs);

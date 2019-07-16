@@ -13,6 +13,9 @@
 
 const unsigned ARGS_QUEUE_BUFFER_NONE = 0;
 
+// Maximum string length for a port option.
+static const unsigned PORTLEN = 6;
+
 /* Enum representing the various state of the parser */
 enum parse_state {
     NO_STATE,     // Ready for anything!
@@ -20,7 +23,9 @@ enum parse_state {
     RULE_VALUE,   // expecting rule value (like "modest mouse")
     QUEUE,        // expecting "queue_only" int value
     IFILE,        // expecting song list input file
-    QUEUE_BUFFER  // expecting queue buffer value
+    QUEUE_BUFFER, // expecting queue buffer value
+    HOST,         // expecting a hostname or ip address
+    PORT          // expecting a port number
 };
 
 /* check and see if 'to_check' matches any of 'count' given
@@ -75,6 +80,8 @@ int ashuffle_init(struct ashuffle_options * opts) {
     opts->check_uris = true;
     list_init(&opts->ruleset);
     opts->queue_buffer = ARGS_QUEUE_BUFFER_NONE; // 0
+    opts->host = NULL;
+    opts->port = 0;
     return 0;
 }
 
@@ -139,6 +146,12 @@ int ashuffle_options(struct ashuffle_options * opts,
         } else if (transable && opts->file_in == NULL && check_flags(argv[i], 2, "--file", "-f")) {
             flush_rule(state, opts, &rule);
             state = IFILE;
+        } else if (transable && check_flags(argv[i], 1, "--host")) {
+            flush_rule(state, opts, &rule);
+            state = HOST;
+        } else if (transable && check_flags(argv[i], 2, "--port", "-p")) {
+            flush_rule(state, opts, &rule);
+            state = PORT;
         } else if (state == RULE) {
             match_field = argv[i];
             state = RULE_VALUE;
@@ -165,6 +178,25 @@ int ashuffle_options(struct ashuffle_options * opts,
             opts->queue_buffer = strtou(argv[i]);
             if (opts->queue_buffer == UINT_MAX) {
                 fprintf(stderr, "Error converting queue buffer length '%s' to integer.\n",
+                        argv[i]);
+                return -1;
+            }
+            state = NO_STATE;
+        } else if (state == HOST) {
+            opts->host = strdup(argv[i]);
+            if (opts->host == NULL) {
+                perror("Error processing host");
+                return -1;
+            }
+            state = NO_STATE;
+        } else if (state == PORT) {
+            if (strlen(argv[i]) >= PORTLEN) {
+                fputs("Error processing port: number too large.\n", stderr);
+                return -1;
+            }
+            opts->port = strtou(argv[i]);
+            if (opts->port == UINT_MAX) {
+                fprintf(stderr, "Error converting port number '%s' to integer.\n",
                         argv[i]);
                 return -1;
             }
@@ -208,6 +240,8 @@ void ashuffle_help(FILE * output) {
     "                  currently playing song. This is to support MPD features\n"
     "                  like crossfade that don't work if there are no more\n"
     "                  songs in the queue.\n"
+    "   --host         Specify a hostname or IP address to connect to. Defaults\n"
+    "                  to `localhost`.\n"
+    "   -p,--port      Specify a port number to connect to. Defaults to `6600`.\n"
     "See included `readme.md` file for PATTERN syntax.\n", output);
 }
-
