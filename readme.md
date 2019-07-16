@@ -101,7 +101,7 @@ effectively.
 ## help text
 
 ```
-usage: ashuffle -? -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
+usage: ashuffle -h -n { ..opts.. } [-e PATTERN ...] [-o NUMBER] [-f FILENAME]
 
 Optional Arguments:
    -e,--exclude   Specify things to remove from shuffle (think blacklist).
@@ -120,7 +120,7 @@ Optional Arguments:
                   currently playing song. This is to support MPD features
                   like crossfade that don't work if there are no more
                   songs in the queue.
-   -h,--host      Specify a hostname or IP address to connect to. Defaults to
+   --host         Specify a hostname or IP address to connect to. Defaults to
                   to `localhost`.
    -p,--port      Specify a port number to connect to. Defaults to `6600`.
 See included `readme.md` file for PATTERN syntax.

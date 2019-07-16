@@ -16,7 +16,7 @@ struct ashuffle_options {
     bool check_uris;
     unsigned queue_buffer;
     char * host;
-    char port[PORTLEN];
+    unsigned port;
 };
 
 int ashuffle_init(struct ashuffle_options *);
