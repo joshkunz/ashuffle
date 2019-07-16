@@ -1,5 +1,4 @@
 #define _GNU_SOURCE
-#include <mpd/client.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -7,6 +6,8 @@
 #include <stdbool.h>
 #include <time.h>
 #include <assert.h>
+
+#include <mpd/client.h>
 
 #include "getpass.h"
 #include "shuffle.h"
@@ -19,7 +20,7 @@
 static const int TIMEOUT = 25000;
 
 /* The size of the rolling shuffle window */
-static const int WINDOW_SIZE = 7;
+const int WINDOW_SIZE = 7;
 
 /* These MPD commands are required for ashuffle to run */
 const char* REQUIRED_COMMANDS[] = {
@@ -158,7 +159,7 @@ int build_songs_mpd(struct mpd_connection * mpd,
 
 /* Append a random song from the given list of
  * songs to the queue */
-void queue_random_song(struct mpd_connection * mpd,
+void shuffle_single(struct mpd_connection * mpd,
                        struct shuffle_chain * songs) {
     if (mpd_run_add(mpd, shuffle_pick(songs)) != true) { mpd_perror(mpd); }
 }
@@ -172,7 +173,7 @@ int try_first(struct mpd_connection * mpd, struct shuffle_chain * songs) {
     }
 
     if (mpd_status_get_state(status) != MPD_STATE_PLAY) {
-        queue_random_song(mpd, songs);
+        shuffle_single(mpd, songs);
         if (mpd_run_play_pos(mpd, mpd_status_get_queue_length(status)) != true) {
             mpd_perror(mpd);
         }
@@ -223,10 +224,10 @@ int try_enqueue(struct mpd_connection * mpd,
     if (should_add) {
         if (options->queue_buffer != ARGS_QUEUE_BUFFER_NONE) {
             for (unsigned i = queue_songs_remaining; i < options->queue_buffer; i++) {
-                queue_random_song(mpd, songs);
+                shuffle_single(mpd, songs);
             }
         } else {
-            queue_random_song(mpd, songs);
+            shuffle_single(mpd, songs);
         }
     }
 
@@ -367,7 +368,7 @@ void parse_mpd_host(char * mpd_host, struct mpd_host * o_mpd_host) {
     }
 }
 
-struct mpd_connection * connect(struct ashuffle_options *options) {
+struct mpd_connection *ashuffle_connect(struct ashuffle_options *options) {
     assert(options != NULL && "options should always be set");
     struct mpd_connection *mpd;
 
@@ -417,66 +418,4 @@ struct mpd_connection * connect(struct ashuffle_options *options) {
         die("password applied, but required command still not allowed.");
     }
     return mpd;
-}
-
-int main(int argc, const char * argv[]) {
-    /* attempt to parse out options given on the command line */
-    struct ashuffle_options options;
-    options_init(&options);
-    struct options_parse_result parse_r = options_parse(&options, argc, argv);
-    if (parse_r.status != PARSE_OK) {
-        if (parse_r.msg != NULL) {
-            fprintf(stderr, "error: %s\n", parse_r.msg);
-        }
-        options_help(stderr);
-        exit(1);
-    }
-    options_parse_result_free(&parse_r);
-
-    /* attempt to connect to MPD */
-    struct mpd_connection *mpd = connect(&options);
-
-    struct shuffle_chain songs;
-    shuffle_init(&songs, WINDOW_SIZE);
-
-    /* build the list of songs to shuffle through */
-    if (options.file_in != NULL) {
-        build_songs_file(mpd, &options.ruleset, options.file_in,
-                         &songs, options.check_uris);
-    } else {
-        build_songs_mpd(mpd, &options.ruleset, &songs);
-    }
-
-    if (shuffle_length(&songs) == 0) {
-        puts("Song pool is empty.");
-        return -1;
-    }
-    printf("Picking random songs out of a pool of %u.\n",
-           shuffle_length(&songs));
-
-    /* Seed the random number generator */
-    srand(time(NULL));
-
-    /* do the main action */
-    if (options.queue_only) {
-        for (unsigned i = 0; i < options.queue_only; i++) {
-            queue_random_song(mpd, &songs);
-        }
-        printf("Added %u songs.\n", options.queue_only);
-    } else {
-        shuffle_idle(mpd, &songs, &options);
-    }
-
-    /* dispose of the rules used to build the song-list */
-    for (unsigned i = 0; i < options.ruleset.length; i++) {
-        rule_free(list_at(&options.ruleset, i)->data);
-    }
-    list_free(&options.ruleset);
-
-    free(options.host);
-
-    /* free-up our songs */
-    shuffle_free(&songs);
-    mpd_connection_free(mpd);
-    return 0;
 }

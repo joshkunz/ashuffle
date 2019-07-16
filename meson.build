@@ -6,20 +6,26 @@ add_global_arguments([
 	language: 'c'
 )
 
-sources = [
+high_dep_sources = [
+    'src/ashuffle.c',
+]
+
+low_dep_sources = [
 	'src/args.c',
 	'src/getpass.c',
 	'src/list.c',
 	'src/rule.c',
-	'src/shuffle.c',
+    'src/shuffle.c',
     'src/util.c',
 ]
+
+sources = low_dep_sources + high_dep_sources
 
 clientlib = dependency('libmpdclient')
 
 ashuffle = executable(
 	'ashuffle',
-	sources + ['src/ashuffle.c'],
+	sources + ['src/main.c'],
 	dependencies: clientlib,
 	install: true
 )
@@ -48,7 +54,7 @@ tests = {
 foreach test_name, test_sources : tests
     test_exe = executable(
         test_name + '_test',
-        sources + test_sources,
+        low_dep_sources + test_sources,
         include_directories : src_inc,
         dependencies : [libtap_dep, testhelpers_dep, clientfake_dep],
         c_args : test_c_args,
