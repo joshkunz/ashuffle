@@ -21,14 +21,27 @@ low_dep_sources = [
 
 sources = low_dep_sources + high_dep_sources
 
+executable_sources = sources + ['src/main.c']
+
 clientlib = dependency('libmpdclient')
 
 ashuffle = executable(
 	'ashuffle',
-	sources + ['src/main.c'],
+	executable_sources,
 	dependencies: clientlib,
 	install: true
 )
+
+if get_option('tidy_mode')
+    clang_tidy = run_target('clang-tidy',
+        command : ['clang-tidy',
+                   '-p', meson.build_root(),
+                  ] + executable_sources,
+    )
+endif
+
+# We only generate tests if we are *not running in tidy mode
+if not get_option('tidy_mode')
 
 subdir('t')
 
@@ -62,3 +75,5 @@ foreach test_name, test_sources : tests
     )
     test(test_name, test_exe)
 endforeach
+
+endif # tidy_mode

@@ -78,7 +78,7 @@ bool ruleset_accepts_uri(struct mpd_connection * mpd,
         /* even though we're searching for a single song, libmpdclient
          * still acts like we're reading a song list. We read an aditional
          * element to convince MPD this is the end of the song list. */
-        song = mpd_recv_song(mpd);
+        (void) mpd_recv_song(mpd);
     } else {
         fprintf(stderr, "Song uri '%s' not found.\n", uri);
     }
@@ -102,11 +102,10 @@ int build_songs_file(struct mpd_connection * mpd, struct list * ruleset,
         }
 
         /* if this line has terminating newline attached, set it
-         * to null and decrement the length (effectively removing
-         * the newline). */
+         * to null (effectively removing the newline). */
         if (uri[length - 1] == '\n') {
-            uri[length - 1] = '\0';
             length -= 1;
+            uri[length] = '\0';
         }
 
         if ((check && ruleset_accepts_uri(mpd, ruleset, uri)) || (! check)) {

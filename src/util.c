@@ -34,6 +34,8 @@ char * xsprintf(const char * fmt, ...) {
         abort();
     }
 
+    va_end(rest);
+
     return res;
 }
 
@@ -47,5 +49,7 @@ void die(const char * fmt, ...) {
     strcat(fmt_nl, "\n");
 
     vfprintf(stderr, fmt_nl, rest);
+
+    va_end(rest);
     exit(1);
 }
