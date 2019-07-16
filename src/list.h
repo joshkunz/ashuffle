@@ -5,12 +5,12 @@ struct node;
 
 struct datum {
     size_t length;
-    void * data;
+    void *data;
 };
 
 struct list {
     unsigned length;
-    struct node * _list;
+    struct node *_list;
 };
 
 /* initialize the received list structure */
@@ -31,14 +31,14 @@ void list_push_str(struct list *, const char *);
 
 /* Return a pointer to the datum at 'index'. Panics if `index` is outside
  * of the range [0, list->length). */
-const struct datum * list_at(const struct list *, unsigned index);
+const struct datum *list_at(const struct list *, unsigned index);
 
 /* Same as list_at, but assumes the datum contains a null-terminated string. */
-const char * list_at_str(const struct list *, unsigned index);
+const char *list_at_str(const struct list *, unsigned index);
 
 /* Pop item at index 'index' in list 'from' and push it onto the end of
  * list 'to'. If 'index' is out of bounds, the program will crash. */
-void list_pop_push(struct list * from, struct list * to, unsigned index);
+void list_pop_push(struct list *from, struct list *to, unsigned index);
 
 /* Remove the datum at 'index' from the list. If index is out of bounds,
  * the program will crash. */
@@ -47,4 +47,4 @@ void list_pop(struct list *, unsigned index);
 /* Free all elements of the list, and their datums. */
 void list_free(struct list *);
 
-#endif 
+#endif

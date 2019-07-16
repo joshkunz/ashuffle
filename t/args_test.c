@@ -1,9 +1,9 @@
 #define _GNU_SOURCE
+#include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <string.h>
-#include <assert.h>
 
 #include <mpd/client.h>
 #include <tap.h>
@@ -16,7 +16,7 @@
 #include "t/helpers.h"
 #include "t/mpdclient_fake.h"
 
-struct options_parse_result parse_only(const char * first, ...) {
+struct options_parse_result parse_only(const char *first, ...) {
     struct ashuffle_options opts;
     options_init(&opts);
 
@@ -29,7 +29,7 @@ struct options_parse_result parse_only(const char * first, ...) {
     va_list rest;
     va_start(rest, first);
     while (true) {
-        const char * next = va_arg(rest, const char *);
+        const char *next = va_arg(rest, const char *);
         if (next == NULL) {
             break;
         }
@@ -37,7 +37,7 @@ struct options_parse_result parse_only(const char * first, ...) {
     }
     va_end(rest);
 
-    const char ** args_arr = xmalloc(sizeof(const char *) * args.length);
+    const char **args_arr = xmalloc(sizeof(const char *) * args.length);
     for (unsigned i = 0; i < args.length; i++) {
         args_arr[i] = list_at_str(&args, i);
     }
@@ -58,9 +58,10 @@ void test_default() {
 
     options_init(&opts);
 
-    const char * test_args[] = {"ashuffle"};
+    const char *test_args[] = {"ashuffle"};
 
-    struct options_parse_result res = options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
+    struct options_parse_result res =
+        options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
     cmp_ok(res.status, "==", PARSE_OK, "empty parse works");
     options_parse_result_free(&res);
 
@@ -68,7 +69,8 @@ void test_default() {
     cmp_ok(opts.queue_only, "==", 0, "no 'queue only' by default");
     ok(opts.file_in == NULL, "no input file by default");
     cmp_ok(opts.check_uris, "==", true, "check_uris on by default");
-    cmp_ok(opts.queue_buffer, "==", ARGS_QUEUE_BUFFER_NONE, "no queue buffer by default");
+    cmp_ok(opts.queue_buffer, "==", ARGS_QUEUE_BUFFER_NONE,
+           "no queue buffer by default");
 }
 
 void test_basic_short() {
@@ -78,9 +80,10 @@ void test_basic_short() {
 
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
-    const char * test_args[] = {
-        "ashuffle", "-o", "5", "-n", "-q", "10",
-            "-e", "artist", "test artist", "artist", "another one", "-f", "/dev/zero",
+    const char *test_args[] = {
+        "ashuffle",    "-o", "5",         "-n",          "-q",
+        "10",          "-e", "artist",    "test artist", "artist",
+        "another one", "-f", "/dev/zero",
     };
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -101,11 +104,10 @@ void test_basic_long() {
 
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
-    const char * test_args[] = {
-        "ashuffle", "--only", "5", "--no-check",
-            "--file", "/dev/zero",
-            "--exclude", "artist", "test artist", "artist", "another one",
-            "--queue-buffer", "10",
+    const char *test_args[] = {
+        "ashuffle",    "--only",         "5",      "--no-check",  "--file",
+        "/dev/zero",   "--exclude",      "artist", "test artist", "artist",
+        "another one", "--queue-buffer", "10",
     };
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -126,12 +128,10 @@ void test_basic_mixed_long_short() {
 
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
-    const char * test_args[] = {
-        "ashuffle", "-o", "5",
-            "--file", "/dev/zero",
-            "-n",
-            "--queue-buffer", "10",
-            "--exclude", "artist", "test artist", "artist", "another one",
+    const char *test_args[] = {
+        "ashuffle",       "-o", "5",         "--file", "/dev/zero",   "-n",
+        "--queue-buffer", "10", "--exclude", "artist", "test artist", "artist",
+        "another one",
     };
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -160,10 +160,9 @@ void test_bad_strtou() {
 }
 
 void test_rule_basic() {
-
     struct ashuffle_options opts;
     options_init(&opts);
-    const char * test_args[] = {"ashuffle", "-e", "artist", "__artist__"};
+    const char *test_args[] = {"ashuffle", "-e", "artist", "__artist__"};
 
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
@@ -178,35 +177,36 @@ void test_rule_basic() {
 
     // Now we pull out the first rule, and then check it against our
     // test songs.
-    const struct datum * d = list_at(&opts.ruleset, 0);
+    const struct datum *d = list_at(&opts.ruleset, 0);
     assert(d != NULL && "list_at should never return NULL");
-    assert(d->length == sizeof(struct song_rule) && "datum should contain a song rule");
+    assert(d->length == sizeof(struct song_rule) &&
+           "datum should contain a song rule");
 
-    struct song_rule * r = (struct song_rule *) d->data;
+    struct song_rule *r = (struct song_rule *)d->data;
 
-    TEST_SONG(matching,
-        TAG(MPD_TAG_ARTIST, "__artist__"));
-    TEST_SONG(not_matching,
-        TAG(MPD_TAG_ARTIST, "not artist"));
+    TEST_SONG(matching, TAG(MPD_TAG_ARTIST, "__artist__"));
+    TEST_SONG(not_matching, TAG(MPD_TAG_ARTIST, "not artist"));
 
     ok(!rule_match(r, &matching), "basic rule arg should exclude match song");
-    ok(rule_match(r, &not_matching), "basic rule arg should not exclude other song");
+    ok(rule_match(r, &not_matching),
+       "basic rule arg should not exclude other song");
 
     end_skip;
 }
 
 void test_file_stdin() {
-    const char * file_flags[] = {"-f", "--file"};
+    const char *file_flags[] = {"-f", "--file"};
 
     for (unsigned i = 0; i < STATIC_ARRAY_LEN(file_flags); i++) {
-        const char * flag_under_test = file_flags[i];
+        const char *flag_under_test = file_flags[i];
         struct ashuffle_options opts;
         options_init(&opts);
 
-        const char * test_args[] = {"ashuffle", flag_under_test, "-"};
+        const char *test_args[] = {"ashuffle", flag_under_test, "-"};
         struct options_parse_result res =
             options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
-        cmp_ok(res.status, "==", PARSE_OK, "[%s] parse works OK", flag_under_test);
+        cmp_ok(res.status, "==", PARSE_OK, "[%s] parse works OK",
+               flag_under_test);
         options_parse_result_free(&res);
 
         ok(opts.file_in == stdin, "%s parses as stdin", flag_under_test);
@@ -214,48 +214,43 @@ void test_file_stdin() {
 }
 
 void test_partials() {
-    #define TEST_PARTIAL(name, _res, err_match) \
-    do { \
-        struct options_parse_result res = (_res); \
-        cmp_ok(res.status, "==", PARSE_FAILURE, "partial " name " should fail to parse"); \
-        like(res.msg, err_match); \
-        options_parse_result_free(&res); \
+#define TEST_PARTIAL(name, _res, err_match)              \
+    do {                                                 \
+        struct options_parse_result res = (_res);        \
+        cmp_ok(res.status, "==", PARSE_FAILURE,          \
+               "partial " name " should fail to parse"); \
+        like(res.msg, err_match);                        \
+        options_parse_result_free(&res);                 \
     } while (0)
 
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
-    TEST_PARTIAL("only short",
-                 PARSE_ONLY("-o"), "no argument supplied for '-o'");
-    TEST_PARTIAL("only long",
-                 PARSE_ONLY("--only"), "no argument supplied for '--only'");
+    TEST_PARTIAL("only short", PARSE_ONLY("-o"),
+                 "no argument supplied for '-o'");
+    TEST_PARTIAL("only long", PARSE_ONLY("--only"),
+                 "no argument supplied for '--only'");
 
-    TEST_PARTIAL("file short",
-                 PARSE_ONLY("-f"), "no argument supplied for '-f'");
-    TEST_PARTIAL("file long",
-                 PARSE_ONLY("--file"), "no argument supplied for '--file'");
+    TEST_PARTIAL("file short", PARSE_ONLY("-f"),
+                 "no argument supplied for '-f'");
+    TEST_PARTIAL("file long", PARSE_ONLY("--file"),
+                 "no argument supplied for '--file'");
 
-    TEST_PARTIAL("queue buffer short",
-                 PARSE_ONLY("-q"),
+    TEST_PARTIAL("queue buffer short", PARSE_ONLY("-q"),
                  "no argument supplied for '-q'");
-    TEST_PARTIAL("queue buffer long",
-                 PARSE_ONLY("--queue-buffer"),
+    TEST_PARTIAL("queue buffer long", PARSE_ONLY("--queue-buffer"),
                  "no argument supplied for '--queue-buffer'");
 
-    TEST_PARTIAL("exclude short no arg",
-                 PARSE_ONLY("-e"),
+    TEST_PARTIAL("exclude short no arg", PARSE_ONLY("-e"),
                  "no argument supplied for '-e'");
-    TEST_PARTIAL("exclude short only match",
-                 PARSE_ONLY("-e", "artist"),
+    TEST_PARTIAL("exclude short only match", PARSE_ONLY("-e", "artist"),
                  "no value supplied for match 'artist'");
     TEST_PARTIAL("exclude short only match mutli",
                  PARSE_ONLY("-e", "artist", "whatever", "artist"),
                  "no value supplied for match 'artist'");
 
-    TEST_PARTIAL("exclude long no arg",
-                 PARSE_ONLY("--exclude"),
+    TEST_PARTIAL("exclude long no arg", PARSE_ONLY("--exclude"),
                  "no argument supplied for '--exclude'");
-    TEST_PARTIAL("exclude long only match",
-                 PARSE_ONLY("--exclude", "artist"),
+    TEST_PARTIAL("exclude long only match", PARSE_ONLY("--exclude", "artist"),
                  "no value supplied for match 'artist'");
     TEST_PARTIAL("exclude long only match mutli",
                  PARSE_ONLY("--exclude", "artist", "whatever", "artist"),
@@ -263,13 +258,14 @@ void test_partials() {
 }
 
 void test_help() {
-    const char * help_flags[] = {"-h", "--help", "-?"};
+    const char *help_flags[] = {"-h", "--help", "-?"};
 
     for (unsigned i = 0; i < STATIC_ARRAY_LEN(help_flags); i++) {
-        const char * flag_under_test = help_flags[i];
+        const char *flag_under_test = help_flags[i];
 
         struct options_parse_result res = PARSE_ONLY(flag_under_test);
-        cmp_ok(res.status, "==", PARSE_HELP, "[%s] parses as help", flag_under_test);
+        cmp_ok(res.status, "==", PARSE_HELP, "[%s] parses as help",
+               flag_under_test);
         options_parse_result_free(&res);
     }
 }
@@ -283,12 +279,14 @@ void test_bad_option() {
     options_parse_result_free(&res);
 
     res = PARSE_ONLY("-n", "--bad_arg", "-o", "5");
-    cmp_ok(res.status, "==", PARSE_FAILURE, "--bad_arg in middle fails full parse");
+    cmp_ok(res.status, "==", PARSE_FAILURE,
+           "--bad_arg in middle fails full parse");
     like(res.msg, "bad option '--bad_arg'");
     options_parse_result_free(&res);
 
     res = PARSE_ONLY("-n", "-o", "5", "-b");
-    cmp_ok(res.status, "==", PARSE_FAILURE, "bad arg -b at end fails full parse");
+    cmp_ok(res.status, "==", PARSE_FAILURE,
+           "bad arg -b at end fails full parse");
     like(res.msg, "bad option '-b'");
     options_parse_result_free(&res);
 }

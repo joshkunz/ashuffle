@@ -2,14 +2,14 @@
 
 #include <mpd/client.h>
 
-#include "getpass.h"
-#include "shuffle.h"
-#include "list.h"
-#include "rule.h"
 #include "args.h"
 #include "ashuffle.h"
+#include "getpass.h"
+#include "list.h"
+#include "rule.h"
+#include "shuffle.h"
 
-int main(int argc, const char * argv[]) {
+int main(int argc, const char *argv[]) {
     /* attempt to parse out options given on the command line */
     struct ashuffle_options options;
     options_init(&options);
@@ -31,8 +31,8 @@ int main(int argc, const char * argv[]) {
 
     /* build the list of songs to shuffle through */
     if (options.file_in != NULL) {
-        build_songs_file(mpd, &options.ruleset, options.file_in,
-                         &songs, options.check_uris);
+        build_songs_file(mpd, &options.ruleset, options.file_in, &songs,
+                         options.check_uris);
     } else {
         build_songs_mpd(mpd, &options.ruleset, &songs);
     }

@@ -1,19 +1,19 @@
-#include <stdio.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include "list.h"
 
 #ifndef ASHUFFLE_ARGS_H
 #define ASHUFFLE_ARGS_H
 
-const unsigned ARGS_QUEUE_BUFFER_NONE; // 0
+const unsigned ARGS_QUEUE_BUFFER_NONE;  // 0
 
 struct ashuffle_options {
     struct list ruleset;
     unsigned queue_only;
-    FILE * file_in;
+    FILE *file_in;
     bool check_uris;
     unsigned queue_buffer;
-    char * host;
+    char *host;
     unsigned port;
 };
 
@@ -25,7 +25,7 @@ typedef enum {
 
 struct options_parse_result {
     parse_status_t status;
-    char * msg;
+    char *msg;
 };
 
 void options_parse_result_free(struct options_parse_result *);
@@ -36,9 +36,9 @@ void options_init(struct ashuffle_options *);
  * parse result describes the results of the parse.
  * options_parse_result_free *must* be called reguardless of the status
  * of the parse. */
-struct options_parse_result options_parse(struct ashuffle_options *, 
-                                          int argc, const char * argv[]);
+struct options_parse_result options_parse(struct ashuffle_options *, int argc,
+                                          const char *argv[]);
 
-void options_help(FILE * output_stream);
+void options_help(FILE *output_stream);
 
 #endif

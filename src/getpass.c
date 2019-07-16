@@ -1,24 +1,24 @@
 #define _GNU_SOURCE
+#include <assert.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <termios.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdbool.h>
-#include <assert.h>
 
 #include "getpass.h"
 
 #define DEFAULT_GETLINE_BUFSIZE 100
 
 #define set_flag(field, flag, state) \
-    do { \
-        if ((state)) { \
-            (field) |= (flag); \
-        } else { \
-            (field) &= ~(flag); \
-        } \
-    } while (0) 
+    do {                             \
+        if ((state)) {               \
+            (field) |= (flag);       \
+        } else {                     \
+            (field) &= ~(flag);      \
+        }                            \
+    } while (0)
 
 static void set_echo(FILE *stream, bool echo_state, bool echo_nl_state) {
     struct termios flags;
@@ -36,7 +36,7 @@ static void set_echo(FILE *stream, bool echo_state, bool echo_nl_state) {
     }
 }
 
-char * as_getpass(FILE * in_stream, FILE * out_stream, const char *prompt) {
+char *as_getpass(FILE *in_stream, FILE *out_stream, const char *prompt) {
     if (fwrite(prompt, strlen(prompt), 1, out_stream) != 1) {
         perror("getpass (fwrite)");
         exit(1);
@@ -48,7 +48,7 @@ char * as_getpass(FILE * in_stream, FILE * out_stream, const char *prompt) {
 
     set_echo(out_stream, false, true);
 
-    char * result = NULL;
+    char *result = NULL;
     size_t result_size = 0;
     ssize_t result_len = getline(&result, &result_size, in_stream);
     if (result_len < 0) {
@@ -56,8 +56,8 @@ char * as_getpass(FILE * in_stream, FILE * out_stream, const char *prompt) {
         exit(1);
     }
     // Trim off the trailing newline, if it exists
-    if (result[result_len-1] == '\n') {
-        result[result_len-1] = '\0';
+    if (result[result_len - 1] == '\n') {
+        result[result_len - 1] = '\0';
     }
 
     set_echo(out_stream, true, true);

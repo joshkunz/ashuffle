@@ -12,20 +12,20 @@
 void test_basic() {
     struct shuffle_chain chain;
     shuffle_init(&chain, 1);
-    const char * test_str = "test";
+    const char* test_str = "test";
     shuffle_add(&chain, test_str);
     is(shuffle_pick(&chain), test_str, "pick returns only string");
 
     /* Bit of explanation here: If we have a 1-item chain, it should
      * be OK to run `pick` twice (having it return the same string both
      * times). */
-    lives_ok({ (void) shuffle_pick(&chain); }, "double-pick 1-item chain");
+    lives_ok({ (void)shuffle_pick(&chain); }, "double-pick 1-item chain");
     is(shuffle_pick(&chain), test_str, "double-pick on 1-item chain matches");
     shuffle_free(&chain);
 }
 
 // Returns true if the list `lst` contains the string `a`.
-bool check_contains(const char * a, const char * lst[], size_t lst_len) {
+bool check_contains(const char* a, const char* lst[], size_t lst_len) {
     for (size_t i = 0; i < lst_len; i++) {
         if (strcmp(a, lst[i]) == 0) {
             return true;
@@ -35,9 +35,9 @@ bool check_contains(const char * a, const char * lst[], size_t lst_len) {
 }
 
 // Returns true if all items in `lst` are unique.
-bool check_unique(const char * lst[], size_t lst_len) {
+bool check_unique(const char* lst[], size_t lst_len) {
     for (size_t i = 0; i < lst_len; i++) {
-        for (size_t j = i+1; j < lst_len; j++) {
+        for (size_t j = i + 1; j < lst_len; j++) {
             if (strcmp(lst[i], lst[j]) == 0) {
                 return false;
             }
@@ -52,14 +52,14 @@ void test_multi() {
     struct shuffle_chain chain;
     shuffle_init(&chain, 1);
 
-    const char * test_items[] = {"item 1", "item 2", "item 3"};
+    const char* test_items[] = {"item 1", "item 2", "item 3"};
 
     shuffle_add(&chain, test_items[0]);
     shuffle_add(&chain, test_items[1]);
     shuffle_add(&chain, test_items[2]);
 
     for (unsigned i = 0; i < 5000; i++) {
-        const char * item = shuffle_pick(&chain);
+        const char* item = shuffle_pick(&chain);
         if (!check_contains(item, test_items, 3)) {
             fail("pick %u rounds", test_rounds);
             diag("  fail on round: %u", i);
@@ -77,14 +77,14 @@ void test_window_of_size(const unsigned window_size) {
     shuffle_init(&chain, window_size);
 
     for (unsigned i = 0; i < window_size; i++) {
-        char * item = xsprintf("item %u", i);
+        char* item = xsprintf("item %u", i);
         shuffle_add(&chain, item);
         free(item);
     }
 
     // Our buffer of picked items needs to be one larger than the window size
     // so we can test that there is at least one repeat.
-    const char * picked[window_size + 1];
+    const char* picked[window_size + 1];
 
     for (unsigned i = 0; i < window_size + 1; i++) {
         picked[i] = shuffle_pick(&chain);

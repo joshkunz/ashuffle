@@ -1,12 +1,12 @@
 #define _GNU_SOURCE
 #define _POSIX_C_SOURCE 201904L
-#include <stdlib.h>
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-void * xmalloc(size_t size) {
-    void * res = calloc(1, size);
+void *xmalloc(size_t size) {
+    void *res = calloc(1, size);
     if (res == NULL) {
         perror("xmalloc");
         abort();
@@ -14,8 +14,8 @@ void * xmalloc(size_t size) {
     return res;
 }
 
-char * xstrdup(const char * to_dup) {
-    char * res = strdup(to_dup);
+char *xstrdup(const char *to_dup) {
+    char *res = strdup(to_dup);
     if (res == NULL) {
         perror("xstrdup");
         abort();
@@ -23,11 +23,11 @@ char * xstrdup(const char * to_dup) {
     return res;
 }
 
-char * xsprintf(const char * fmt, ...) {
+char *xsprintf(const char *fmt, ...) {
     va_list rest;
     va_start(rest, fmt);
 
-    char * res = NULL;
+    char *res = NULL;
 
     if (vasprintf(&res, fmt, rest) < 0) {
         perror("xsprintf");
@@ -39,7 +39,7 @@ char * xsprintf(const char * fmt, ...) {
     return res;
 }
 
-void die(const char * fmt, ...) {
+void die(const char *fmt, ...) {
     va_list rest;
     va_start(rest, fmt);
 

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+git ls-files | egrep '(c|h)$' | while read F; do
+    clang-format -i $F
+done

@@ -4,14 +4,14 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include <tap.h>
 #include <mpd/client.h>
+#include <tap.h>
 
-#include "rule.h"
 #include "list.h"
+#include "rule.h"
 
-#include "t/mpdclient_fake.h"
 #include "t/helpers.h"
+#include "t/mpdclient_fake.h"
 
 static void test_basic() {
     struct song_rule rule;
@@ -20,16 +20,15 @@ static void test_basic() {
     set_tag_name_iparse_result("don't care", MPD_TAG_UNKNOWN);
     int res = rule_add_criteria(&rule, "don't care", "don't care");
     cmp_ok(res, "!=", 0, "add_criteria should fail on MPD_TAG_UNKNOWN");
-    cmp_ok(rule.matchers.length, "==", 0, "no matchers after failed add_critera");
+    cmp_ok(rule.matchers.length, "==", 0,
+           "no matchers after failed add_critera");
 
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
     res = rule_add_criteria(&rule, "artist", "foo fighters");
     cmp_ok(res, "==", 0, "add_criteria with regular tag works");
 
-    TEST_SONG(matching,
-        TAG(MPD_TAG_ARTIST, "foo fighters"));
-    TEST_SONG(non_matching,
-        TAG(MPD_TAG_ARTIST, "some randy"));
+    TEST_SONG(matching, TAG(MPD_TAG_ARTIST, "foo fighters"));
+    TEST_SONG(non_matching, TAG(MPD_TAG_ARTIST, "some randy"));
 
     ok(!rule_match(&rule, &matching), "should exclude song with matching tag");
     ok(rule_match(&rule, &non_matching), "incldues song with non-matching tag");
@@ -45,18 +44,17 @@ static void test_submatch() {
     int res = rule_add_criteria(&rule, "artist", "foo");
     cmp_ok(res, "==", 0);
 
-    TEST_SONG(matching,
-        TAG(MPD_TAG_ARTIST, "foo fighters"));
+    TEST_SONG(matching, TAG(MPD_TAG_ARTIST, "foo fighters"));
 
-    TEST_SONG(mid_word_matching,
-        TAG(MPD_TAG_ARTIST, "floofoofaf"));
+    TEST_SONG(mid_word_matching, TAG(MPD_TAG_ARTIST, "floofoofaf"));
 
-    TEST_SONG(mid_word_matching_case,
-        TAG(MPD_TAG_ARTIST, "fLOoFoOfaF"));
+    TEST_SONG(mid_word_matching_case, TAG(MPD_TAG_ARTIST, "fLOoFoOfaF"));
 
     ok(!rule_match(&rule, &matching), "should exclude song with submatch");
-    ok(!rule_match(&rule, &mid_word_matching), "should exclude song with submatch mid-word");
-    ok(!rule_match(&rule, &mid_word_matching_case), "should exclude song with submatch mid-word (case insensitive)");
+    ok(!rule_match(&rule, &mid_word_matching),
+       "should exclude song with submatch mid-word");
+    ok(!rule_match(&rule, &mid_word_matching_case),
+       "should exclude song with submatch mid-word (case insensitive)");
 
     rule_free(&rule);
 }
@@ -74,26 +72,25 @@ static void test_multi() {
     res = rule_add_criteria(&rule, "artist", "__artist__");
     cmp_ok(res, "==", 0);
 
-    TEST_SONG(full_match,
-        TAG(MPD_TAG_ARTIST, "__artist__"),
-        TAG(MPD_TAG_ALBUM, "__album__"));
+    TEST_SONG(full_match, TAG(MPD_TAG_ARTIST, "__artist__"),
+              TAG(MPD_TAG_ALBUM, "__album__"));
 
-    TEST_SONG(partial_match_artist,
-        TAG(MPD_TAG_ARTIST, "__artist__"),
-        TAG(MPD_TAG_ALBUM, "no match"));
+    TEST_SONG(partial_match_artist, TAG(MPD_TAG_ARTIST, "__artist__"),
+              TAG(MPD_TAG_ALBUM, "no match"));
 
-    TEST_SONG(partial_match_album,
-        TAG(MPD_TAG_ARTIST, "no match"),
-        TAG(MPD_TAG_ALBUM, "__album__"));
+    TEST_SONG(partial_match_album, TAG(MPD_TAG_ARTIST, "no match"),
+              TAG(MPD_TAG_ALBUM, "__album__"));
 
-    TEST_SONG(no_match,
-        TAG(MPD_TAG_ARTIST, "no match"),
-        TAG(MPD_TAG_ALBUM, "no match"));
+    TEST_SONG(no_match, TAG(MPD_TAG_ARTIST, "no match"),
+              TAG(MPD_TAG_ALBUM, "no match"));
 
     ok(!rule_match(&rule, &full_match), "should match if all fields match");
-    ok(!rule_match(&rule, &partial_match_artist), "should match if any field matches (artist)");
-    ok(!rule_match(&rule, &partial_match_album), "should match if any field matches (album)");
-    ok(rule_match(&rule, &no_match), "no match if no matching fields, even with multiple possibilities");
+    ok(!rule_match(&rule, &partial_match_artist),
+       "should match if any field matches (artist)");
+    ok(!rule_match(&rule, &partial_match_album),
+       "should match if any field matches (album)");
+    ok(rule_match(&rule, &no_match),
+       "no match if no matching fields, even with multiple possibilities");
 
     rule_free(&rule);
 }

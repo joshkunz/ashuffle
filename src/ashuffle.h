@@ -16,22 +16,19 @@ extern const unsigned WINDOW_SIZE;
 struct mpd_connection* ashuffle_connect(struct ashuffle_options*);
 
 // Build a `shuffle_chain` of songs from URIs in the given file.
-int build_songs_file(struct mpd_connection * mpd, struct list * ruleset,
-                     FILE * input, struct shuffle_chain * songs, bool check);
+int build_songs_file(struct mpd_connection* mpd, struct list* ruleset,
+                     FILE* input, struct shuffle_chain* songs, bool check);
 
 // Build a `shuffle_chain` of songs, by querying the given MPD instance.
-int build_songs_mpd(struct mpd_connection * mpd,
-                    struct list * ruleset,
-                    struct shuffle_chain * songs);
+int build_songs_mpd(struct mpd_connection* mpd, struct list* ruleset,
+                    struct shuffle_chain* songs);
 
 // Add a single random song from the given shuffle chain to the given MPD
 // instance.
-void shuffle_single(struct mpd_connection * mpd,
-                    struct shuffle_chain * songs);
+void shuffle_single(struct mpd_connection* mpd, struct shuffle_chain* songs);
 
 // Use the MPD `idle` command to queue songs random songs when the current
 // queue finishes playing. This is the core loop of `ashuffle`.
-int shuffle_idle(struct mpd_connection * mpd,
-                 struct shuffle_chain * songs,
-                 struct ashuffle_options * options);
+int shuffle_idle(struct mpd_connection* mpd, struct shuffle_chain* songs,
+                 struct ashuffle_options* options);
 #endif

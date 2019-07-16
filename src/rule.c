@@ -1,11 +1,11 @@
 #define _GNU_SOURCE
 
-#include <mpd/client.h>
 #include <assert.h>
+#include <mpd/client.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
 #include "list.h"
 #include "rule.h"
@@ -13,10 +13,10 @@
 
 struct rule_field {
     enum mpd_tag_type tag;
-    char * value;
+    char *value;
 };
 
-void rule_init(struct song_rule * rule) {
+void rule_init(struct song_rule *rule) {
     /* set the type */
     rule->type = RULE_EXCLUDE;
 
@@ -24,9 +24,8 @@ void rule_init(struct song_rule * rule) {
     list_init(&rule->matchers);
 }
 
-int rule_add_criteria(struct song_rule * rule,
-                      const char * field,
-                      const char * expected_value) {
+int rule_add_criteria(struct song_rule *rule, const char *field,
+                      const char *expected_value) {
     struct rule_field matcher;
     /* try and parse out the tag to match on */
     matcher.tag = mpd_tag_name_iparse(field);
@@ -45,16 +44,17 @@ int rule_add_criteria(struct song_rule * rule,
     return 0;
 }
 
-bool rule_match(struct song_rule * rule, 
-                const struct mpd_song * song) {
-    struct rule_field * current_matcher = NULL;
-    const char * tag_value = NULL;
+bool rule_match(struct song_rule *rule, const struct mpd_song *song) {
+    struct rule_field *current_matcher = NULL;
+    const char *tag_value = NULL;
     for (unsigned i = 0; i < rule->matchers.length; i++) {
         current_matcher = list_at(&rule->matchers, i)->data;
         /* get the first result for this tag */
         tag_value = mpd_song_get_tag(song, current_matcher->tag, 0);
         /* if the tag doesn't exist, we can't match on it. */
-        if (tag_value == NULL) { continue; }
+        if (tag_value == NULL) {
+            continue;
+        }
         /* if our match value is at least a substring of the tag's
          * value, we have a match. e.g. de matches 'De La Soul'.
          * If the output of strstr is NULL we don't have a substring
@@ -73,12 +73,12 @@ bool rule_match(struct song_rule * rule,
     return true;
 }
 
-void rule_free(struct song_rule * rule) {
-    struct rule_field * field;
+void rule_free(struct song_rule *rule) {
+    struct rule_field *field;
     for (unsigned i = 0; i < rule->matchers.length; i++) {
-        const struct datum * item = list_at(&rule->matchers, i);
+        const struct datum *item = list_at(&rule->matchers, i);
         assert(item != NULL && "in-bound matcher should never be NULL");
-        field = (struct rule_field *) item->data;
+        field = (struct rule_field *)item->data;
         free(field->value);
     }
     list_free(&rule->matchers);

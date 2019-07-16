@@ -1,12 +1,12 @@
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "list.h"
 #include "shuffle.h"
 
-#define RAND_REAL() ((double) rand() / (double)RAND_MAX)
+#define RAND_REAL() ((double)rand() / (double)RAND_MAX)
 
-void shuffle_init(struct shuffle_chain * s, unsigned window_size) {
+void shuffle_init(struct shuffle_chain *s, unsigned window_size) {
     list_init(&s->pool);
     list_init(&s->window);
     s->max_window = window_size;
@@ -18,7 +18,7 @@ unsigned shuffle_length(struct shuffle_chain *s) {
 }
 
 /* add an item to the chain by pushing it into the pool */
-void shuffle_add(struct shuffle_chain * s, const char * item) {
+void shuffle_add(struct shuffle_chain *s, const char *item) {
     list_push_str(&s->pool, item);
 }
 
@@ -33,8 +33,8 @@ static void fill_window(struct shuffle_chain *s) {
 
 /* Randomly pick an element added via 'shuffle_add' and return
  * a pointer to it. */
-const char * shuffle_pick(struct shuffle_chain * s) {
-    const void * data = NULL;
+const char *shuffle_pick(struct shuffle_chain *s) {
+    const void *data = NULL;
     if (shuffle_length(s) == 0) {
         fprintf(stderr, "shuffle_pick: cannot pick from empty chain.");
         abort();
@@ -48,7 +48,7 @@ const char * shuffle_pick(struct shuffle_chain * s) {
 }
 
 /* Free memory associated with the shuffle chain. */
-void shuffle_free(struct shuffle_chain * s) {
+void shuffle_free(struct shuffle_chain *s) {
     list_free(&s->pool);
     list_free(&s->window);
 }
