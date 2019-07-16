@@ -13,4 +13,7 @@ char * xstrdup(const char *);
 /* Equivalent to asprintf, but it cannot fail. */
 char * xsprintf(const char * fmt, ...);
 
+/* Exit the program after displaying the given error. */
+void die(const char * fmt, ...);
+
 #endif

@@ -13,12 +13,13 @@
 #include "list.h"
 #include "rule.h"
 #include "args.h"
+#include "util.h"
 
 /* 25 seconds is the default timeout */
-#define TIMEOUT 25000
+static const int TIMEOUT = 25000;
 
 /* The size of the rolling shuffle window */
-#define WINDOW_SIZE 7
+static const int WINDOW_SIZE = 7;
 
 /* These MPD commands are required for ashuffle to run */
 const char* REQUIRED_COMMANDS[] = {
@@ -137,7 +138,7 @@ int build_songs_mpd(struct mpd_connection * mpd,
                 "MPD server closed the connection while getting the list of all songs.\n"
                 "If MPD error logs say \"Output buffer is full\", consider setting\n"
                 "max_output_buffer_size to a higher value (e.g. 32768) in your MPD config.\n");
-	exit(1);
+        exit(1);
     } else if (err != MPD_ERROR_SUCCESS) {
         mpd_perror(mpd);
     }
@@ -293,13 +294,11 @@ void get_mpd_password(struct mpd_connection * mpd) {
             return;
         } else if (err == MPD_ERROR_SERVER) {
             enum mpd_server_error server_err = mpd_connection_get_server_error(mpd);
-            if (server_err == MPD_SERVER_ERROR_PASSWORD) {
-                mpd_connection_clear_error(mpd);
-                fprintf(stderr, "incorrect password.\n");
-                continue;
-            } else {
+            if (server_err != MPD_SERVER_ERROR_PASSWORD) {
                 mpd_perror(mpd);
             }
+            mpd_connection_clear_error(mpd);
+            fprintf(stderr, "incorrect password.\n");
         } else {
             mpd_perror(mpd);
         }
@@ -368,46 +367,31 @@ void parse_mpd_host(char * mpd_host, struct mpd_host * o_mpd_host) {
     }
 }
 
-int main (int argc, const char * argv[]) {
-    /* attempt to parse out options given on the command line */
-    struct ashuffle_options options;
-    options_init(&options);
-    struct options_parse_result parse_r = options_parse(&options, argc, argv);
-    if (parse_r.status != PARSE_OK) {
-        if (parse_r.msg != NULL) {
-            fprintf(stderr, "error: %s\n", parse_r.msg);
-        }
-        options_help(stderr);
-        exit(1);
-    }
-    options_parse_result_free(&parse_r);
-
-    /* attempt to connect to MPD */
+struct mpd_connection * connect(struct ashuffle_options *options) {
+    assert(options != NULL && "options should always be set");
     struct mpd_connection *mpd;
 
     /* Attempt to get host from command line if available. Otherwise use
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
-    char * mpd_host_raw = options.host ?
-                            options.host : getenv("MPD_HOST") ?
+    char * mpd_host_raw = options->host ?
+                            options->host : getenv("MPD_HOST") ?
                             getenv("MPD_HOST") : "localhost";
     struct mpd_host mpd_host;
     parse_mpd_host(mpd_host_raw, &mpd_host);
 
     /* Same thing for the port, use the command line defined port, environment
      * defined, or the default port */
-    unsigned mpd_port = options.port ?
-                            options.port : (unsigned) (getenv("MPD_PORT") ?
+    unsigned mpd_port = options->port ?
+                            options->port : (unsigned) (getenv("MPD_PORT") ?
                             atoi(getenv("MPD_PORT")) : 6600);
 
     /* Create a new connection to mpd */
     mpd = mpd_connection_new(mpd_host.host, mpd_port, TIMEOUT);
 
     if (mpd == NULL) {
-        fputs("Could not connect due to lack of memory.", stderr);
-        return 1;
+        die("Could not connect due to lack of memory.");
     } else if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        fprintf(stderr, "Could not connect to %s:%u.\n", mpd_host.host, mpd_port);
-        return 1;
+        die("Could not connect to %s:%u.", mpd_host.host, mpd_port);
     }
 
     /* Password Workflow:
@@ -424,16 +408,33 @@ int main (int argc, const char * argv[]) {
     }
     bool need_mpd_password = is_mpd_password_needed(mpd);
     if (mpd_host.password != NULL && need_mpd_password) {
-        fprintf(stderr, "password applied, but required command still not allowed.\n");
-        exit(1);
+        die("password applied, but required command still not allowed.");
     }
     if (need_mpd_password) {
         get_mpd_password(mpd);
     }
     if (is_mpd_password_needed(mpd)) {
-        fprintf(stderr, "password applied, but required command still not allowed.\n");
+        die("password applied, but required command still not allowed.");
+    }
+    return mpd;
+}
+
+int main(int argc, const char * argv[]) {
+    /* attempt to parse out options given on the command line */
+    struct ashuffle_options options;
+    options_init(&options);
+    struct options_parse_result parse_r = options_parse(&options, argc, argv);
+    if (parse_r.status != PARSE_OK) {
+        if (parse_r.msg != NULL) {
+            fprintf(stderr, "error: %s\n", parse_r.msg);
+        }
+        options_help(stderr);
         exit(1);
     }
+    options_parse_result_free(&parse_r);
+
+    /* attempt to connect to MPD */
+    struct mpd_connection *mpd = connect(&options);
 
     struct shuffle_chain songs;
     shuffle_init(&songs, WINDOW_SIZE);

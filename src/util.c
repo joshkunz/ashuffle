@@ -36,3 +36,16 @@ char * xsprintf(const char * fmt, ...) {
 
     return res;
 }
+
+void die(const char * fmt, ...) {
+    va_list rest;
+    va_start(rest, fmt);
+
+    // +2 = 1 (newline) + 1 (null)
+    char *fmt_nl = xmalloc(strlen(fmt) + 2);
+    strcpy(fmt_nl, fmt);
+    strcat(fmt_nl, "\n");
+
+    vfprintf(stderr, fmt_nl, rest);
+    exit(1);
+}

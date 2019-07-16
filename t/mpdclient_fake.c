@@ -7,12 +7,12 @@
 
 #include "mpdclient_fake.h"
 
-/* Fake interface to match MPD */
-
 static struct {
     const char * field_name;
     enum mpd_tag_type tag;
 } _MPD_IPARSE_EXPECTED;
+
+/* Fake interface to match MPD */
 
 enum mpd_tag_type mpd_tag_name_iparse(const char * field) {
     if (strcmp(_MPD_IPARSE_EXPECTED.field_name, field) != 0) {
