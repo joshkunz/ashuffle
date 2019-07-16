@@ -13,6 +13,9 @@
 
 const unsigned ARGS_QUEUE_BUFFER_NONE = 0;
 
+// Maximum string length for a port option.
+static const unsigned PORTLEN = 6;
+
 /* Enum representing the various state of the parser */
 enum parse_state {
     NO_STATE,     // Ready for anything!
@@ -192,6 +195,11 @@ int ashuffle_options(struct ashuffle_options * opts,
                 return -1;
             }
             opts->port = strtou(argv[i]);
+            if (opts->port == UINT_MAX) {
+                fprintf(stderr, "Error converting port number '%s' to integer.\n",
+                        argv[i]);
+                return -1;
+            }
             state = NO_STATE;
         } else {
             fprintf(stderr, "Invalid option: %s.\n", argv[i]);

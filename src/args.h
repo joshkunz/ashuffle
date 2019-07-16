@@ -5,8 +5,6 @@
 #ifndef ASHUFFLE_ARGS_H
 #define ASHUFFLE_ARGS_H
 
-#define PORTLEN 6
-
 const unsigned ARGS_QUEUE_BUFFER_NONE; // 0
 
 struct ashuffle_options {
