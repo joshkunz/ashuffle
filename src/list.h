@@ -44,6 +44,12 @@ void list_pop_push(struct list *from, struct list *to, unsigned index);
  * the program will crash. */
 void list_pop(struct list *, unsigned index);
 
+/* Like list_pop: Remove the datum at 'index' from the list. Additionally, the
+ * contents of datum will be stored in `out`, which must not be NULL. The
+ * `data` pointer in the `out` datum will be owned by the caller, and must
+ * by free'd by the caller. If 'index' is out of bounds, the program crashes. */
+void list_leak(struct list *, unsigned index, struct datum *out);
+
 /* Free all elements of the list, and their datums. */
 void list_free(struct list *);
 

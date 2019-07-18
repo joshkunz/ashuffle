@@ -133,6 +133,17 @@ void list_pop(struct list *l, unsigned index) {
     free(extracted);
 }
 
+void list_leak(struct list *l, unsigned index, struct datum *out) {
+    assert(out != NULL && "cannot store result in NULL datum");
+    struct node *extracted = list_node_extract(l, index);
+    if (extracted == NULL) {
+        exit_oob(l, index);
+    }
+    memcpy(out, &extracted->data, sizeof(struct datum));
+    // Note: Explicitly don't free node->data here.
+    free(extracted);
+}
+
 /* free all elements of the list */
 void list_free(struct list *l) {
     while (l->_list != NULL) {

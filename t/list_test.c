@@ -52,11 +52,44 @@ void test_multi_push_pop() {
     list_free(&test_list);
 }
 
+void test_leak() {
+    struct list t;
+    list_init(&t);
+    char* a = "test str A";
+    char* b = "test str B";
+    char* c = "test str C";
+    list_push_str(&t, a);
+    list_push_str(&t, b);
+    list_push_str(&t, c);
+
+    cmp_ok(t.length, "==", 3, "leak: length 3 after appending 3 strings");
+    dies_ok({ list_leak(&t, 1, NULL); }, "leak: fail to leak to NULL datum");
+    dies_ok(
+        {
+            struct datum _bad;
+            list_leak(&t, 3, &_bad);
+        },
+        "leak: fail to leak out of bounds");
+    struct datum outa;
+    list_leak(&t, 1, &outa);
+    is(outa.data, b, "leak: popped item 1 matches string 2");
+    cmp_ok((size_t)outa.data, "!=", (size_t)a,
+           "leak: popped value is owned by the caller");
+    free(outa.data);
+
+    cmp_ok(t.length, "==", 2, "leak: list length 2 after list_leak");
+    is(list_at_str(&t, 0), a,
+       "leak: remaing strings match original strings (a)");
+    is(list_at_str(&t, 1), c,
+       "leak: remaing strings match original strings (c)");
+}
+
 int main() {
     plan(NO_PLAN);
 
     test_basic();
     test_multi_push_pop();
+    test_leak();
 
     done_testing();
 }
