@@ -31,8 +31,7 @@ const char *REQUIRED_COMMANDS[] = {
 void mpd_perror(struct mpd_connection *mpd) {
     assert(mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS &&
            "must be an error present");
-    fprintf(stderr, "MPD error: %s\n", mpd_connection_get_error_message(mpd));
-    exit(1);
+    die("MPD error: %s", mpd_connection_get_error_message(mpd));
 }
 
 void mpd_perror_if_error(struct mpd_connection *mpd) {
@@ -94,8 +93,7 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
     length = getline(&uri, &ignored, input);
     while (!feof(input) && !ferror(input)) {
         if (length < 1) {
-            fprintf(stderr, "invalid URI in input stream\n");
-            exit(1);
+            die("invalid URI in input stream");
         }
 
         /* if this line has terminating newline attached, set it
@@ -132,14 +130,10 @@ int build_songs_mpd(struct mpd_connection *mpd, struct list *ruleset,
     struct mpd_song *song = mpd_recv_song(mpd);
     const enum mpd_error err = mpd_connection_get_error(mpd);
     if (err == MPD_ERROR_CLOSED) {
-        fprintf(stderr,
-                "MPD server closed the connection while getting the list of "
-                "all songs.\n"
-                "If MPD error logs say \"Output buffer is full\", consider "
-                "setting\n"
-                "max_output_buffer_size to a higher value (e.g. 32768) in your "
-                "MPD config.\n");
-        exit(1);
+        die("MPD server closed the connection while getting the list of\n"
+            "all songs. If MPD error logs say \"Output buffer is full\",\n"
+            "consider setting max_output_buffer_size to a higher value\n"
+            "(e.g. 32768) in your MPD config.");
     } else if (err != MPD_ERROR_SUCCESS) {
         mpd_perror(mpd);
     }
@@ -175,8 +169,7 @@ int try_first(struct mpd_connection *mpd, struct shuffle_chain *songs) {
 
     if (mpd_status_get_state(status) != MPD_STATE_PLAY) {
         shuffle_single(mpd, songs);
-        if (mpd_run_play_pos(mpd, mpd_status_get_queue_length(status)) !=
-            true) {
+        if (!mpd_run_play_pos(mpd, mpd_status_get_queue_length(status))) {
             mpd_perror(mpd);
         }
     }
@@ -239,13 +232,12 @@ int try_enqueue(struct mpd_connection *mpd, struct shuffle_chain *songs,
         /* Since the 'status' was before we added our song, and the queue
          * is zero-indexed, the length will be the position of the song we
          * just added. Play that song */
-        if (mpd_run_play_pos(mpd, mpd_status_get_queue_length(status)) !=
-            true) {
+        if (!mpd_run_play_pos(mpd, mpd_status_get_queue_length(status))) {
             mpd_perror(mpd);
         }
         /* Immediately pause playback if mpd single mode is on */
         if (mpd_status_get_single(status)) {
-            if (mpd_run_pause(mpd, true) != true) {
+            if (mpd_run_pause(mpd, true)) {
                 mpd_perror(mpd);
             }
         }

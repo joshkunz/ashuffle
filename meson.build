@@ -23,6 +23,9 @@ sources = low_dep_sources + high_dep_sources
 
 executable_sources = sources + ['src/main.c']
 
+src_inc = include_directories('src')
+root_inc = include_directories('.')
+
 clientlib = dependency('libmpdclient')
 
 ashuffle = executable(
@@ -55,13 +58,12 @@ test_options = [
     'b_sanitize=undefined',
 ]
 
-src_inc = include_directories('src')
-
 tests = {
-    'list': ['t/list_test.c'],
-    'shuffle': ['t/shuffle_test.c'],
-    'rule': ['t/rule_test.c'],
     'args': ['t/args_test.c'],
+    'ashuffle': ['src/ashuffle.c', 't/ashuffle_test.c'],
+    'list': ['t/list_test.c'],
+    'rule': ['t/rule_test.c'],
+    'shuffle': ['t/shuffle_test.c'],
 }
 
 foreach test_name, test_sources : tests

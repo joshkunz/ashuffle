@@ -15,6 +15,9 @@
 #define TEST_SONG(name, ...)                          \
     test_tag_value_t __tags_##name[] = {__VA_ARGS__}; \
     struct mpd_song name =                            \
-        test_build_song(__tags_##name, STATIC_ARRAY_LEN(__tags_##name))
+        test_build_song(#name, __tags_##name, STATIC_ARRAY_LEN(__tags_##name))
+
+#define TEST_SONG_URI(name) \
+    struct mpd_song name = test_build_song(#name, NULL, 0)
 
 #endif

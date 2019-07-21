@@ -5,7 +5,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "src/list.h"
+#include "src/util.h"
+
 #include "mpdclient_fake.h"
+
+#define UNUSED __attribute__((unused))
 
 static struct {
     const char *field_name;
@@ -29,32 +34,254 @@ const char *mpd_song_get_tag(const struct mpd_song *song,
     return song->tag_values[type];
 }
 
+static struct {
+    const char *host;
+    unsigned port;
+    unsigned delay;
+} _MPD_SERVER;
+
+struct mpd_status {
+    const struct mpd_connection *c;
+};
+
+static void mpd_connection_set_error(struct mpd_connection *c, enum mpd_error e,
+                                     const char *msg) {
+    free((void *)c->error.msg);
+    c->error.error = e;
+    c->error.server_error = MPD_SERVER_ERROR_UNK;
+    if (msg) {
+        c->error.msg = xstrdup(msg);
+    } else {
+        c->error.msg = NULL;
+    }
+}
+
+static void mpd_connection_set_server_error(struct mpd_connection *c,
+                                                   enum mpd_server_error e,
+                                                   const char *msg) {
+    free((void *)c->error.msg);
+    c->error.server_error = e;
+    c->error.error = MPD_ERROR_SERVER;
+    if (msg) {
+        c->error.msg = xstrdup(msg);
+    } else {
+        c->error.msg = NULL;
+    }
+}
+
+void mpd_connection_free(struct mpd_connection* connection) {
+    free((void *)connection->error.msg);
+    // TODO: cleanup users
+    list_free(&connection->pair_iter);
+    list_free(&connection->song_iter);
+    list_free(&connection->db);
+    list_free(&connection->queue);
+}
+
+struct mpd_connection *mpd_connection_new(const char *host, unsigned port,
+                                          unsigned timeout_ms) {
+    struct mpd_connection *ret = xmalloc(sizeof(struct mpd_connection));
+    if (!strcmp(host, _MPD_SERVER.host)) {
+        mpd_connection_set_error(ret, MPD_ERROR_RESOLVER, "host not found");
+    } else if (port != _MPD_SERVER.port) {
+        mpd_connection_set_error(ret, MPD_ERROR_RESOLVER, "port not found");
+    } else if (_MPD_SERVER.delay > timeout_ms) {
+        mpd_connection_set_error(ret, MPD_ERROR_TIMEOUT,
+                                 "connection timed out");
+    } else {
+        mpd_connection_set_error(ret, MPD_ERROR_SUCCESS, "success");
+    }
+    return ret;
+}
+
+bool mpd_connection_clear_error(struct mpd_connection *connection) {
+    switch (connection->error.error) {
+        case MPD_ERROR_RESOLVER:
+        case MPD_ERROR_TIMEOUT:
+            return false;
+        default:
+            mpd_connection_set_error(connection, MPD_ERROR_SUCCESS, NULL);
+            return true;
+    }
+}
+
+enum mpd_error mpd_connection_get_error(
+    const struct mpd_connection *connection) {
+    return connection->error.error;
+}
+
+enum mpd_server_error mpd_connection_get_server_error(
+    const struct mpd_connection *connection) {
+    return connection->error.server_error;
+}
+
+const char *mpd_connection_get_error_message(
+    const struct mpd_connection *connection) {
+    return connection->error.msg;
+}
+
+void mpd_song_free(struct mpd_song *song) { free(song); }
+
+const char *mpd_song_get_uri(const struct mpd_song *song) { return song->uri; }
+
+struct mpd_song *mpd_recv_song(struct mpd_connection *connection) {
+    if (connection->song_iter.length == 0) {
+        return NULL;
+    }
+    struct datum d;
+    list_leak(&connection->song_iter, 0, &d);
+    return (struct mpd_song *)d.data;
+}
+
+struct mpd_pair *mpd_recv_pair(struct mpd_connection *connection) {
+    if (connection->pair_iter.length == 0) {
+        return NULL;
+    }
+    struct datum d;
+    list_leak(&connection->pair_iter, 0, &d);
+    return (struct mpd_pair *)d.data;
+}
+
+struct mpd_pair *mpd_recv_pair_named(struct mpd_connection *connection, UNUSED const char * name) {
+    return mpd_recv_pair(connection);
+}
+
+bool mpd_run_pause(struct mpd_connection *connection, bool mode) {
+    if (mode) {
+        connection->state.play_state = MPD_STATE_PLAY;
+    } else {
+        connection->state.play_state = MPD_STATE_PAUSE;
+    }
+    return true;
+}
+
+bool mpd_run_play_pos(struct mpd_connection *connection, unsigned song_pos) {
+    // +1 because song_pos is zero-indexed.
+    if ((song_pos + 1) > connection->queue.length) {
+        mpd_connection_set_server_error(connection, MPD_SERVER_ERROR_ARG,
+                                        "Bad song index");
+        return false;
+    }
+    connection->state.play_state = MPD_STATE_PLAY;
+    connection->state.queue_pos = song_pos;
+    return true;
+}
+
+struct mpd_status *mpd_run_status(struct mpd_connection *connection) {
+    struct mpd_status *ret = xmalloc(sizeof(struct mpd_status));
+    ret->c = connection;
+    return ret;
+}
+
+void mpd_status_free(struct mpd_status *status) { free(status); }
+
+unsigned mpd_status_get_queue_length(const struct mpd_status *status) {
+    return status->c->queue.length;
+}
+
+bool mpd_status_get_single(const struct mpd_status *status) {
+    return status->c->state.single;
+}
+
+int mpd_status_get_song_pos(const struct mpd_status *status) {
+    // This value is preserved across stop/play/pause etc. unless it is
+    // explicitly changed by a "play" command, or the song finishes and
+    // progresses to the next item.
+    return status->c->state.queue_pos;
+}
+
+enum mpd_state mpd_status_get_state(const struct mpd_status *status) {
+    return status->c->state.play_state;
+}
+
+// Assumes that we've already set up the song_iter?
+bool mpd_send_list_all_meta(UNUSED struct mpd_connection *connection,
+                            const char *path) {
+    assert(path == NULL && "only NULL path supported");
+    return true;
+}
+
+// Assumes pair iter has been set up correctly.
+bool mpd_send_disallowed_commands(UNUSED struct mpd_connection *connection) {
+    return true;
+}
+
+bool mpd_search_db_songs(UNUSED struct mpd_connection *connection,
+                         UNUSED bool exact) {
+    return true;
+}
+
+bool mpd_search_add_uri_constraint(UNUSED struct mpd_connection *connection,
+                                   UNUSED enum mpd_operator oper,
+                                   UNUSED const char *value) {
+    // We assume that the test suite already set up song_iter correctly.
+    return true;
+}
+
+bool mpd_search_commit(UNUSED struct mpd_connection *connection) {
+    return true;
+}
+
+void mpd_return_pair(UNUSED struct mpd_connection *connection,
+                     struct mpd_pair *pair) {
+    free(pair);
+}
+
+enum mpd_idle mpd_run_idle_mask(UNUSED struct mpd_connection *connection,
+                                UNUSED enum mpd_idle mask) {
+    assert(false && "not implemented");
+}
+
+bool mpd_run_add(UNUSED struct mpd_connection *connection,
+                 const char *uri) {
+    int found_idx = -1;
+    for (unsigned i = 0; i < connection->db.length; i++) {
+        struct mpd_song* song = (struct mpd_song*) list_at(&connection->db, i)->data;
+        if (strcmp(song->uri, uri)) {
+            found_idx = (int) i;
+            break;
+        }
+    }
+    if (found_idx == -1) {
+        mpd_connection_set_server_error(connection, MPD_SERVER_ERROR_NO_EXIST, "uri does not exist");
+        return false;
+    }
+    list_push(&connection->queue, list_at(&connection->db, found_idx));
+    return true;
+}
+
+bool mpd_run_password(struct mpd_connection *connection,
+                      const char *password) {
+    assert(false && "TODO");
+    for (unsigned i = 0; i < connection->auth.users.length; i++) {
+        struct mpdfake_user* user = (struct mpdfake_user*) list_at(&connection->auth.users, i)->data;
+        if (strcmp(user->password, password)) {
+        }
+    }
+}
+
 /* Test helpers */
 
 void set_tag_name_iparse_result(const char *check_name, enum mpd_tag_type t) {
     if (_MPD_IPARSE_EXPECTED.field_name != NULL) {
         free((void *)_MPD_IPARSE_EXPECTED.field_name);
     }
-    _MPD_IPARSE_EXPECTED.field_name = strdup(check_name);
-    if (_MPD_IPARSE_EXPECTED.field_name == NULL) {
-        perror("failed to strdup");
-        exit(1);
-    }
+    _MPD_IPARSE_EXPECTED.field_name = xstrdup(check_name);
     _MPD_IPARSE_EXPECTED.tag = t;
 }
 
-struct mpd_song test_build_song(test_tag_value_t *vals, size_t len) {
+struct mpd_song test_build_song(const char *uri, test_tag_value_t *vals,
+                                size_t len) {
     struct mpd_song ret;
     memset(&ret, 0, sizeof(ret));
+    ret.uri = uri;
 
     for (size_t i = 0; i < len; i++) {
         enum mpd_tag_type cur_tag = vals[i].tag;
         const char *cur_val = ret.tag_values[cur_tag];
         /* Check and make sure we haven't already set that value yet. */
         if (cur_val != NULL) {
-            fprintf(stderr, "tag value %d already defined as %s\n", cur_tag,
-                    cur_val);
-            exit(1);
+            die("tag value %d already defined as %s", cur_tag, cur_val);
         }
         ret.tag_values[cur_tag] = vals[i].val;
     }

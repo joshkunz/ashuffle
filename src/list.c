@@ -12,8 +12,7 @@ struct node {
 };
 
 static void exit_oob(const struct list *l, unsigned index) {
-    fprintf(stderr, "index %d is out of bounds in list %p\n", index, (void *)l);
-    exit(1);
+    die("index %d is out of bounds in list %p\n", index, (void *)l);
 }
 
 void list_init(struct list *list) {
