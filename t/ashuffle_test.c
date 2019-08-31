@@ -21,8 +21,7 @@
 // connect
 // build_songs_file
 //  + with/without nocheck
-// build_songs_mpd
-//  + ruleset accepts uri?
+// (DONE) build_songs_mpd
 // shuffle_single
 // shuffle_idle
 //  + try_first
@@ -37,7 +36,8 @@ void list_push_song(struct list* l, struct mpd_song *s) {
 }
 
 void test_build_songs_mpd_basic() {
-    struct mpd_connection* c = xmalloc(sizeof(struct mpd_connection));
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
 
     struct shuffle_chain chain;
     shuffle_init(&chain, 1);
@@ -46,20 +46,22 @@ void test_build_songs_mpd_basic() {
 
     TEST_SONG_URI(song_a);
     TEST_SONG_URI(song_b);
-    list_push_song(&c->song_iter, &song_a);
-    list_push_song(&c->song_iter, &song_b);
+    list_push_song(&c.song_iter, &song_a);
+    list_push_song(&c.song_iter, &song_b);
 
-    int result = build_songs_mpd(c, &ruleset, &chain);
+    int result = build_songs_mpd(&c, &ruleset, &chain);
     cmp_ok(result, "==", 0, "build_songs_mpd basic returns ok");
-    cmp_ok(shuffle_length(&chain), "==", 2, "build_songs_mpd_basic: 2 songs added to shuffle chain");
+    cmp_ok(shuffle_length(&chain), "==", 2,
+           "build_songs_mpd_basic: 2 songs added to shuffle chain");
 
-    mpd_connection_free(c);
+    mpd_connection_free(&c);
     shuffle_free(&chain);
     list_free(&ruleset);
 }
 
 void test_build_songs_mpd_filter() {
-    struct mpd_connection* c = xmalloc(sizeof(struct mpd_connection));
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
 
     struct shuffle_chain chain;
     shuffle_init(&chain, 1);
@@ -84,15 +86,15 @@ void test_build_songs_mpd_filter() {
     TEST_SONG(song_c,
         TAG(MPD_TAG_ARTIST, "__artist__"));
 
-    list_push_song(&c->song_iter, &song_a);
-    list_push_song(&c->song_iter, &song_b);
-    list_push_song(&c->song_iter, &song_c);
+    list_push_song(&c.song_iter, &song_a);
+    list_push_song(&c.song_iter, &song_b);
+    list_push_song(&c.song_iter, &song_c);
 
-    int result = build_songs_mpd(c, &ruleset, &chain);
+    int result = build_songs_mpd(&c, &ruleset, &chain);
     cmp_ok(result, "==", 0, "build_songs_mpd filter returns ok");
     cmp_ok(shuffle_length(&chain), "==", 2, "build_songs_mpd_filter: 2 songs added to shuffle chain");
 
-    mpd_connection_free(c);
+    mpd_connection_free(&c);
     rule_free(&artist_match);
     shuffle_free(&chain);
 }
