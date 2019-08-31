@@ -84,12 +84,35 @@ void test_leak() {
        "leak: remaing strings match original strings (c)");
 }
 
+void test_empty() {
+    struct list t;
+    list_init(&t);
+
+    struct datum d = {
+        .length = 0,
+        .data = NULL,
+    };
+    list_push(&t, &d);
+
+    cmp_ok(t.length, "==", 1, "empty: length 1 after appending empty element");
+
+    ok(list_at(&t, 0)->data == NULL, "empty: item 1 is NULL pointer");
+    ok(list_at(&t, 0)->length == 0, "empty: item 1 is 0 length");
+
+    list_pop(&t, 0);
+
+    cmp_ok(t.length, "==", 0, "empty: length 0 after popping empty element");
+
+    list_free(&t);
+}
+
 int main() {
     plan(NO_PLAN);
 
     test_basic();
     test_multi_push_pop();
     test_leak();
+    test_empty();
 
     done_testing();
 }

@@ -77,8 +77,13 @@ struct node *list_node_extract(struct list *l, unsigned index) {
 
 static void datum_copy_into(struct datum *dst, const struct datum *src) {
     dst->length = src->length;
-    dst->data = xmalloc(src->length);
-    memcpy(dst->data, src->data, src->length);
+    // Only copy data if there is data to copy.
+    if (src->length) {
+        dst->data = xmalloc(src->length);
+        memcpy(dst->data, src->data, src->length);
+    } else {
+        dst->data = NULL;
+    }
 }
 
 void list_push(struct list *l, const struct datum *d) {
