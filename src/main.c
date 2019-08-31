@@ -33,6 +33,7 @@ int main(int argc, const char *argv[]) {
     if (options.file_in != NULL) {
         build_songs_file(mpd, &options.ruleset, options.file_in, &songs,
                          options.check_uris);
+        fclose(options.file_in);
     } else {
         build_songs_mpd(mpd, &options.ruleset, &songs);
     }

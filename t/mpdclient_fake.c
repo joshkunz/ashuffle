@@ -44,8 +44,8 @@ struct mpd_status {
     const struct mpd_connection *c;
 };
 
-static void mpd_connection_set_error(struct mpd_connection *c, enum mpd_error e,
-                                     const char *msg) {
+void mpd_connection_set_error(struct mpd_connection *c, enum mpd_error e,
+                              const char *msg) {
     free((void *)c->error.msg);
     c->error.error = e;
     c->error.server_error = MPD_SERVER_ERROR_UNK;
@@ -56,9 +56,8 @@ static void mpd_connection_set_error(struct mpd_connection *c, enum mpd_error e,
     }
 }
 
-static void mpd_connection_set_server_error(struct mpd_connection *c,
-                                                   enum mpd_server_error e,
-                                                   const char *msg) {
+void mpd_connection_set_server_error(struct mpd_connection *c,
+                                     enum mpd_server_error e, const char *msg) {
     free((void *)c->error.msg);
     c->error.server_error = e;
     c->error.error = MPD_ERROR_SERVER;
@@ -69,7 +68,7 @@ static void mpd_connection_set_server_error(struct mpd_connection *c,
     }
 }
 
-void mpd_connection_free(struct mpd_connection* connection) {
+void mpd_connection_free(struct mpd_connection *connection) {
     free((void *)connection->error.msg);
     // TODO: cleanup users
     list_free(&connection->pair_iter);
@@ -142,7 +141,8 @@ struct mpd_pair *mpd_recv_pair(struct mpd_connection *connection) {
     return (struct mpd_pair *)d.data;
 }
 
-struct mpd_pair *mpd_recv_pair_named(struct mpd_connection *connection, UNUSED const char * name) {
+struct mpd_pair *mpd_recv_pair_named(struct mpd_connection *connection,
+                                     UNUSED const char *name) {
     return mpd_recv_pair(connection);
 }
 
@@ -232,29 +232,30 @@ enum mpd_idle mpd_run_idle_mask(UNUSED struct mpd_connection *connection,
     assert(false && "not implemented");
 }
 
-bool mpd_run_add(UNUSED struct mpd_connection *connection,
-                 const char *uri) {
+bool mpd_run_add(UNUSED struct mpd_connection *connection, const char *uri) {
     int found_idx = -1;
     for (unsigned i = 0; i < connection->db.length; i++) {
-        struct mpd_song* song = (struct mpd_song*) list_at(&connection->db, i)->data;
+        struct mpd_song *song =
+            (struct mpd_song *)list_at(&connection->db, i)->data;
         if (strcmp(song->uri, uri)) {
-            found_idx = (int) i;
+            found_idx = (int)i;
             break;
         }
     }
     if (found_idx == -1) {
-        mpd_connection_set_server_error(connection, MPD_SERVER_ERROR_NO_EXIST, "uri does not exist");
+        mpd_connection_set_server_error(connection, MPD_SERVER_ERROR_NO_EXIST,
+                                        "uri does not exist");
         return false;
     }
     list_push(&connection->queue, list_at(&connection->db, found_idx));
     return true;
 }
 
-bool mpd_run_password(struct mpd_connection *connection,
-                      const char *password) {
+bool mpd_run_password(struct mpd_connection *connection, const char *password) {
     assert(false && "TODO");
     for (unsigned i = 0; i < connection->auth.users.length; i++) {
-        struct mpdfake_user* user = (struct mpdfake_user*) list_at(&connection->auth.users, i)->data;
+        struct mpdfake_user *user =
+            (struct mpdfake_user *)list_at(&connection->auth.users, i)->data;
         if (strcmp(user->password, password)) {
         }
     }

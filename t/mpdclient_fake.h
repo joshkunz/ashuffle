@@ -42,6 +42,17 @@ struct mpd_connection {
     struct list queue;
 };
 
+/* MPD Connection helpers */
+
+// Set the given server error `e` and associated message. This will also
+// set the neccesary regular connection error as a server error.
+void mpd_connection_set_server_error(struct mpd_connection* c,
+                                     enum mpd_server_error e, const char* msg);
+
+// Set the given error `e` and associated message on this connection.
+void mpd_connection_set_error(struct mpd_connection* c, enum mpd_error e,
+                              const char* msg);
+
 /* constructors */
 
 typedef struct {

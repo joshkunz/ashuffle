@@ -114,7 +114,6 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
         /* get the next uri */
         length = getline(&uri, &ignored, input);
     }
-    fclose(input);
     return 0;
 }
 
