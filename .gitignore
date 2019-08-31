@@ -7,3 +7,6 @@ src/t/*_test
 # Exclude generated Go packages.
 test/harness/pkg/**
 test/harness/src/github.com/**
+
+# Common meson build directory
+build/**
