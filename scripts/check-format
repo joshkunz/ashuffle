@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+declare -a BAD_FORMAT
+
+while read F; do
+    cmp "$F" <(clang-format "$F") >/dev/null
+    if test $? -ne 0; then
+        BAD_FORMAT+=( "$F" )
+    fi
+done <<<$( git ls-files | egrep '(c|h)$' )
+
+if test "${#BAD_FORMAT[@]}" -gt 0; then
+    echo "Unformatted files found (format with scrpts/format):"
+    for F in "${BAD_FORMAT[@]}"; do
+        echo "$F"
+    done
+    exit 1
+fi
+
+exit 0
