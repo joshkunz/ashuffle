@@ -3,3 +3,7 @@ ashuffle.dSYM
 *.o
 *.swp
 src/t/*_test
+
+# Exclude generated Go packages.
+test/harness/pkg/**
+test/harness/src/github.com/**
