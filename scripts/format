@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
-git ls-files | egrep '(c|h)$' | while read F; do
+
+function files_to_format() {
+    if test "$#" -gt 0; then
+        printf "%s\n" "$@"
+    else
+        git ls-files | egrep '\.(c|h)$'
+    fi
+}
+
+files_to_format "$@" | while read F; do
     clang-format -i $F
 done

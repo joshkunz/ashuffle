@@ -2,18 +2,27 @@
 
 declare -a BAD_FORMAT
 
+function staged_modified_files() {
+    git status --porcelain=2 \
+        | egrep '^1 M' | awk '{ print $9 }'
+}
+
 while read F; do
+    if test -z "$F"; then continue; fi
     cmp "$F" <(clang-format "$F") >/dev/null
     if test $? -ne 0; then
         BAD_FORMAT+=( "$F" )
     fi
-done <<<$( git ls-files | egrep '(c|h)$' )
+done <<<$( staged_modified_files | egrep '\.(c|h)$' )
 
 if test "${#BAD_FORMAT[@]}" -gt 0; then
-    echo "Unformatted files found (format with scrpts/format):"
-    for F in "${BAD_FORMAT[@]}"; do
-        echo "$F"
-    done
+    echo "Unformatted files found:"
+    printf "  %s\n" "${BAD_FORMAT[@]}"
+    echo
+    echo "Fix by running:"
+    echo "  scripts/format \\"
+    echo "    " "${BAD_FORMAT[@]}"
+    echo
     exit 1
 fi
 
