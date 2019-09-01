@@ -67,4 +67,10 @@ struct mpd_song test_build_song(const char* uri, test_tag_value_t* vals,
 /* Set the value returned by mpd_tag_name_iparse */
 void set_tag_name_iparse_result(const char* name, enum mpd_tag_type wanted);
 
+// Set the enum that will be returned on subsequent calls to mpd_run_idle
+void set_idle_result(enum mpd_idle);
+
+// Return the currently playing song on the MPD connection.
+const struct mpd_song* mpd_playing(struct mpd_connection* c);
+
 #endif

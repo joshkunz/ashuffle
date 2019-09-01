@@ -321,9 +321,16 @@ void test_shuffle_single() {
     shuffle_free(&chain);
 }
 
+// This function returns true, false, true, false... etc for each call. It
+// can be used with shuffle_loop to make the internal loop run exactly once.
+static bool once_f() {
+    static unsigned count;
+    return (count++ % 2) == 0;
+}
+
 // When used with shuffle_loop, this function will only allow the
 // initialization code to run.
-bool only_init_f() { return false; }
+static bool only_init_f() { return false; }
 
 void test_shuffle_loop_init_empty() {
     struct mpd_connection c;
@@ -439,6 +446,62 @@ void test_shuffle_loop_init_stopped() {
            "shuffle_loop_init_stopped: queue position on second song");
 }
 
+void test_shuffle_loop_basic() {
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    TEST_SONG_URI(song_a);
+    TEST_SONG_URI(song_b);
+
+    struct ashuffle_options options;
+    options_init(&options);
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 1);
+    shuffle_add(&chain, song_a.uri);
+
+    list_init(&c.db);
+    list_push_song(&c.db, &song_a);
+    list_push_song(&c.db, &song_b);
+
+    // Pretend like we already have a song in our queue, that was playing,
+    // but now we've stopped.
+    list_init(&c.queue);
+    list_push_song(&c.queue, &song_b);
+    // If we've gone past the end of the queue, libmpdclient signals this
+    // by setting the queue position to -1 (likely because it is unset in the
+    // mpd status response).
+    c.state.queue_pos = -1;
+    c.state.play_state = MPD_STATE_STOP;
+
+    // Make future IDLE calls return IDLE_QUEUE
+    set_idle_result(MPD_IDLE_QUEUE);
+
+    struct shuffle_test_delegate delegate = {
+        .skip_init = true,
+        .until_f = once_f,
+    };
+
+    int result = shuffle_loop(&c, &chain, &options, &delegate);
+
+    // We should add a new item to the queue, and start playing.
+    cmp_ok(result, "==", 0, "shuffle_loop_basic: shuffle_loop returns 0");
+    cmp_ok(c.queue.length, "==", 2,
+           "shuffle_loop_basic: added one song to queue");
+    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
+           "shuffle_loop_basic: playing after init");
+    cmp_ok(c.state.queue_pos, "==", 1,
+           "shuffle_loop_basic: queue position on second song");
+
+    // The currently playing item should be song_a (the only song in the
+    // shuffle chain). If the mpd state is invalid, no playing song is returned,
+    // and we skip this check.
+    if (mpd_playing(&c)) {
+        is(mpd_playing(&c)->uri, song_a.uri,
+           "shuffle_loop_basic: queued and played song_a");
+    }
+}
+
 int main() {
     plan(NO_PLAN);
 
@@ -451,6 +514,8 @@ int main() {
     test_shuffle_loop_init_empty();
     test_shuffle_loop_init_playing();
     test_shuffle_loop_init_stopped();
+
+    test_shuffle_loop_basic();
 
     done_testing();
 }

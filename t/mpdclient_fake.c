@@ -231,9 +231,13 @@ void mpd_return_pair(UNUSED struct mpd_connection *connection,
     free(pair);
 }
 
+static enum mpd_idle _IDLE;
+
+void set_idle_result(enum mpd_idle idle) { _IDLE = idle; }
+
 enum mpd_idle mpd_run_idle_mask(UNUSED struct mpd_connection *connection,
                                 UNUSED enum mpd_idle mask) {
-    assert(false && "not implemented");
+    return _IDLE;
 }
 
 bool mpd_run_add(struct mpd_connection *connection, const char *uri) {
@@ -291,4 +295,12 @@ struct mpd_song test_build_song(const char *uri, test_tag_value_t *vals,
         ret.tag_values[cur_tag] = vals[i].val;
     }
     return ret;
+}
+
+const struct mpd_song *mpd_playing(struct mpd_connection *c) {
+    if (c->queue.length <= c->state.queue_pos) {
+        return NULL;
+    }
+    return (const struct mpd_song *)list_at(&c->queue, c->state.queue_pos)
+        ->data;
 }
