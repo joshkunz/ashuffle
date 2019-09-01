@@ -10,6 +10,7 @@
 #include <mpd/client.h>
 
 #include "args.h"
+#include "ashuffle.h"
 #include "getpass.h"
 #include "list.h"
 #include "rule.h"
@@ -248,21 +249,26 @@ int try_enqueue(struct mpd_connection *mpd, struct shuffle_chain *songs,
 }
 
 /* Keep adding songs when the queue runs out */
-int shuffle_until(struct mpd_connection *mpd, struct shuffle_chain *songs,
-                  struct ashuffle_options *options, bool (*until_f)()) {
-    assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST &&
-           "QUEUE Now different signal.");
+int shuffle_loop(struct mpd_connection *mpd, struct shuffle_chain *songs,
+                 struct ashuffle_options *options,
+                 struct shuffle_test_delegate *test_d) {
+    static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
+                  "QUEUE Now different signal.");
     int idle_mask = MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER;
 
-    if (try_first(mpd, songs) != 0) {
-        return -1;
-    }
-    if (try_enqueue(mpd, songs, options) != 0) {
-        return -1;
+    // If the test delegate's `skip_init` is set to true, then skip the
+    // initializer.
+    if (!test_d || !test_d->skip_init) {
+        if (try_first(mpd, songs) != 0) {
+            return -1;
+        }
+        if (try_enqueue(mpd, songs, options) != 0) {
+            return -1;
+        }
     }
 
-    // Loop forever if until_f is unset.
-    while (until_f == NULL || until_f()) {
+    // Loop forever if test delegates are not set.
+    while (test_d == NULL || test_d->until_f()) {
         /* wait till the player state changes */
         enum mpd_idle event = mpd_run_idle_mask(mpd, idle_mask);
         mpd_perror_if_error(mpd);

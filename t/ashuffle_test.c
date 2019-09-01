@@ -321,11 +321,11 @@ void test_shuffle_single() {
     shuffle_free(&chain);
 }
 
-// When used with shuffle_until, this function will only allow the
+// When used with shuffle_loop, this function will only allow the
 // initialization code to run.
 bool only_init_f() { return false; }
 
-void test_shuffle_until_init_empty() {
+void test_shuffle_loop_init_empty() {
     struct mpd_connection c;
     memset(&c, 0, sizeof(c));
 
@@ -341,19 +341,22 @@ void test_shuffle_until_init_empty() {
     list_init(&c.db);
     list_push_song(&c.db, &song_a);
 
-    int result = shuffle_until(&c, &chain, &options, only_init_f);
+    struct shuffle_test_delegate delegate = {
+        .until_f = only_init_f,
+    };
 
-    cmp_ok(result, "==", 0,
-           "shuffle_until_init_empty: shuffle_until returns 0");
+    int result = shuffle_loop(&c, &chain, &options, &delegate);
+
+    cmp_ok(result, "==", 0, "shuffle_loop_init_empty: shuffle_loop returns 0");
     cmp_ok(c.queue.length, "==", 1,
-           "shuffle_until_init_empty: added one song to queue");
+           "shuffle_loop_init_empty: added one song to queue");
     cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_until_init_empty: playing after init");
+           "shuffle_loop_init_empty: playing after init");
     cmp_ok(c.state.queue_pos, "==", 0,
-           "shuffle_until_init_empty: queue position on first song");
+           "shuffle_loop_init_empty: queue position on first song");
 }
 
-void test_shuffle_until_init_playing() {
+void test_shuffle_loop_init_playing() {
     struct mpd_connection c;
     memset(&c, 0, sizeof(c));
 
@@ -376,21 +379,25 @@ void test_shuffle_until_init_playing() {
     c.state.play_state = MPD_STATE_PLAY;
     c.state.queue_pos = 0;
 
-    int result = shuffle_until(&c, &chain, &options, only_init_f);
+    struct shuffle_test_delegate delegate = {
+        .until_f = only_init_f,
+    };
+
+    int result = shuffle_loop(&c, &chain, &options, &delegate);
 
     // We shouldn't add anything to the queue if we're already playing,
     // ashuffle should start silently.
     cmp_ok(result, "==", 0,
-           "shuffle_until_init_playing: shuffle_until returns 0");
+           "shuffle_loop_init_playing: shuffle_loop returns 0");
     cmp_ok(c.queue.length, "==", 1,
-           "shuffle_until_init_playing: no songs added to queue");
+           "shuffle_loop_init_playing: no songs added to queue");
     cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_until_init_playing: playing after init");
+           "shuffle_loop_init_playing: playing after init");
     cmp_ok(c.state.queue_pos, "==", 0,
-           "shuffle_until_init_playing: queue position on first song");
+           "shuffle_loop_init_playing: queue position on first song");
 }
 
-void test_shuffle_until_init_stopped() {
+void test_shuffle_loop_init_stopped() {
     struct mpd_connection c;
     memset(&c, 0, sizeof(c));
 
@@ -415,17 +422,21 @@ void test_shuffle_until_init_stopped() {
     c.state.queue_pos = 0;
     c.state.play_state = MPD_STATE_STOP;
 
-    int result = shuffle_until(&c, &chain, &options, only_init_f);
+    struct shuffle_test_delegate delegate = {
+        .until_f = only_init_f,
+    };
+
+    int result = shuffle_loop(&c, &chain, &options, &delegate);
 
     // We should add a new item to the queue, and start playing.
     cmp_ok(result, "==", 0,
-           "shuffle_until_init_stopped: shuffle_until returns 0");
+           "shuffle_loop_init_stopped: shuffle_loop returns 0");
     cmp_ok(c.queue.length, "==", 2,
-           "shuffle_until_init_stopped: added one song to queue");
+           "shuffle_loop_init_stopped: added one song to queue");
     cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_until_init_stopped: playing after init");
+           "shuffle_loop_init_stopped: playing after init");
     cmp_ok(c.state.queue_pos, "==", 1,
-           "shuffle_until_init_stopped: queue position on second song");
+           "shuffle_loop_init_stopped: queue position on second song");
 }
 
 int main() {
@@ -437,9 +448,9 @@ int main() {
     test_build_songs_file_check();
     test_shuffle_single();
 
-    test_shuffle_until_init_empty();
-    test_shuffle_until_init_playing();
-    test_shuffle_until_init_stopped();
+    test_shuffle_loop_init_empty();
+    test_shuffle_loop_init_playing();
+    test_shuffle_loop_init_stopped();
 
     done_testing();
 }
