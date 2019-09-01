@@ -283,13 +283,42 @@ void test_build_songs_file_check() {
     }
 
     // cleanup.
-
     fclose(f);
 
     mpd_connection_free(&c);
     shuffle_free(&chain);
     rule_free(&artist_match);
     list_free(&ruleset);
+}
+
+void test_shuffle_single() {
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    TEST_SONG_URI(song_a);
+    TEST_SONG_URI(song_b);
+
+    list_init(&c.db);
+    list_push_song(&c.db, &song_a);
+    list_push_song(&c.db, &song_b);
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 1);
+    shuffle_add(&chain, song_a.uri);
+
+    cmp_ok(c.queue.length, "==", 0,
+           "shuffle_single: queue empty before song added");
+    shuffle_single(&c, &chain);
+
+    cmp_ok(c.queue.length, "==", 1,
+           "shuffle_single: queue length 1 after song added");
+
+    struct mpd_song *queue_head = list_at(&c.queue, 0)->data;
+    is(queue_head->uri, song_a.uri,
+       "shuffle_single: ensure that song_a was added");
+
+    mpd_connection_free(&c);
+    shuffle_free(&chain);
 }
 
 int main() {
@@ -299,6 +328,7 @@ int main() {
     test_build_songs_mpd_filter();
     test_build_songs_file_nocheck();
     test_build_songs_file_check();
+    test_shuffle_single();
 
     done_testing();
 }

@@ -232,12 +232,12 @@ enum mpd_idle mpd_run_idle_mask(UNUSED struct mpd_connection *connection,
     assert(false && "not implemented");
 }
 
-bool mpd_run_add(UNUSED struct mpd_connection *connection, const char *uri) {
+bool mpd_run_add(struct mpd_connection *connection, const char *uri) {
     int found_idx = -1;
     for (unsigned i = 0; i < connection->db.length; i++) {
         struct mpd_song *song =
             (struct mpd_song *)list_at(&connection->db, i)->data;
-        if (strcmp(song->uri, uri)) {
+        if (strcmp(song->uri, uri) == 0) {
             found_idx = (int)i;
             break;
         }
