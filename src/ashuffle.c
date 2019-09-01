@@ -248,8 +248,8 @@ int try_enqueue(struct mpd_connection *mpd, struct shuffle_chain *songs,
 }
 
 /* Keep adding songs when the queue runs out */
-int shuffle_idle(struct mpd_connection *mpd, struct shuffle_chain *songs,
-                 struct ashuffle_options *options) {
+int shuffle_until(struct mpd_connection *mpd, struct shuffle_chain *songs,
+                  struct ashuffle_options *options, bool (*until_f)()) {
     assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST &&
            "QUEUE Now different signal.");
     int idle_mask = MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER;
@@ -261,7 +261,8 @@ int shuffle_idle(struct mpd_connection *mpd, struct shuffle_chain *songs,
         return -1;
     }
 
-    while (true) {
+    // Loop forever if until_f is unset.
+    while (until_f == NULL || until_f()) {
         /* wait till the player state changes */
         enum mpd_idle event = mpd_run_idle_mask(mpd, idle_mask);
         mpd_perror_if_error(mpd);

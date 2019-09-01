@@ -55,7 +55,8 @@ int main(int argc, const char *argv[]) {
         }
         printf("Added %u songs.\n", options.queue_only);
     } else {
-        shuffle_idle(mpd, &songs, &options);
+        // Shuffle forever.
+        shuffle_until(mpd, &songs, &options, NULL);
     }
 
     /* dispose of the rules used to build the song-list */

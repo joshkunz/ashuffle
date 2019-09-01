@@ -28,7 +28,7 @@ int build_songs_mpd(struct mpd_connection* mpd, struct list* ruleset,
 void shuffle_single(struct mpd_connection* mpd, struct shuffle_chain* songs);
 
 // Use the MPD `idle` command to queue songs random songs when the current
-// queue finishes playing. This is the core loop of `ashuffle`.
-int shuffle_idle(struct mpd_connection* mpd, struct shuffle_chain* songs,
-                 struct ashuffle_options* options);
+// queue finishes playing. This is the core loop of `ashuffle`. The
+int shuffle_until(struct mpd_connection* mpd, struct shuffle_chain* songs,
+                  struct ashuffle_options* options, bool (*until_f)());
 #endif

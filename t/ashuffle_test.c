@@ -321,6 +321,113 @@ void test_shuffle_single() {
     shuffle_free(&chain);
 }
 
+// When used with shuffle_until, this function will only allow the
+// initialization code to run.
+bool only_init_f() { return false; }
+
+void test_shuffle_until_init_empty() {
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    TEST_SONG_URI(song_a);
+
+    struct ashuffle_options options;
+    options_init(&options);
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 1);
+    shuffle_add(&chain, song_a.uri);
+
+    list_init(&c.db);
+    list_push_song(&c.db, &song_a);
+
+    int result = shuffle_until(&c, &chain, &options, only_init_f);
+
+    cmp_ok(result, "==", 0,
+           "shuffle_until_init_empty: shuffle_until returns 0");
+    cmp_ok(c.queue.length, "==", 1,
+           "shuffle_until_init_empty: added one song to queue");
+    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
+           "shuffle_until_init_empty: playing after init");
+    cmp_ok(c.state.queue_pos, "==", 0,
+           "shuffle_until_init_empty: queue position on first song");
+}
+
+void test_shuffle_until_init_playing() {
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    TEST_SONG_URI(song_a);
+
+    struct ashuffle_options options;
+    options_init(&options);
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 1);
+    shuffle_add(&chain, song_a.uri);
+
+    list_init(&c.db);
+    list_push_song(&c.db, &song_a);
+
+    // Pretend like we already have a song in our queue, and we're playing.
+    list_init(&c.queue);
+    list_push_song(&c.queue, &song_a);
+
+    c.state.play_state = MPD_STATE_PLAY;
+    c.state.queue_pos = 0;
+
+    int result = shuffle_until(&c, &chain, &options, only_init_f);
+
+    // We shouldn't add anything to the queue if we're already playing,
+    // ashuffle should start silently.
+    cmp_ok(result, "==", 0,
+           "shuffle_until_init_playing: shuffle_until returns 0");
+    cmp_ok(c.queue.length, "==", 1,
+           "shuffle_until_init_playing: no songs added to queue");
+    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
+           "shuffle_until_init_playing: playing after init");
+    cmp_ok(c.state.queue_pos, "==", 0,
+           "shuffle_until_init_playing: queue position on first song");
+}
+
+void test_shuffle_until_init_stopped() {
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    TEST_SONG_URI(song_a);
+    TEST_SONG_URI(song_b);
+
+    struct ashuffle_options options;
+    options_init(&options);
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 1);
+    shuffle_add(&chain, song_a.uri);
+
+    list_init(&c.db);
+    list_push_song(&c.db, &song_a);
+    list_push_song(&c.db, &song_b);
+
+    // Pretend like we already have a song in our queue, that was playing,
+    // but now we've stopped.
+    list_init(&c.queue);
+    list_push_song(&c.queue, &song_b);
+    c.state.queue_pos = 0;
+    c.state.play_state = MPD_STATE_STOP;
+
+    int result = shuffle_until(&c, &chain, &options, only_init_f);
+
+    // We should add a new item to the queue, and start playing.
+    cmp_ok(result, "==", 0,
+           "shuffle_until_init_stopped: shuffle_until returns 0");
+    cmp_ok(c.queue.length, "==", 2,
+           "shuffle_until_init_stopped: added one song to queue");
+    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
+           "shuffle_until_init_stopped: playing after init");
+    cmp_ok(c.state.queue_pos, "==", 1,
+           "shuffle_until_init_stopped: queue position on second song");
+}
+
 int main() {
     plan(NO_PLAN);
 
@@ -329,6 +436,10 @@ int main() {
     test_build_songs_file_nocheck();
     test_build_songs_file_check();
     test_shuffle_single();
+
+    test_shuffle_until_init_empty();
+    test_shuffle_until_init_playing();
+    test_shuffle_until_init_stopped();
 
     done_testing();
 }

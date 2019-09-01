@@ -41,7 +41,10 @@ static struct {
 } _MPD_SERVER;
 
 struct mpd_status {
-    const struct mpd_connection *c;
+    unsigned queue_length;
+    bool single;
+    int song_pos;
+    enum mpd_state state;
 };
 
 void mpd_connection_set_error(struct mpd_connection *c, enum mpd_error e,
@@ -167,31 +170,32 @@ bool mpd_run_play_pos(struct mpd_connection *connection, unsigned song_pos) {
     return true;
 }
 
-struct mpd_status *mpd_run_status(struct mpd_connection *connection) {
+struct mpd_status *mpd_run_status(struct mpd_connection *c) {
     struct mpd_status *ret = xmalloc(sizeof(struct mpd_status));
-    ret->c = connection;
+    ret->queue_length = c->queue.length;
+    ret->single = c->state.single;
+    ret->song_pos = c->state.queue_pos;
+    ret->state = c->state.play_state;
+
     return ret;
 }
 
 void mpd_status_free(struct mpd_status *status) { free(status); }
 
 unsigned mpd_status_get_queue_length(const struct mpd_status *status) {
-    return status->c->queue.length;
+    return status->queue_length;
 }
 
 bool mpd_status_get_single(const struct mpd_status *status) {
-    return status->c->state.single;
+    return status->single;
 }
 
 int mpd_status_get_song_pos(const struct mpd_status *status) {
-    // This value is preserved across stop/play/pause etc. unless it is
-    // explicitly changed by a "play" command, or the song finishes and
-    // progresses to the next item.
-    return status->c->state.queue_pos;
+    return status->song_pos;
 }
 
 enum mpd_state mpd_status_get_state(const struct mpd_status *status) {
-    return status->c->state.play_state;
+    return status->state;
 }
 
 // Assumes that we've already set up the song_iter?
