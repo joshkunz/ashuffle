@@ -489,7 +489,7 @@ void test_shuffle_loop_basic() {
     cmp_ok(c.queue.length, "==", 2,
            "shuffle_loop_basic: added one song to queue");
     cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_loop_basic: playing after init");
+           "shuffle_loop_basic: playing after loop");
     cmp_ok(c.state.queue_pos, "==", 1,
            "shuffle_loop_basic: queue position on second song");
 
@@ -499,6 +499,159 @@ void test_shuffle_loop_basic() {
     if (mpd_playing(&c)) {
         is(mpd_playing(&c)->uri, song_a.uri,
            "shuffle_loop_basic: queued and played song_a");
+    }
+}
+
+void test_shuffle_loop_empty() {
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    TEST_SONG_URI(song_a);
+
+    struct ashuffle_options options;
+    options_init(&options);
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 1);
+    shuffle_add(&chain, song_a.uri);
+
+    list_init(&c.db);
+    list_push_song(&c.db, &song_a);
+
+    // Pretend like the queue was just emptied.
+    list_init(&c.queue);
+    c.state.queue_pos = 0;
+
+    // Make future IDLE calls return IDLE_QUEUE
+    set_idle_result(MPD_IDLE_QUEUE);
+
+    struct shuffle_test_delegate delegate = {
+        .skip_init = true,
+        .until_f = once_f,
+    };
+
+    int result = shuffle_loop(&c, &chain, &options, &delegate);
+
+    // We should add a new item to the queue, and start playing.
+    cmp_ok(result, "==", 0, "shuffle_loop_empty: shuffle_loop returns 0");
+    cmp_ok(c.queue.length, "==", 1,
+           "shuffle_loop_empty: added one song to queue");
+    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
+           "shuffle_loop_empty: playing after loop");
+    cmp_ok(c.state.queue_pos, "==", 0,
+           "shuffle_loop_empty: queue position on first song");
+
+    // The currently playing item should be song_a (the only song in the
+    // shuffle chain). If the mpd state is invalid, no playing song is returned,
+    // and we skip this check.
+    if (mpd_playing(&c)) {
+        is(mpd_playing(&c)->uri, song_a.uri,
+           "shuffle_loop_empty: queued and played song_a");
+    }
+}
+
+void test_shuffle_loop_empty_buffer() {
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    TEST_SONG_URI(song_a);
+
+    struct ashuffle_options options;
+    options_init(&options);
+    options.queue_buffer = 3;
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 1);
+    shuffle_add(&chain, song_a.uri);
+
+    list_init(&c.db);
+    list_push_song(&c.db, &song_a);
+
+    // Pretend like the queue was just emptied.
+    list_init(&c.queue);
+    c.state.queue_pos = -1;
+
+    // Make future IDLE calls return IDLE_QUEUE
+    set_idle_result(MPD_IDLE_QUEUE);
+
+    struct shuffle_test_delegate delegate = {
+        .skip_init = true,
+        .until_f = once_f,
+    };
+
+    int result = shuffle_loop(&c, &chain, &options, &delegate);
+
+    // We should add 4 new items to the queue, and start playing on the first
+    // one.
+    cmp_ok(result, "==", 0,
+           "shuffle_loop_empty_buffer: shuffle_loop returns 0");
+    // queue_buffer + the currently playing song.
+    cmp_ok(c.queue.length, "==", 4,
+           "shuffle_loop_empty_buffer: added one song to queue");
+    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
+           "shuffle_loop_empty_buffer: playing after loop");
+    cmp_ok(c.state.queue_pos, "==", 0,
+           "shuffle_loop_empty_buffer: queue position on first song");
+
+    if (mpd_playing(&c)) {
+        is(mpd_playing(&c)->uri, song_a.uri,
+           "shuffle_loop_empty_buffer: queued and played song_a");
+    }
+}
+
+void test_shuffle_loop_buffer_partial() {
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    TEST_SONG_URI(song_a);
+    TEST_SONG_URI(song_b);
+
+    struct ashuffle_options options;
+    options_init(&options);
+    options.queue_buffer = 3;
+
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 1);
+    shuffle_add(&chain, song_a.uri);
+
+    list_init(&c.db);
+    list_push_song(&c.db, &song_a);
+
+    // Pretend like the queue already has a few songs in it, and we're in
+    // the middle of playing it. We normally don't need to do anything,
+    // but we may need to update the queue buffer.
+    list_init(&c.queue);
+    list_push_song(&c.queue, &song_b);
+    list_push_song(&c.queue, &song_b);
+    list_push_song(&c.queue, &song_b);
+    c.state.queue_pos = 1;
+    c.state.play_state = MPD_STATE_PLAY;
+
+    // Make future IDLE calls return IDLE_QUEUE
+    set_idle_result(MPD_IDLE_QUEUE);
+
+    struct shuffle_test_delegate delegate = {
+        .skip_init = true,
+        .until_f = once_f,
+    };
+
+    int result = shuffle_loop(&c, &chain, &options, &delegate);
+
+    cmp_ok(result, "==", 0,
+           "shuffle_loop_partial_buffer: shuffle_loop returns 0");
+    // We had 3 songs in the queue, and we were playing the second song, so
+    // we only need to add 2 more songs to fill out the queue buffer.
+    cmp_ok(c.queue.length, "==", 5,
+           "shuffle_loop_partial_buffer: added one song to queue");
+    // We should still be playing the same song as before.
+    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
+           "shuffle_loop_partial_buffer: playing after loop");
+    cmp_ok(c.state.queue_pos, "==", 1,
+           "shuffle_loop_partial_buffer: queue position on the same song");
+
+    if (mpd_playing(&c)) {
+        is(mpd_playing(&c)->uri, song_b.uri,
+           "shuffle_loop_partial_buffer: playing the same song as before");
     }
 }
 
@@ -516,6 +669,9 @@ int main() {
     test_shuffle_loop_init_stopped();
 
     test_shuffle_loop_basic();
+    test_shuffle_loop_empty();
+    test_shuffle_loop_empty_buffer();
+    test_shuffle_loop_buffer_partial();
 
     done_testing();
 }

@@ -217,8 +217,14 @@ int try_enqueue(struct mpd_connection *mpd, struct shuffle_chain *songs,
     /* Add another song to the list and restart the player */
     if (should_add) {
         if (options->queue_buffer != ARGS_QUEUE_BUFFER_NONE) {
-            for (unsigned i = queue_songs_remaining; i < options->queue_buffer;
-                 i++) {
+            unsigned to_enqueue = options->queue_buffer;
+            // If we're not currently "on" a song, then we need to not only
+            // enqueue options->queue_buffer songs, but also the song we're
+            // about to play, so increment the `to_enqueue' count by one.
+            if (past_last || queue_empty) {
+                to_enqueue += 1;
+            }
+            for (unsigned i = queue_songs_remaining; i < to_enqueue; i++) {
                 shuffle_single(mpd, songs);
             }
         } else {
