@@ -15,7 +15,8 @@ extern const int WINDOW_SIZE;
 // be found in MPD_HOST, then `getpass_f' will be used to prompt the user
 // for a password. If `getpass_f' is NULL, the a default password prompt
 // (based on getpass) will be used.
-struct mpd_connection *ashuffle_connect(struct ashuffle_options *options, char *(*getpass_f)());
+struct mpd_connection* ashuffle_connect(struct ashuffle_options* options,
+                                        char* (*getpass_f)());
 
 // Build a `shuffle_chain` of songs from URIs in the given file.
 int build_songs_file(struct mpd_connection* mpd, struct list* ruleset,

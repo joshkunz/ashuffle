@@ -281,13 +281,12 @@ bool mpd_run_add(struct mpd_connection *connection, const char *uri) {
 }
 
 bool mpd_run_password(struct mpd_connection *connection, const char *password) {
-    assert(false && "TODO");
-    for (unsigned i = 0; i < connection->auth.users.length; i++) {
-        struct mpdfake_user *user =
-            (struct mpdfake_user *)list_at(&connection->auth.users, i)->data;
-        if (strcmp(user->password, password)) {
-        }
+    if (strcmp(connection->password, password) == 0) {
+        return true;
     }
+    mpd_connection_set_server_error(connection, MPD_SERVER_ERROR_PASSWORD,
+                                    "wrong password");
+    return true;
 }
 
 /* Test helpers */

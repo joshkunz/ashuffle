@@ -388,7 +388,8 @@ void parse_mpd_host(char *mpd_host, struct mpd_host *o_mpd_host) {
     }
 }
 
-struct mpd_connection *ashuffle_connect(struct ashuffle_options *options, char *(*getpass_f)()) {
+struct mpd_connection *ashuffle_connect(struct ashuffle_options *options,
+                                        char *(*getpass_f)()) {
     assert(options != NULL && "options should always be set");
     struct mpd_connection *mpd;
 

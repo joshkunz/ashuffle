@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#define _POSIX_C_SOURCE 201908L
 #include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -17,16 +18,16 @@
 #include "t/helpers.h"
 #include "t/mpdclient_fake.h"
 
-// Main tests
-// connect
-// shuffle_single
-// shuffle_idle
-//  + try_first
-//  + try_enqueue
-
 void xclearenv() {
     if (clearenv()) {
         perror("xclearenv");
+        abort();
+    }
+}
+
+void xsetenv(const char *key, const char *value) {
+    if (setenv(key, value, 1) != 0) {
+        perror("xsetenv");
         abort();
     }
 }
@@ -687,6 +688,10 @@ void test_connect_no_password() {
     struct mpd_connection c;
     memset(&c, 0, sizeof(c));
 
+    struct mpd_pair not_needed = {"", "__uneeded__"};
+    list_init(&c.pair_iter);
+    list_push_pair(&c.pair_iter, &not_needed);
+
     mpd_set_connection(&c);
 
     struct mpd_connection *result = ashuffle_connect(&opts, failing_getpass_f);
@@ -694,8 +699,208 @@ void test_connect_no_password() {
     ok(result == &c, "connect_no_password: connection matches set connection");
     cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
            "connect_no_password: connection successful");
+}
 
-    options_free(&opts);
+void test_connect_parse_host() {
+    struct host_port_case {
+        const char *host;
+        // Used when "password" is set to differentiate between the host that
+        // is set in "mpd_set_server", and the host that literally put into
+        // the MPD_HOST environment. If unset `host' is put in the MPD_HOST
+        // environment variable.
+        const char *host_env;
+        const char *password;
+        unsigned port;
+    } cases[] = {
+        {"localhost", NULL, NULL, 6600},
+        {"localhost", "foo@localhost", "foo", 6600},
+        {"something.random.com", NULL, NULL, 123},
+        {"/test/mpd.socket", NULL, NULL, 5555},
+        {"/another/mpd.socket", "with_pass@/another/mpd.socket", "with_pass",
+         102400},
+    };
+
+    for (unsigned i = 0; i < STATIC_ARRAY_LEN(cases); i++) {
+        xclearenv();
+        mpd_set_server(cases[i].host, cases[i].port, 0);
+        if (cases[i].host_env) {
+            xsetenv("MPD_HOST", cases[i].host_env);
+        } else {
+            xsetenv("MPD_HOST", cases[i].host);
+        }
+        char *str_port = xsprintf("%u", cases[i].port);
+        xsetenv("MPD_PORT", str_port);
+
+        struct ashuffle_options opts;
+        options_init(&opts);
+
+        struct mpd_connection c;
+        memset(&c, 0, sizeof(c));
+        if (cases[i].password) {
+            c.password = cases[i].password;
+        }
+        mpd_set_connection(&c);
+
+        struct mpd_connection *result =
+            ashuffle_connect(&opts, failing_getpass_f);
+        ok(result == &c,
+           "connect_parse_host[%u]: connection matches set connection", i);
+        cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
+               "connect_parse_host[%u]: connection successful", i);
+
+        free(str_port);
+    }
+}
+
+void test_connect_env_password() {
+    xclearenv();
+    // Default host/port;
+    mpd_set_server("localhost", 6600, 0);
+
+    // set our password in the environment
+    xsetenv("MPD_HOST", "test_password@localhost");
+
+    struct ashuffle_options opts;
+    options_init(&opts);
+
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    c.password = "test_password";
+
+    mpd_set_connection(&c);
+
+    struct mpd_connection *result = ashuffle_connect(&opts, failing_getpass_f);
+
+    ok(result == &c, "connect_env_password: connection matches set connection");
+    cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
+           "connect_env_password: connection successful");
+}
+
+static unsigned _GOOD_PASSWORD_COUNT = 0;
+
+char *good_password_f() {
+    _GOOD_PASSWORD_COUNT += 1;
+    return "good_password";
+}
+
+void test_connect_env_bad_password() {
+    xclearenv();
+    // Default host/port;
+    mpd_set_server("localhost", 6600, 0);
+
+    // set our password in the environment
+    xsetenv("MPD_HOST", "bad_password@localhost");
+
+    struct ashuffle_options opts;
+    options_init(&opts);
+
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    c.password = "good_password";
+
+    mpd_set_connection(&c);
+
+    // using good_password_f, just in-case ashuffle_connect decides to prompt
+    // for a password. It should fail without ever calling good_password_f.
+    dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
+            "connect_env_bad_password: fail to connect with bad password");
+}
+
+void test_connect_env_ok_password_bad_perms() {
+    xclearenv();
+    // Default host/port;
+    mpd_set_server("localhost", 6600, 0);
+
+    // set our password in the environment
+    xsetenv("MPD_HOST", "good_password@localhost");
+
+    struct ashuffle_options opts;
+    options_init(&opts);
+
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    c.password = "good_password";
+
+    // We have a good password, *but*, we're missing
+    list_init(&c.pair_iter);
+    struct mpd_pair status_pair = {"", "status"};
+    list_push_pair(&c.pair_iter, &status_pair);
+
+    mpd_set_connection(&c);
+
+    // We should terminate after seeing the bad permissions. If we end up
+    // re-prompting (and getting a good password), we should succeed, and fail
+    // the test.
+    dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
+            "connect_env_ok_password_bad_perms: fail to connect with bad "
+            "permissions");
+}
+
+// If no password is supplied in the environment, but we have a restricted
+// command, then we should prompt for a user password. Once that password
+// matches, *and* we don't have any more disallowed required commands, then
+// we should be OK.
+void test_connect_bad_perms_ok_prompt() {
+    xclearenv();
+    mpd_set_server("localhost", 6600, 0);
+
+    struct ashuffle_options opts;
+    options_init(&opts);
+
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    c.password = "good_password";
+
+    list_init(&c.pair_iter);
+    struct mpd_pair add_pair = {"", "add"};
+    list_push_pair(&c.pair_iter, &add_pair);
+
+    mpd_set_connection(&c);
+
+    unsigned good_password_before = _GOOD_PASSWORD_COUNT;
+
+    struct mpd_connection *result = ashuffle_connect(&opts, good_password_f);
+
+    unsigned good_password_after = _GOOD_PASSWORD_COUNT;
+
+    ok(result == &c,
+       "connect_bad_perms_ok_prompt: connection matches set connection");
+    cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
+           "connect_bad_perms_ok_prompt: connection successful");
+    cmp_ok(good_password_before, "==", good_password_after - 1,
+           "connect_bad_perms_ok_prompt: password prompt should have been "
+           "called once");
+}
+
+void test_connect_bad_perms_prompt_bad_perms() {
+    xclearenv();
+    mpd_set_server("localhost", 6600, 0);
+
+    struct ashuffle_options opts;
+    options_init(&opts);
+
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    c.password = "good_password";
+
+    list_init(&c.pair_iter);
+    struct mpd_pair play_pair = {"", "play"};
+    // Add the disabled command twice, so after the prompt, we still recognise
+    // the pasword as invalid.
+    list_push_pair(&c.pair_iter, &play_pair);
+    // An empty entry stops processing, for the first check.
+    list_push_empty(&c.pair_iter);
+    list_push_pair(&c.pair_iter, &play_pair);
+
+    mpd_set_connection(&c);
+
+    dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
+            "connect_bad_perms_ok_prompt: fails to connect");
 }
 
 int main() {
@@ -717,6 +922,12 @@ int main() {
     test_shuffle_loop_buffer_partial();
 
     test_connect_no_password();
+    test_connect_parse_host();
+    test_connect_env_password();
+    test_connect_env_bad_password();
+    test_connect_env_ok_password_bad_perms();
+    test_connect_bad_perms_ok_prompt();
+    test_connect_bad_perms_prompt_bad_perms();
 
     done_testing();
 }

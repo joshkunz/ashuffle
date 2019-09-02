@@ -22,20 +22,11 @@ struct mpdfake_player_state {
     enum mpd_state play_state;
 };
 
-struct mpdfake_user {
-    const char* password;
-    struct list cmds;
-};
-
-struct mpdfake_auth {
-    char* current_password;
-    struct list users;
-};
-
 struct mpd_connection {
     struct mpdfake_connection_error error;
     struct mpdfake_player_state state;
-    struct mpdfake_auth auth;
+    const char*
+        password;  // The password that mpd_run_password is check against.
     struct list pair_iter;  // must contain struct mpd_pair
     struct list song_iter;  // must contain struct mpd_song
     struct list db;
