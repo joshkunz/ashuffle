@@ -53,6 +53,17 @@ void mpd_connection_set_server_error(struct mpd_connection* c,
 void mpd_connection_set_error(struct mpd_connection* c, enum mpd_error e,
                               const char* msg);
 
+// The the location of the MPD "server". Future calls to `mpd_connection_new'
+// will only succeed if they match these values.
+void mpd_set_server(const char* host, unsigned port, unsigned delay);
+
+// Sets the next connection that will be returned by mpd_connection_new. This
+// allows the test harness to inject mpd_connections. MPD connections set
+// using this function will only be returned once (from the next call to
+// mpd_connection_new). If this function is not called before a call to
+// mpd_connection_new, a NULL connection will be returned.
+void mpd_set_connection(struct mpd_connection* c);
+
 /* constructors */
 
 typedef struct {

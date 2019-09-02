@@ -24,6 +24,13 @@
 //  + try_first
 //  + try_enqueue
 
+void xclearenv() {
+    if (clearenv()) {
+        perror("xclearenv");
+        abort();
+    }
+}
+
 void list_push_song(struct list *l, struct mpd_song *s) {
     struct datum d = {
         .length = sizeof(struct mpd_song),
@@ -36,6 +43,14 @@ void list_push_empty(struct list *l) {
     struct datum d = {
         .length = 0,
         .data = NULL,
+    };
+    list_push(l, &d);
+}
+
+void list_push_pair(struct list *l, struct mpd_pair *p) {
+    struct datum d = {
+        .length = sizeof(struct mpd_pair),
+        .data = p,
     };
     list_push(l, &d);
 }
@@ -655,6 +670,34 @@ void test_shuffle_loop_buffer_partial() {
     }
 }
 
+static char *failing_getpass_f() {
+    die("called failing getpass!");
+    return NULL;  // unreachable
+}
+
+void test_connect_no_password() {
+    // Make sure the environment doesn't influence the test.
+    xclearenv();
+    // Default host/port;
+    mpd_set_server("localhost", 6600, 0);
+
+    struct ashuffle_options opts;
+    options_init(&opts);
+
+    struct mpd_connection c;
+    memset(&c, 0, sizeof(c));
+
+    mpd_set_connection(&c);
+
+    struct mpd_connection *result = ashuffle_connect(&opts, failing_getpass_f);
+
+    ok(result == &c, "connect_no_password: connection matches set connection");
+    cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
+           "connect_no_password: connection successful");
+
+    options_free(&opts);
+}
+
 int main() {
     plan(NO_PLAN);
 
@@ -672,6 +715,8 @@ int main() {
     test_shuffle_loop_empty();
     test_shuffle_loop_empty_buffer();
     test_shuffle_loop_buffer_partial();
+
+    test_connect_no_password();
 
     done_testing();
 }

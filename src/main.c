@@ -24,7 +24,7 @@ int main(int argc, const char *argv[]) {
     options_parse_result_free(&parse_r);
 
     /* attempt to connect to MPD */
-    struct mpd_connection *mpd = ashuffle_connect(&options);
+    struct mpd_connection *mpd = ashuffle_connect(&options, NULL);
 
     struct shuffle_chain songs;
     shuffle_init(&songs, WINDOW_SIZE);

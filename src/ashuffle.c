@@ -297,10 +297,18 @@ int shuffle_loop(struct mpd_connection *mpd, struct shuffle_chain *songs,
     return 0;
 }
 
-void get_mpd_password(struct mpd_connection *mpd) {
+static char *default_getpass() {
+    return as_getpass(stdin, stdout, "mpd password: ");
+}
+
+static void get_mpd_password(struct mpd_connection *mpd, char *(*getpass_f)()) {
+    char *(*do_getpass)() = getpass_f;
+    if (do_getpass == NULL) {
+        do_getpass = default_getpass;
+    }
     /* keep looping till we get a bad error, or we get a good password. */
     while (true) {
-        char *pass = as_getpass(stdin, stdout, "mpd password: ");
+        char *pass = do_getpass();
         mpd_run_password(mpd, pass);
         const enum mpd_error err = mpd_connection_get_error(mpd);
         if (err == MPD_ERROR_SUCCESS) {
@@ -380,7 +388,7 @@ void parse_mpd_host(char *mpd_host, struct mpd_host *o_mpd_host) {
     }
 }
 
-struct mpd_connection *ashuffle_connect(struct ashuffle_options *options) {
+struct mpd_connection *ashuffle_connect(struct ashuffle_options *options, char *(*getpass_f)()) {
     assert(options != NULL && "options should always be set");
     struct mpd_connection *mpd;
 
@@ -425,7 +433,7 @@ struct mpd_connection *ashuffle_connect(struct ashuffle_options *options) {
         die("password applied, but required command still not allowed.");
     }
     if (need_mpd_password) {
-        get_mpd_password(mpd);
+        get_mpd_password(mpd, getpass_f);
     }
     if (is_mpd_password_needed(mpd)) {
         die("password applied, but required command still not allowed.");

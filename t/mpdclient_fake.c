@@ -34,11 +34,28 @@ const char *mpd_song_get_tag(const struct mpd_song *song,
     return song->tag_values[type];
 }
 
+static struct mpd_connection *mpd_connection_swap(struct mpd_connection *c) {
+    static struct mpd_connection *conn;
+    struct mpd_connection *ret = conn;
+    conn = c;
+    return ret;
+}
+
+void mpd_set_connection(struct mpd_connection *c) {
+    (void)mpd_connection_swap(c);
+}
+
 static struct {
     const char *host;
     unsigned port;
     unsigned delay;
 } _MPD_SERVER;
+
+void mpd_set_server(const char *host, unsigned port, unsigned delay) {
+    _MPD_SERVER.host = host;
+    _MPD_SERVER.port = port;
+    _MPD_SERVER.delay = delay;
+}
 
 struct mpd_status {
     unsigned queue_length;
@@ -82,8 +99,12 @@ void mpd_connection_free(struct mpd_connection *connection) {
 
 struct mpd_connection *mpd_connection_new(const char *host, unsigned port,
                                           unsigned timeout_ms) {
-    struct mpd_connection *ret = xmalloc(sizeof(struct mpd_connection));
-    if (!strcmp(host, _MPD_SERVER.host)) {
+    struct mpd_connection *ret = mpd_connection_swap(NULL);
+    // If we have no connection to return, just return immediately.
+    if (ret == NULL) {
+        return ret;
+    }
+    if (strcmp(host, _MPD_SERVER.host) != 0) {
         mpd_connection_set_error(ret, MPD_ERROR_RESOLVER, "host not found");
     } else if (port != _MPD_SERVER.port) {
         mpd_connection_set_error(ret, MPD_ERROR_RESOLVER, "port not found");
