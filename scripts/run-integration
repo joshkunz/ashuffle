@@ -1,0 +1,3 @@
+#!/bin/bash
+./scripts/build-test-image
+exec docker run --name mpd_test --rm -it test/mpd:latest

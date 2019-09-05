@@ -1,12 +1,11 @@
-ashuffle
 ashuffle.dSYM
 *.o
 *.swp
 src/t/*_test
 
 # Exclude generated Go packages.
-test/harness/pkg/**
-test/harness/src/github.com/**
+t/integration/pkg/**
+t/integration/src/github.com/**
 
 # Common meson build directory
 build/**

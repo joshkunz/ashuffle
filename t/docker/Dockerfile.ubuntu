@@ -1,0 +1,44 @@
+FROM ubuntu:latest
+
+ENV MPD_URL http://www.musicpd.org/download/mpd/0.21/mpd-0.21.14.tar.xz
+#ENV MPD_URL http://www.musicpd.org/download/mpd/0.21/mpd-0.21.3.tar.xz
+ENV LIBMPDCLIENT_URL https://www.musicpd.org/download/libmpdclient/2/libmpdclient-2.16.tar.xz
+
+RUN apt-get update && \
+        apt-get upgrade -y && \
+        apt-get install -y\
+            build-essential \
+            libboost-dev \
+            libmad0 libmad0-dev \
+            python3 python3-pip \
+            ninja-build \
+            xz-utils \
+            pkg-config
+
+RUN pip3 install meson
+
+ADD ${LIBMPDCLIENT_URL} /opt/libmpdclient/archive.tar.xz
+RUN cd /opt/libmpdclient && \
+        tar --strip-components=1 -xJvf archive.tar.xz && \
+        rm archive.tar.xz && \
+        meson . build && \
+        ninja -C build && \
+        ninja -C build install
+
+ADD ${MPD_URL} /opt/mpd/archive.tar.xz
+RUN cd /opt/mpd && \
+        tar --strip-components=1 -xJvf archive.tar.xz && \
+        rm archive.tar.xz && \
+        meson . build/release --buildtype=debugoptimized -Db_ndebug=true && \
+        ninja -C build/release && \
+        ninja -C build/release install
+
+RUN apt-get install -y \
+        mpc ncmpc telnet gdb
+
+COPY test/manual/test-tracks/*.mp3 /music/
+COPY test/manual/mpd.conf /etc/mpd.conf
+#COPY test/manual/mpd-passwd.conf /conf
+RUN mkdir /mpd
+
+COPY ./ /ashuffle/

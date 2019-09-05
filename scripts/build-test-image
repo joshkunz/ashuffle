@@ -1,0 +1,31 @@
+#!/bin/bash
+
+TEMPDIR="./tmp"
+
+function die() {
+    echo "$@" >&2
+    exit 1
+}
+
+cd $(git rev-parse --show-toplevel)
+
+if test -d "${TEMPDIR}"; then
+    die "Directory /tmp exists, can't create stage"
+fi
+
+mkdir "${TEMPDIR}"
+STAGE_DIR=$(mktemp -p "${TEMPDIR}" --directory)
+if test ! -d "${STAGE_DIR}"; then
+    rm -r "${TEMPDIR}"
+    die "Failed to create staging directory"
+fi
+
+# Why on earth git does not use the standard exlude rules for ls-files is
+# beyond me.
+tar -cvf "${STAGE_DIR}/ashuffle-archive.tar" --files-from=<(git ls-files --exclude-standard -cmo)
+
+docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
+    -t "test/mpd:latest" -f ./t/docker/Dockerfile.alpine .
+
+rm -r "${STAGE_DIR}"
+rm -r "${TEMPDIR}"
