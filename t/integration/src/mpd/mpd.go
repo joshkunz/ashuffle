@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"text/template"
 	"time"
 
@@ -180,6 +181,20 @@ func (i *Instance) Queue() []string {
 		result = append(result, attr["file"])
 	}
 	return result
+}
+
+func (i *Instance) QueuePos() int64 {
+	attrs, err := i.cli.Status()
+	if err != nil {
+		i.Errors = append(i.Errors, err)
+		return -1
+	}
+	res, err := strconv.ParseInt(attrs["song"], 10, 64)
+	if err != nil {
+		i.Errors = append(i.Errors, err)
+		return -1
+	}
+	return res
 }
 
 type State string
