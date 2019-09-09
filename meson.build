@@ -1,4 +1,4 @@
-project('ashuffle', 'c', version: '1.0.3', default_options: ['c_std=c99'])
+project('ashuffle', 'c', default_options: ['c_std=c11'])
 
 add_global_arguments([
 	'-Wextra',
