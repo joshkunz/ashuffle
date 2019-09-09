@@ -3,10 +3,12 @@ package ashuffle
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"syscall"
+	"time"
 )
 
 type Ashuffle struct {
@@ -17,17 +19,67 @@ type Ashuffle struct {
 	Stderr *bytes.Buffer
 }
 
-func (a *Ashuffle) Shutdown() error {
-	a.cancelFunc()
-	err := a.cmd.Wait()
+const MaxShutdownWait = 500 * time.Millisecond
+
+type ShutdownType uint
+
+const (
+	ShutdownUnknown ShutdownType = iota
+	ShutdownHard
+	ShutdownSoft
+)
+
+// Waits for ashuffle to terminate. Once it does, it sends an empty struct
+// on the returned channel and closes it. If the underlying process never
+// terminates, the returned channel may never yield a value.
+func (a *Ashuffle) tryWait() <-chan error {
+	c := make(chan error, 1)
+	go func() {
+		c <- a.cmd.Wait()
+		close(c)
+	}()
+	return c
+}
+
+// safeWait waits for the underlying ashuffle process to abort within
+// MaxShutdownWait time units, or it forcibly kills the process by cancelling
+// its context.
+func (a *Ashuffle) safeWait() error {
+	select {
+	case err := <-a.tryWait():
+		return err
+	case <-time.After(MaxShutdownWait):
+		a.cancelFunc()
+		return errors.New("ashuffle took too long to exit. It has been killed")
+	}
+}
+
+// Shutdown the ashuffle instance. If sType is not given, or is ShutdownUnknown,
+// or ShutdownHardthen a "hard" shutdown will be performed (ashuffle is
+// killed). If ShutdownSoft is given, then the process will wait at most
+// MaxShutdownWait time units for ashuffle to terminate normally, or it will
+// forcibly terminate the process.
+func (a *Ashuffle) Shutdown(sType ...ShutdownType) error {
+	var t ShutdownType
+	if len(sType) > 0 {
+		t = sType[0]
+	}
+
+	// Don't send the abort signal, if we are just doing a "soft" shutdown.
+	// Wait for the process to terminate normally.
+	if t != ShutdownSoft {
+		a.cancelFunc()
+	}
+	err := a.safeWait()
 	if err == nil {
 		return nil
 	} else if err, ok := err.(*exec.ExitError); ok {
 		bySig := err.ExitCode() == -1
 		status := err.Sys().(syscall.WaitStatus)
-		// We actually expect ashuffle to get killed by the cancel func
-		// most of the time, don't fail for "real" if that happens.
-		if bySig && status.Signal() == syscall.SIGKILL {
+		// If the user did not specify ShutdownSoft, we actually expect
+		// ashuffle to get killed by the cancel func. Don't fail for "real" if
+		// that happens.
+		if t != ShutdownSoft && bySig && status.Signal() == syscall.SIGKILL {
 			return nil
 		}
 		if err.Success() {

@@ -78,7 +78,7 @@ func TestShuffleOnce(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new MPD instance: %v", err)
 	}
-	ashuffle, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
+	as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
 		MPDAddress: mpdi,
 		Args:       []string{"-o", "3"},
 	})
@@ -86,10 +86,13 @@ func TestShuffleOnce(t *testing.T) {
 		t.Fatalf("failed to create new ashuffle instance")
 	}
 
-	time.Sleep(time.Second)
+	// Wait for ashuffle to exit.
+	if err := as.Shutdown(ashuffle.ShutdownSoft); err != nil {
+		t.Errorf("ashuffle did not shut down cleanly: %v", err)
+	}
 
 	if state := mpdi.PlayState(); state != mpd.StateStop {
-		t.Errorf("want mpd state play, got: %v", state)
+		t.Errorf("want mpd state stop, got: %v", state)
 	}
 
 	if queueLen := len(mpdi.Queue()); queueLen != 3 {
