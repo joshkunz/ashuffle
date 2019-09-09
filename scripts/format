@@ -1,13 +1,20 @@
 #!/usr/bin/env bash
 
-function files_to_format() {
+src_files() {
     if test "$#" -gt 0; then
         printf "%s\n" "$@"
     else
-        git ls-files | egrep '\.(c|h)$'
+        git ls-files
     fi
 }
 
-files_to_format "$@" | while read F; do
-    clang-format -i $F
+src_files "$@" | while read F; do
+    case $F in
+        *.c|*.h)
+            clang-format -i "$F"
+            ;;
+        *.go)
+            gofmt -w "$F"
+            ;;
+    esac
 done
