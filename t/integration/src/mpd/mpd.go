@@ -274,6 +274,8 @@ func New(ctx context.Context, opts *Options) (*Instance, error) {
 		mpdBin = opts.BinPath
 	}
 	cmd := exec.CommandContext(mpdCtx, mpdBin, "--no-daemon", "--stderr", root.confPath)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
 		cancel()
 		root.cleanup()

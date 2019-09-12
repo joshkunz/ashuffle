@@ -1,11 +1,4 @@
 FROM alpine:edge
-ENV MPD_MAJOR_VERSION 0.21
-ENV MPD_VERSION 0.21.14
-ENV LIBMPDCLIENT_MAJOR_VERSION 2
-ENV LIBMPDCLIENT_VERSION 2.16
-
-ENV MPD_URL http://www.musicpd.org/download/mpd/${MPD_MAJOR_VERSION}/mpd-${MPD_VERSION}.tar.xz
-ENV LIBMPDCLIENT_URL https://www.musicpd.org/download/libmpdclient/${LIBMPDCLIENT_MAJOR_VERSION}/libmpdclient-${LIBMPDCLIENT_VERSION}.tar.xz
 
 RUN apk update && \
         apk upgrade && \
@@ -18,8 +11,11 @@ RUN apk update && \
             libmad libmad-dev \
             meson \
             ninja \
-            xz \
-            ncmpc mpc
+            xz
+
+ENV LIBMPDCLIENT_MAJOR_VERSION 2
+ENV LIBMPDCLIENT_VERSION 2.16
+ENV LIBMPDCLIENT_URL https://www.musicpd.org/download/libmpdclient/${LIBMPDCLIENT_MAJOR_VERSION}/libmpdclient-${LIBMPDCLIENT_VERSION}.tar.xz
 
 ADD ${LIBMPDCLIENT_URL} /opt/libmpdclient/archive.tar.xz
 RUN cd /opt/libmpdclient && \
@@ -28,6 +24,10 @@ RUN cd /opt/libmpdclient && \
         meson . build && \
         ninja -C build && \
         ninja -C build install
+
+ENV MPD_MAJOR_VERSION 0.21
+ENV MPD_VERSION 0.21.5
+ENV MPD_URL http://www.musicpd.org/download/mpd/${MPD_MAJOR_VERSION}/mpd-${MPD_VERSION}.tar.xz
 
 ADD ${MPD_URL} /opt/mpd/archive.tar.xz
 RUN cd /opt/mpd && \

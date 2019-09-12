@@ -1,6 +1,7 @@
 #!/bin/bash
 
 TEMPDIR="./tmp"
+IMAGE_BASE=ubuntu
 
 function die() {
     echo "$@" >&2
@@ -24,8 +25,18 @@ fi
 # beyond me.
 tar -cvf "${STAGE_DIR}/ashuffle-archive.tar" --files-from=<(git ls-files --exclude-standard -cmo)
 
-docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
-    -t "test/mpd:latest" -f ./t/docker/Dockerfile.alpine .
+case "${IMAGE_BASE}" in
+    ubuntu)
+        docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
+            -t "test/mpd:latest" -f ./t/docker/Dockerfile.ubuntu .
+        ;;
+    alpine)
+        docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
+            -t "test/mpd:latest" -f ./t/docker/Dockerfile.alpine .
+        ;;
+    *)
+        die "invalid image base: ${IMAGE_BASE}"
+esac
 
 rm -r "${STAGE_DIR}"
 rm -r "${TEMPDIR}"

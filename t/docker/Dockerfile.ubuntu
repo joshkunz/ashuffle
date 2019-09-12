@@ -1,44 +1,69 @@
 FROM ubuntu:latest
 
-ENV MPD_URL http://www.musicpd.org/download/mpd/0.21/mpd-0.21.14.tar.xz
-#ENV MPD_URL http://www.musicpd.org/download/mpd/0.21/mpd-0.21.3.tar.xz
-ENV LIBMPDCLIENT_URL https://www.musicpd.org/download/libmpdclient/2/libmpdclient-2.16.tar.xz
+RUN apt-get update -y && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+        build-essential \
+        doxygen \
+        gdb \
+        git \
+        libboost-all-dev \
+        libmad0-dev \
+        ninja-build \
+        pkg-config \
+        python3 python3-pip \
+        telnet \
+        xz-utils && \
+    pip3 install \
+        meson
 
-RUN apt-get update && \
-        apt-get upgrade -y && \
-        apt-get install -y\
-            build-essential \
-            libboost-dev \
-            libmad0 libmad0-dev \
-            python3 python3-pip \
-            ninja-build \
-            xz-utils \
-            pkg-config
+ENV GO_VERSION 1.13
+ENV GO_URL https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz
 
-RUN pip3 install meson
+ADD ${GO_URL} /opt/go/archive.tar.gz
+RUN cd /opt/go && \
+    tar --strip-components=1 -xzvf archive.tar.gz && \
+    rm archive.tar.gz && \
+    ln -s /opt/go/bin/go /usr/bin/ && \
+    ln -s /opt/go/bin/gofmt /usr/bin/ && \
+    go version
+
+ENV LIBMPDCLIENT_MAJOR_VERSION 2
+ENV LIBMPDCLIENT_VERSION 2.16
+ENV LIBMPDCLIENT_URL https://www.musicpd.org/download/libmpdclient/${LIBMPDCLIENT_MAJOR_VERSION}/libmpdclient-${LIBMPDCLIENT_VERSION}.tar.xz
 
 ADD ${LIBMPDCLIENT_URL} /opt/libmpdclient/archive.tar.xz
 RUN cd /opt/libmpdclient && \
         tar --strip-components=1 -xJvf archive.tar.xz && \
         rm archive.tar.xz && \
-        meson . build && \
+        meson . build --prefix=/usr && \
         ninja -C build && \
         ninja -C build install
+
+ENV MPD_MAJOR_VERSION 0.21
+ENV MPD_VERSION 0.21.5
+ENV MPD_URL http://www.musicpd.org/download/mpd/${MPD_MAJOR_VERSION}/mpd-${MPD_VERSION}.tar.xz
 
 ADD ${MPD_URL} /opt/mpd/archive.tar.xz
 RUN cd /opt/mpd && \
         tar --strip-components=1 -xJvf archive.tar.xz && \
         rm archive.tar.xz && \
-        meson . build/release --buildtype=debugoptimized -Db_ndebug=true && \
+        meson . build/release --prefix=/usr --buildtype=debugoptimized -Db_ndebug=true && \
         ninja -C build/release && \
         ninja -C build/release install
 
-RUN apt-get install -y \
-        mpc ncmpc telnet gdb
+COPY /t/static/tracks/*.mp3 /music/
+COPY /t/static/mpd.conf /conf
+COPY /t/docker/scripts/run_integration.sh /exec/
 
-COPY test/manual/test-tracks/*.mp3 /music/
-COPY test/manual/mpd.conf /etc/mpd.conf
-#COPY test/manual/mpd-passwd.conf /conf
-RUN mkdir /mpd
+# The directory that contains the staged ashuffle source. If unset the
+# build directory (presumably the ashuffle root) is used. This has some
+# drawbacks, like potentially including a build directory that would conflict
+# with the container's build directory.
+ARG STAGE_DIR
+ENV STAGE_DIR ${STAGE_DIR:-./}
 
-COPY ./ /ashuffle/
+# This archive is created automatically by the build script.
+ADD ${STAGE_DIR}/ashuffle-archive.tar /ashuffle/
+
+CMD ["/exec/run_integration.sh"]
