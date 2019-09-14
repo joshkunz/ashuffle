@@ -7,5 +7,5 @@ die() {
 
 export GOPATH=/ashuffle/t/integration
 cd "$GOPATH"
-go get ./... || die "failed to fetch test dependencies"
-exec go test integration
+go get -t ./... || die "failed to fetch test dependencies"
+exec go test -v integration

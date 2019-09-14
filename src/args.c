@@ -26,7 +26,8 @@ enum parse_state {
     IFILE,         // expecting song list input file
     QUEUE_BUFFER,  // expecting queue buffer value
     HOST,          // expecting a hostname or ip address
-    PORT           // expecting a port number
+    PORT,          // expecting a port number
+    TEST,          // expecting a test option
 };
 
 /* check and see if 'to_check' matches any of 'count' given
@@ -80,8 +81,8 @@ static void flush_rule(enum parse_state state, struct ashuffle_options *opts,
 }
 
 void options_init(struct ashuffle_options *opts) {
-    opts->queue_only = 0;
-    opts->file_in = NULL;
+    // Zero out all fields by default.
+    memset(opts, 0, sizeof(struct ashuffle_options));
     opts->check_uris = true;
     list_init(&opts->ruleset);
     opts->queue_buffer = ARGS_QUEUE_BUFFER_NONE;  // 0
@@ -167,6 +168,10 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
         } else if (transable && check_flags(argv[i], 2, "--port", "-p")) {
             flush_rule(state, opts, &rule);
             state = PORT;
+        } else if (transable &&
+                   check_flags(argv[i], 1, "--test_enable_option_do_not_use")) {
+            flush_rule(state, opts, &rule);
+            state = TEST;
         } else if (state == RULE || state == RULE_FIRST) {
             match_field = argv[i];
             state = RULE_VALUE;
@@ -206,6 +211,12 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
             opts->port = strtou(argv[i]);
             if (opts->port == UINT_MAX) {
                 PARSE_FAIL("couldn't convert port '%s' to integer.", argv[i]);
+            }
+        } else if (state == TEST) {
+            if (check_flags(argv[i], 1, "print_all_songs_and_exit")) {
+                opts->test.print_all_songs_and_exit = true;
+            } else {
+                PARSE_FAIL("bad test option '%s'", argv[i]);
             }
             state = NO_STATE;
         } else {

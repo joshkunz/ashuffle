@@ -38,6 +38,18 @@ int main(int argc, const char *argv[]) {
         build_songs_mpd(mpd, &options.ruleset, &songs);
     }
 
+    // For integration testing, we sometimes just want to have ashuffle
+    // dump the list of songs in its shuffle chain.
+    if (options.test.print_all_songs_and_exit) {
+        struct list all_songs;
+        list_init(&all_songs);
+        shuffle_items(&songs, &all_songs);
+        for (unsigned i = 0; i < all_songs.length; i++) {
+            puts(list_at_str(&all_songs, i));
+        }
+        return 0;
+    }
+
     if (shuffle_length(&songs) == 0) {
         puts("Song pool is empty.");
         return -1;

@@ -16,7 +16,6 @@ type Ashuffle struct {
 	cancelFunc func()
 
 	Stdout *bytes.Buffer
-	Stderr *bytes.Buffer
 }
 
 const MaxShutdownWait = 500 * time.Millisecond
@@ -120,9 +119,8 @@ func New(ctx context.Context, path string, opts *Options) (*Ashuffle, error) {
 	var args []string
 	cmd := exec.CommandContext(runCtx, path, args...)
 	stdout := bytes.Buffer{}
-	stderr := bytes.Buffer{}
 	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	cmd.Stderr = os.Stderr
 
 	if opts != nil {
 		cmd.Args = append([]string{path}, opts.Args...)
@@ -146,6 +144,5 @@ func New(ctx context.Context, path string, opts *Options) (*Ashuffle, error) {
 		cmd:        cmd,
 		cancelFunc: cancel,
 		Stdout:     &stdout,
-		Stderr:     &stderr,
 	}, nil
 }

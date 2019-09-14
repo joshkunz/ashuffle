@@ -169,6 +169,16 @@ func (i *Instance) Prev() {
 	i.maybeErr(i.cli.Previous())
 }
 
+// Db returns a list of all URIs in this MPD instance's database.
+func (i *Instance) Db() []string {
+	res, err := i.cli.GetFiles()
+	if err != nil {
+		i.Errors = append(i.Errors, err)
+		return nil
+	}
+	return res
+}
+
 // Queue returns an array of the songs currently in the queue.
 func (i *Instance) Queue() []string {
 	attrs, err := i.cli.PlaylistInfo(-1, -1)

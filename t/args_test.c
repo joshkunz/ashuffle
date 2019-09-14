@@ -71,6 +71,8 @@ void test_default() {
     cmp_ok(opts.check_uris, "==", true, "check_uris on by default");
     cmp_ok(opts.queue_buffer, "==", ARGS_QUEUE_BUFFER_NONE,
            "no queue buffer by default");
+    cmp_ok(opts.test.print_all_songs_and_exit, "==", false,
+           "no print_all_songs_and_exit by default");
 }
 
 void test_basic_short() {
@@ -255,6 +257,9 @@ void test_partials() {
     TEST_PARTIAL("exclude long only match mutli",
                  PARSE_ONLY("--exclude", "artist", "whatever", "artist"),
                  "no value supplied for match 'artist'");
+    TEST_PARTIAL("test option no arg",
+                 PARSE_ONLY("--test_enable_option_do_not_use"),
+                 "no argument supplied for '--test_enable_option_do_not_use'");
 }
 
 void test_help() {
@@ -289,6 +294,29 @@ void test_bad_option() {
            "bad arg -b at end fails full parse");
     like(res.msg, "bad option '-b'");
     options_parse_result_free(&res);
+
+    res = PARSE_ONLY("--test_enable_option_do_not_use", "invalid");
+    cmp_ok(res.status, "==", PARSE_FAILURE,
+           "test_enable_option fails to parse with bad option");
+    like(res.msg, "bad test option 'invalid'");
+    options_parse_result_free(&res);
+}
+
+void test_test_option() {
+    struct ashuffle_options opts;
+
+    options_init(&opts);
+
+    const char *test_args[] = {"ashuffle", "--test_enable_option_do_not_use",
+                               "print_all_songs_and_exit"};
+
+    struct options_parse_result res =
+        options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
+    cmp_ok(res.status, "==", PARSE_OK, "parsing test_option_works");
+    options_parse_result_free(&res);
+
+    cmp_ok(opts.test.print_all_songs_and_exit, "==", true,
+           "test_option: print_all_songs_and_exit is set");
 }
 
 int main() {
@@ -304,6 +332,7 @@ int main() {
     test_help();
     test_partials();
     test_rule_basic();
+    test_test_option();
 
     done_testing();
 }

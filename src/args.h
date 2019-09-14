@@ -7,6 +7,10 @@
 
 const unsigned ARGS_QUEUE_BUFFER_NONE;  // 0
 
+struct ashuffle_test_options {
+    bool print_all_songs_and_exit;
+};
+
 struct ashuffle_options {
     struct list ruleset;
     unsigned queue_only;
@@ -15,6 +19,7 @@ struct ashuffle_options {
     unsigned queue_buffer;
     char *host;
     unsigned port;
+    struct ashuffle_test_options test;
 };
 
 typedef enum {

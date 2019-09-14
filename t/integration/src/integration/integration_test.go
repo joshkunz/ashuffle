@@ -3,14 +3,20 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"ashuffle"
 	"mpd"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 const ashuffleBin = "/ashuffle/build/ashuffle"
@@ -34,12 +40,14 @@ func panicf(format string, params ...interface{}) {
 // may take a few hundred millis before ashuffle actually gets around to
 // doing what it is supposed to do.
 func tryWaitFor(cond func() bool) {
+	maxWaitC := time.After(waitMax)
+	ticker := time.Tick(waitBackoff)
 	for {
 		select {
-		case <-time.After(waitMax):
+		case <-maxWaitC:
 			log.Printf("giving up after waiting %s", waitMax)
 			return
-		case <-time.Tick(waitBackoff):
+		case <-ticker:
 			if cond() {
 				return
 			}
@@ -185,5 +193,80 @@ func TestBasic(t *testing.T) {
 	if err := ashuffle.Shutdown(); err != nil {
 		t.Errorf("ashuffle did not shut down cleanly: %v", err)
 	}
+	mpdi.Shutdown()
+}
+
+func TestFromFile(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music"})
+	if err != nil {
+		t.Fatalf("failed to create mpd instance: %v", err)
+	}
+
+	// These are the songs we'll ask ashuffle to use. They should all be
+	// in t/static/tracks (which is where /music points to in the docker
+	// container).
+	db := []string{
+		"BoxCat_Games_-_10_-_Epic_Song.mp3",
+		"Broke_For_Free_-_01_-_Night_Owl.mp3",
+		"Jahzzar_-_05_-_Siesta.mp3",
+		"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3",
+		"Tours_-_01_-_Enthusiast.mp3",
+	}
+
+	// The same as "db", but without the songs by Jahzzar and Tours
+	want := []string{
+		"BoxCat_Games_-_10_-_Epic_Song.mp3",
+		"Broke_For_Free_-_01_-_Night_Owl.mp3",
+		"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3",
+	}
+
+	inputF, err := ioutil.TempFile(os.TempDir(), "ashuffle-input")
+	if err != nil {
+		t.Fatalf("couldn't open tempfile: %v", err)
+	}
+	// Cleanup our input file after the test
+	defer func() {
+		loc := inputF.Name()
+		inputF.Close()
+		os.Remove(loc)
+	}()
+
+	if _, err := io.WriteString(inputF, strings.Join(db, "\n")); err != nil {
+		t.Fatalf("couldn't write db into tempfile: %v", err)
+	}
+
+	as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
+		MPDAddress: mpdi,
+		Args: []string{
+			"--exclude", "artist", "tours",
+			// The real album name is "Traveller's Guide", partial match should
+			// work.
+			"--exclude", "artist", "jahzzar", "album", "traveller",
+			// Pass in our list of songs.
+			"-f", inputF.Name(),
+			// Then, we make ashuffle just print the list of songs and quit
+			"--test_enable_option_do_not_use", "print_all_songs_and_exit",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to start ashuffle: %v", err)
+	}
+
+	// Wait for ashuffle to exit.
+	if err := as.Shutdown(ashuffle.ShutdownSoft); err != nil {
+		t.Errorf("ashuffle did not shut down cleanly: %v", err)
+	}
+
+	got := strings.Split(strings.TrimSpace(as.Stdout.String()), "\n")
+
+	sort.Strings(want)
+	sort.Strings(got)
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("shuffle songs differ, diff want got:\n%s", diff)
+	}
+
 	mpdi.Shutdown()
 }
