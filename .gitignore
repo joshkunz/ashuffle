@@ -1,7 +1,6 @@
 ashuffle.dSYM
 *.o
 *.swp
-src/t/*_test
 
 # Exclude generated Go packages.
 t/integration/pkg/**

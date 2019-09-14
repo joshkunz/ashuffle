@@ -1,10 +1,9 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "list.h"
 #include "shuffle.h"
-
-#define RAND_REAL() ((double)rand() / (double)RAND_MAX)
 
 void shuffle_init(struct shuffle_chain *s, unsigned window_size) {
     list_init(&s->pool);
@@ -45,6 +44,18 @@ const char *shuffle_pick(struct shuffle_chain *s) {
     /* push the retrived element back into the pool */
     list_pop_push(&s->window, &s->pool, 0);
     return data;
+}
+
+void shuffle_items(const struct shuffle_chain *s, struct list *out) {
+    assert(out != NULL && "output list must not be null");
+    assert(out->length == 0 && "output list must be empty");
+
+    for (unsigned i = 0; i < s->window.length; i++) {
+        list_push_str(out, list_at_str(&s->window, i));
+    }
+    for (unsigned i = 0; i < s->pool.length; i++) {
+        list_push_str(out, list_at_str(&s->pool, i));
+    }
 }
 
 /* Free memory associated with the shuffle chain. */

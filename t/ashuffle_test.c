@@ -135,12 +135,6 @@ void xfwriteln(FILE *f, const char *msg) {
     free(nl);
 }
 
-// "a" and "b" *point* to the objects (strings) being compared, so we
-// dereference and adapt the types.
-static int compare_str(const void *a, const void *b) {
-    return strcmp(*((const char **)a), *((const char **)b));
-}
-
 void test_build_songs_file_nocheck() {
     struct mpd_connection c;
     memset(&c, 0, sizeof(c));
@@ -185,8 +179,8 @@ void test_build_songs_file_nocheck() {
     got[1] = shuffle_pick(&chain);
     got[2] = shuffle_pick(&chain);
 
-    qsort(want, STATIC_ARRAY_LEN(want), sizeof(want[0]), compare_str);
-    qsort(got, STATIC_ARRAY_LEN(got), sizeof(got[0]), compare_str);
+    qsort_str(want, STATIC_ARRAY_LEN(want));
+    qsort_str(got, STATIC_ARRAY_LEN(got));
 
     assert(STATIC_ARRAY_LEN(want) == window_size &&
            "number of wanted URIs should match the window size");
@@ -281,8 +275,8 @@ void test_build_songs_file_check() {
     got[0] = shuffle_pick(&chain);
     got[1] = shuffle_pick(&chain);
 
-    qsort(want, STATIC_ARRAY_LEN(want), sizeof(want[0]), compare_str);
-    qsort(got, STATIC_ARRAY_LEN(got), sizeof(got[0]), compare_str);
+    qsort_str(want, STATIC_ARRAY_LEN(want));
+    qsort_str(got, STATIC_ARRAY_LEN(got));
 
     assert(STATIC_ARRAY_LEN(want) == window_size &&
            "number of wanted URIs should match the window size");

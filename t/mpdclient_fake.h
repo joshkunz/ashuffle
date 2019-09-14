@@ -1,5 +1,7 @@
 #include <mpd/client.h>
 
+#include "src/list.h"
+
 #ifndef MPDCLIENT_FAKE_H
 #define MPDCLIENT_FAKE_H
 

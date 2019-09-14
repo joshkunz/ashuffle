@@ -6,8 +6,11 @@
 
 #include <tap.h>
 
+#include "list.h"
 #include "shuffle.h"
 #include "util.h"
+
+#include "t/helpers.h"
 
 void test_basic() {
     struct shuffle_chain chain;
@@ -41,6 +44,21 @@ bool check_unique(const char* lst[], size_t lst_len) {
             if (strcmp(lst[i], lst[j]) == 0) {
                 return false;
             }
+        }
+    }
+    return true;
+}
+
+// Returns true if `lst_a` and `lst_b` contain identical strings.
+bool check_array_equal_str(const char* lst_a[], size_t lst_a_len,
+                           const char* lst_b[], size_t lst_b_len) {
+    if (lst_a_len != lst_b_len) {
+        return false;
+    }
+    for (size_t i = 0; i < lst_a_len; i++) {
+        if (strcmp(lst_a[i], lst_b[i]) != 0) {
+            diag("  Arrays differ at index %u", i);
+            return false;
         }
     }
     return true;
@@ -139,6 +157,45 @@ void test_random() {
     shuffle_free(&chain);
 }
 
+void test_items() {
+    struct shuffle_chain chain;
+    shuffle_init(&chain, 2);
+
+    const char* test_uris[] = {"test a", "test b", "test c"};
+
+    shuffle_add(&chain, test_uris[0]);
+    shuffle_add(&chain, test_uris[1]);
+    shuffle_add(&chain, test_uris[2]);
+
+    // This is a gross hack to ensure that we've initialized the window pool.
+    // We want to make sure shuffle_chain also picks up songs in the window.
+    (void)shuffle_pick(&chain);
+
+    struct list got;
+    list_init(&got);
+
+    shuffle_items(&chain, &got);
+
+    cmp_ok(got.length, "==", 3, "items: shuffle chain should have 3 items");
+
+    // In-order to qsort, we need an array, not a list.
+    const char** res_array = xmalloc(sizeof(char*) * got.length);
+    for (unsigned i = 0; i < got.length; i++) {
+        res_array[i] = list_at_str(&got, i);
+    }
+
+    qsort_str(test_uris, STATIC_ARRAY_LEN(test_uris));
+    qsort_str(res_array, got.length);
+
+    ok(check_array_equal_str(test_uris, STATIC_ARRAY_LEN(test_uris), res_array,
+                             got.length),
+       "items: shuffle chain should only contain inserted items");
+
+    free(res_array);
+    list_free(&got);
+    shuffle_free(&chain);
+}
+
 int main() {
     plan(NO_PLAN);
 
@@ -146,6 +203,7 @@ int main() {
     test_multi();
     test_windowing();
     test_random();
+    test_items();
 
     done_testing();
 }

@@ -23,6 +23,9 @@ unsigned shuffle_length(struct shuffle_chain *);
  * a pointer to it. */
 const char *shuffle_pick(struct shuffle_chain *);
 
+/* Copy all songs from from the shuffle chain into the list "out". */
+void shuffle_items(const struct shuffle_chain *, struct list *out);
+
 /* Free memory associated with the shuffle chain. */
 void shuffle_free(struct shuffle_chain *);
 
