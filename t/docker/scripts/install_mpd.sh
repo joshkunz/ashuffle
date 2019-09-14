@@ -14,6 +14,7 @@ die() {
 apply_patches() {
     patch_major="$1"
     patch_minor="$2"
+    echo "Applying patches from ${patch_major}/${patch_minor}..."
     find "${PATCH_DIR}/${patch_major}/${patch_minor}" \
         -maxdepth 1 -type f -name '*.patch' | sort -u | while read P; do
         cat "$P" | patch -p1 || die "failed to apply patch $P"
@@ -27,9 +28,23 @@ do_meson() {
 }
 
 do_legacy() {
-    ./configure --prefix="${PREFIX}" && \
-    make -j && \
-    make -j install
+    errlog="$(tempfile)"
+    test -f "${errlog}" || die "couldn't create error log"
+
+    echo "Configuring mpd..."
+    ./configure --quiet --enable-silent-rules --prefix="${PREFIX}" && \
+    make -j 2>>"${errlog}" && \
+    make -j install 2>>"${errlog}"
+
+    status="$?"
+    if test "${status}" -ne 0; then
+        cat config.log
+        echo "Error log:"
+        cat "${errlog}"
+    fi
+    make -j clean >/dev/null 2>&1
+    rm "${errlog}"
+    return "${status}"
 }
 
 VERSION="$1"
@@ -45,8 +60,9 @@ mkdir -p "${ROOT}"
 test -d "${ROOT}" || die "build root '${ROOT}' not a valid directory"
 cd "${ROOT}"
 
+echo "Fetching libmpdclient-${VERSION}..."
 url="http://www.musicpd.org/download/mpd/${MAJOR}/mpd-${VERSION}.tar.xz"
-wget -q -O- "${url}" | tar --strip-components=1 -xJv
+wget -q -O- "${url}" | tar --strip-components=1 -xJ
 if test "$?" -ne 0; then
     die "failed to fetch mpd-${VERSION} sources"
 fi

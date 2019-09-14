@@ -42,7 +42,8 @@ fi
 
 # Why on earth git does not use the standard exlude rules for ls-files is
 # beyond me.
-tar -cvf "${STAGE_DIR}/ashuffle-archive.tar" --files-from=<(git ls-files --exclude-standard -cmo)
+echo "Building ashuffle archive..."
+tar -cf "${STAGE_DIR}/ashuffle-archive.tar" --files-from=<(git ls-files --exclude-standard -cmo)
 
 case "${IMAGE_BASE}" in
     ubuntu)

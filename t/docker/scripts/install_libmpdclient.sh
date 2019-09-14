@@ -17,9 +17,25 @@ do_meson() {
 }
 
 do_legacy() {
-    ./configure --prefix="${PREFIX}" --disable-documentation && \
-    make && \
-    make install
+    errlog="$(tempfile)"
+    test -f "${errlog}" || die "couldn't create error log"
+
+    echo "Configuring libmpdclient..."
+    # Actual build
+    ./configure --quiet --enable-silent-rules \
+        --prefix="${PREFIX}" --disable-documentation && \
+    make -j 2>>"${errlog}" && \
+    make -j install 2>>"${errlog}"
+
+    status="$?"
+    if test "${status}" -ne 0; then
+        cat config.log
+        echo "Error log:"
+        cat "${errlog}"
+    fi
+    make -j clean >/dev/null 2>&1
+    rm "${errlog}"
+    return "${status}"
 }
 
 VERSION="$1"
@@ -39,8 +55,9 @@ mkdir -p "${ROOT}"
 test -d "${ROOT}" || die "build root '${ROOT}' not a valid directory"
 cd "${ROOT}"
 
+echo "Fetching libmpdclient-${VERSION}..."
 url="https://www.musicpd.org/download/libmpdclient/${MAJOR}/libmpdclient-${VERSION}.tar.xz"
-wget -q -O- "${url}" | tar --strip-components=1 -xJv
+wget -q -O- "${url}" | tar --strip-components=1 -xJ
 if test "$?" -ne 0; then
     die "failed to download and extract libmdclient-${VERSION}"
 fi
