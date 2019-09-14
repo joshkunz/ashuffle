@@ -30,6 +30,8 @@ RUN cd /opt/go && \
 
 # Copy in our install helpers
 COPY /t/docker/scripts/install_libmpdclient.sh /opt/helpers/
+COPY /t/docker/scripts/install_mpd.sh /opt/helpers/
+COPY /t/docker/patches/ /patches/
 
 ENV LIBMPDCLIENT_MAJOR_VERSION 2
 ENV LIBMPDCLIENT_VERSION 2.16
@@ -49,9 +51,7 @@ ADD ${MPD_URL} /opt/mpd/archive.tar.xz
 RUN cd /opt/mpd && \
         tar --strip-components=1 -xJvf archive.tar.xz && \
         rm archive.tar.xz && \
-        meson . build/release --prefix=/usr --buildtype=debugoptimized -Db_ndebug=true && \
-        ninja -C build/release && \
-        ninja -C build/release install
+        /opt/helpers/install_mpd.sh ${MPD_VERSION}
 
 COPY /t/static/tracks/*.mp3 /music/
 COPY /t/static/mpd.conf /conf
