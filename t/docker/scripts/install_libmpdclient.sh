@@ -3,6 +3,7 @@
 set -e
 
 PREFIX=/usr
+ROOT="/opt/libmpdclient"
 
 die() {
     echo $@ >&2
@@ -32,6 +33,16 @@ fi
 
 if ! test "${MAJOR}" = "2"; then
     die "Only major version == 2 is supported."
+fi
+
+mkdir -p "${ROOT}"
+test -d "${ROOT}" || die "build root '${ROOT}' not a valid directory"
+cd "${ROOT}"
+
+url="https://www.musicpd.org/download/libmpdclient/${MAJOR}/libmpdclient-${VERSION}.tar.xz"
+wget -q -O- "${url}" | tar --strip-components=1 -xJv
+if test "$?" -ne 0; then
+    die "failed to download and extract libmdclient-${VERSION}"
 fi
 
 if test "${MINOR}" -eq 12; then

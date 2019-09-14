@@ -4,6 +4,7 @@ set -e
 
 PATCH_DIR=/patches
 PREFIX=/usr
+ROOT=/opt/mpd
 
 die() {
     echo $@ >&2
@@ -38,6 +39,16 @@ MINOR="$(echo "${VERSION}" | cut -d. -f3)"
 # Make sure the version matches the format we expected.
 if test -n "${MINOR}" && ! test "${MAJOR}.${MINOR}" = "${VERSION}"; then
     die "MAJOR.MINOR (${MAJOR}.${MINOR}) doesn't match ${VERSION}"
+fi
+
+mkdir -p "${ROOT}"
+test -d "${ROOT}" || die "build root '${ROOT}' not a valid directory"
+cd "${ROOT}"
+
+url="http://www.musicpd.org/download/mpd/${MAJOR}/mpd-${VERSION}.tar.xz"
+wget -q -O- "${url}" | tar --strip-components=1 -xJv
+if test "$?" -ne 0; then
+    die "failed to fetch mpd-${VERSION} sources"
 fi
 
 case "$MAJOR" in
