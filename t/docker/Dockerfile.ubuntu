@@ -26,13 +26,15 @@ RUN /opt/helpers/install_go.sh ${GO_VERSION}
 
 # Install libmpdclient
 
-ENV LIBMPDCLIENT_VERSION 2.16
+ARG LIBMPDCLIENT_VERSION
+ENV LIBMPDCLIENT_VERSION ${LIBMPDCLIENT_VERSION:-2.16}
 COPY /t/docker/scripts/install_libmpdclient.sh /opt/helpers/
 RUN /opt/helpers/install_libmpdclient.sh ${LIBMPDCLIENT_VERSION}
 
 # Install MPD
 
-ENV MPD_VERSION 0.21.5
+ARG MPD_VERSION
+ENV MPD_VERSION ${MPD_VERSION:-0.21.14}
 COPY /t/docker/scripts/install_mpd.sh /opt/helpers/
 COPY /t/docker/patches/ /patches/
 RUN /opt/helpers/install_mpd.sh ${MPD_VERSION}

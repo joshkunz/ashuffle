@@ -8,6 +8,25 @@ function die() {
     exit 1
 }
 
+MPD_VERSION=""
+LIBMPDCLIENT_VERSION=""
+
+while (( "$#" )); do
+    case "$1" in
+        -m|--mpd-version)
+            MPD_VERSION="$2"
+            shift 2
+            ;;
+        -l|--libmpdclient-version)
+            LIBMPDCLIENT_VERSION="$2"
+            shift 2
+            ;;
+        *)
+            die "unrecognized option $1"
+            ;;
+    esac
+done
+
 cd $(git rev-parse --show-toplevel)
 
 if test -d "${TEMPDIR}"; then
@@ -27,10 +46,20 @@ tar -cvf "${STAGE_DIR}/ashuffle-archive.tar" --files-from=<(git ls-files --exclu
 
 case "${IMAGE_BASE}" in
     ubuntu)
-        docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
+        args=()
+        if test -n "${MPD_VERSION}"; then
+            args+=( "--build-arg" "MPD_VERSION=${MPD_VERSION}" )
+        fi
+        if test -n "${LIBMPDCLIENT_VERSION}"; then
+            args+=( "--build-arg" "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" )
+        fi
+        docker build "${args[@]}" --build-arg "STAGE_DIR=${STAGE_DIR}" \
             -t "test/mpd:latest" -f ./t/docker/Dockerfile.ubuntu .
         ;;
     alpine)
+        if test -n "${MPD_VERSION}" || test -n "${LIBMPDCLIENT_VERSION}"; then
+            die "alpine does not support setting mpd/libmpdclient version"
+        fi
         docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
             -t "test/mpd:latest" -f ./t/docker/Dockerfile.alpine .
         ;;
