@@ -60,7 +60,7 @@ mkdir -p "${ROOT}"
 test -d "${ROOT}" || die "build root '${ROOT}' not a valid directory"
 cd "${ROOT}"
 
-echo "Fetching libmpdclient-${VERSION}..."
+echo "Fetching mpd-${VERSION}..."
 url="http://www.musicpd.org/download/mpd/${MAJOR}/mpd-${VERSION}.tar.xz"
 wget -q -O- "${url}" | tar --strip-components=1 -xJ
 if test "$?" -ne 0; then
