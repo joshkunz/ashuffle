@@ -4,6 +4,11 @@ set -e
 
 PREFIX=/usr
 ROOT="/opt/libmpdclient"
+LATEST_VERSION=2.16
+
+diag() {
+    echo $@ >&2
+}
 
 die() {
     echo $@ >&2
@@ -16,6 +21,8 @@ do_meson() {
     ninja -C build install
 }
 
+MAKE_PARALLEL_JOBS=16
+
 do_legacy() {
     errlog="$(tempfile)"
     test -f "${errlog}" || die "couldn't create error log"
@@ -24,8 +31,8 @@ do_legacy() {
     # Actual build
     ./configure --quiet --enable-silent-rules \
         --prefix="${PREFIX}" --disable-documentation && \
-    make -j 2>>"${errlog}" && \
-    make -j install 2>>"${errlog}"
+    make -j "${MAKE_PARALLEL_JOBS}" 2>>"${errlog}" && \
+    make -j "${MAKE_PARALLEL_JOBS}" install 2>>"${errlog}"
 
     status="$?"
     if test "${status}" -ne 0; then
@@ -39,6 +46,11 @@ do_legacy() {
 }
 
 VERSION="$1"
+if test "${VERSION}" = "latest"; then
+    diag "VERSION=latest, using VERSION=${LATEST_VERSION}"
+    VERSION="${LATEST_VERSION}"
+fi
+
 MAJOR="$(echo "${VERSION}" | cut -d. -f1)"
 MINOR="$(echo "${VERSION}" | cut -d. -f2)"
 

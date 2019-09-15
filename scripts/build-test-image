@@ -8,8 +8,9 @@ function die() {
     exit 1
 }
 
-MPD_VERSION=""
-LIBMPDCLIENT_VERSION=""
+# Use the environment variables by default.
+MPD_VERSION="${MPD_VERSION:-}"
+LIBMPDCLIENT_VERSION="${LIBMPDCLIENT_VERSION:-}"
 
 while (( "$#" )); do
     case "$1" in

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+. "scripts/travis/common.sh"
+
+setup
+env CC=clang meson -Dtidy_mode=true build || die "couldn't run meson"
+exec ninja -C build clang-tidy
