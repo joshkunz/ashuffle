@@ -23,7 +23,6 @@ struct options_parse_result parse_only(const char *first, ...) {
     struct list args;
     list_init(&args);
 
-    list_push_str(&args, "ashuffle");
     list_push_str(&args, first);
 
     va_list rest;
@@ -59,10 +58,7 @@ void test_default() {
 
     options_init(&opts);
 
-    const char *test_args[] = {"ashuffle"};
-
-    struct options_parse_result res =
-        options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
+    struct options_parse_result res = options_parse(&opts, 0, NULL);
     cmp_ok(res.status, "==", PARSE_OK, "empty parse works");
     options_parse_result_free(&res);
 
@@ -88,9 +84,9 @@ void test_basic_short() {
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
     const char *test_args[] = {
-        "ashuffle",    "-o", "5",         "-n",          "-q",
-        "10",          "-e", "artist",    "test artist", "artist",
-        "another one", "-f", "/dev/zero", "-p",          "1234",
+        "-o", "5",         "-n",          "-q",     "10",
+        "-e", "artist",    "test artist", "artist", "another one",
+        "-f", "/dev/zero", "-p",          "1234",
     };
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -115,10 +111,10 @@ void test_basic_long() {
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
     const char *test_args[] = {
-        "ashuffle",    "--only",         "5",      "--no-check",  "--file",
-        "/dev/zero",   "--exclude",      "artist", "test artist", "artist",
-        "another one", "--queue-buffer", "10",     "--host",      "foo",
-        "--port",      "1234",
+        "--only",    "5",           "--no-check",     "--file",
+        "/dev/zero", "--exclude",   "artist",         "test artist",
+        "artist",    "another one", "--queue-buffer", "10",
+        "--host",    "foo",         "--port",         "1234",
     };
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -144,9 +140,8 @@ void test_basic_mixed_long_short() {
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
     const char *test_args[] = {
-        "ashuffle",       "-o", "5",         "--file", "/dev/zero",   "-n",
-        "--queue-buffer", "10", "--exclude", "artist", "test artist", "artist",
-        "another one",
+        "-o", "5",         "--file", "/dev/zero",   "-n",     "--queue-buffer",
+        "10", "--exclude", "artist", "test artist", "artist", "another one",
     };
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -179,7 +174,7 @@ void test_bad_strtou() {
 void test_rule_basic() {
     struct ashuffle_options opts;
     options_init(&opts);
-    const char *test_args[] = {"ashuffle", "-e", "artist", "__artist__"};
+    const char *test_args[] = {"-e", "artist", "__artist__"};
 
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
 
@@ -221,7 +216,7 @@ void test_file_stdin() {
         struct ashuffle_options opts;
         options_init(&opts);
 
-        const char *test_args[] = {"ashuffle", flag_under_test, "-"};
+        const char *test_args[] = {flag_under_test, "-"};
         struct options_parse_result res =
             options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
         cmp_ok(res.status, "==", PARSE_OK, "[%s] parse works OK",
@@ -334,7 +329,7 @@ void test_test_option() {
 
     options_init(&opts);
 
-    const char *test_args[] = {"ashuffle", "--test_enable_option_do_not_use",
+    const char *test_args[] = {"--test_enable_option_do_not_use",
                                "print_all_songs_and_exit"};
 
     struct options_parse_result res =

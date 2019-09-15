@@ -129,7 +129,7 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
 
     int type_flag = -1;
 
-    for (int i = 1; i < argc; i++) {
+    for (int i = 0; i < argc; i++) {
         transable = state_can_trans(state);
         if (transable) {
             type_flag = rule_type_from_flag(argv[i]);

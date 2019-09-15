@@ -13,7 +13,9 @@ int main(int argc, const char *argv[]) {
     /* attempt to parse out options given on the command line */
     struct ashuffle_options options;
     options_init(&options);
-    struct options_parse_result parse_r = options_parse(&options, argc, argv);
+    // Parse the arguments with the program name stripped.
+    struct options_parse_result parse_r =
+        options_parse(&options, argc - 1, &argv[1]);
     if (parse_r.status != PARSE_OK) {
         if (parse_r.msg != NULL) {
             fprintf(stderr, "error: %s\n", parse_r.msg);

@@ -727,38 +727,143 @@ void test_connect_no_password() {
     options_free(&opts);
 }
 
+struct test_connect_host_port {
+    const char *host;
+    unsigned port;
+};
+
 void test_connect_parse_host() {
     struct host_port_case {
-        const char *host;
-        // Used when "password" is set to differentiate between the host that
-        // is set in "mpd_set_server", and the host that literally put into
-        // the MPD_HOST environment. If unset `host' is put in the MPD_HOST
-        // environment variable.
-        const char *host_env;
+        // Want is used to set the actual server host/port.
+        struct test_connect_host_port want;
+        // Password is the password that will be set for the fake MPD server.
         const char *password;
-        unsigned port;
+        // Env are the values that will be stored in the MPD_* environment
+        // variables. If they are NULL or 0, they will remain unset.
+        struct test_connect_host_port env;
+        // Flag are the values that will be given in flags. If they are NULL
+        // or 0, the respective flag will not be set.
+        struct test_connect_host_port flag;
     } cases[] = {
-        {"localhost", NULL, NULL, 6600},
-        {"localhost", "foo@localhost", "foo", 6600},
-        {"something.random.com", NULL, NULL, 123},
-        {"/test/mpd.socket", NULL, NULL, 5555},
-        {"/another/mpd.socket", "with_pass@/another/mpd.socket", "with_pass",
-         102400},
+        // by default, connect to localhost:6600
+        [0] =
+            {
+                .want = {"localhost", 6600},
+                .password = NULL,
+                .env = {NULL, 0},
+                .flag = {NULL, 0},
+            },
+        // If only MPD_HOST is set with a password, and no MPD_PORT
+        [1] =
+            {
+                .want = {"localhost", 6600},
+                .password = "foo",
+                .env = {"foo@localhost", 0},
+                .flag = {NULL, 0},
+            },
+        // MPD_HOST with a domain-like string, and MPD_PORT is set.
+        [2] =
+            {
+                .want = {"something.random.com", 123},
+                .password = NULL,
+                .env = {"something.random.com", 123},
+                .flag = {NULL, 0},
+            },
+        // MPD_HOST is a unix socket, MPD_PORT unset.
+        [3] =
+            {
+                .want.host = "/test/mpd.socket",
+                .want.port = 6600,  // Needed for test, unused by libmpdclient
+                .password = NULL,
+                .env = {"/test/mpd.socket", 0},
+                .flag = {NULL, 0},
+            },
+        // MPD_HOST is a unix socket, with a password.
+        [4] =
+            {
+                .want.host = "/another/mpd.socket",
+                .want.port = 6600,  // Needed for test, unused by libmpdclient
+                .password = "with_pass",
+                .env = {"with_pass@/another/mpd.socket", 0},
+                .flag = {NULL, 0},
+            },
+        // --host example.com, port unset. environ unset.
+        [5] =
+            {
+                .want = {"example.com", 6600},
+                .password = NULL,
+                .env = {NULL, 0},
+                .flag = {"example.com", 0},
+            },
+        // --host some.host.com --port 5512, environ unset
+        [6] =
+            {
+                .want = {"some.host.com", 5512},
+                .password = NULL,
+                .env = {NULL, 0},
+                .flag = {"some.host.com", 5512},
+            },
+        // flag host, with password. environ unset.
+        [7] =
+            {
+                .want = {"yet.another.host", 7781},
+                .password = "secret_password",
+                .env = {NULL, 0},
+                .flag = {"secret_password@yet.another.host", 7781},
+            },
+        // Flags should override MPD_HOST and MPD_PORT environment variables.
+        [8] =
+            {
+                .want = {"real.host", 1234},
+                .password = NULL,
+                .env = {"default.host", 6600},
+                .flag = {"real.host", 1234},
+            },
     };
 
     for (unsigned i = 0; i < STATIC_ARRAY_LEN(cases); i++) {
         xclearenv();
-        mpd_set_server(cases[i].host, cases[i].port, 0);
-        if (cases[i].host_env) {
-            xsetenv("MPD_HOST", cases[i].host_env);
-        } else {
-            xsetenv("MPD_HOST", cases[i].host);
+        mpd_set_server(cases[i].want.host, cases[i].want.port, 0);
+
+        if (cases[i].env.host) {
+            xsetenv("MPD_HOST", cases[i].env.host);
         }
-        char *str_port = xsprintf("%u", cases[i].port);
-        xsetenv("MPD_PORT", str_port);
+        char *str_env_port = xsprintf("%u", cases[i].env.port);
+        if (cases[i].env.port) {
+            xsetenv("MPD_PORT", str_env_port);
+        }
+
+        struct list flags;
+        list_init(&flags);
+
+        if (cases[i].flag.host) {
+            list_push_str(&flags, "--host");
+            list_push_str(&flags, cases[i].flag.host);
+        }
+        if (cases[i].flag.port) {
+            char *str_flag_port = xsprintf("%u", cases[i].flag.port);
+            list_push_str(&flags, "--port");
+            list_push_str(&flags, str_flag_port);
+            free(str_flag_port);
+        }
 
         struct ashuffle_options opts;
         options_init(&opts);
+
+        if (flags.length > 0) {
+            const char **arg_array = xmalloc(sizeof(char *) * flags.length);
+            for (unsigned j = 0; j < flags.length; j++) {
+                arg_array[j] = list_at_str(&flags, j);
+            }
+            struct options_parse_result res;
+            res = options_parse(&opts, flags.length, arg_array);
+            cmp_ok(res.status, "==", PARSE_OK,
+                   "connect_parse_host[%u]: failed to parse option flags", i);
+            if (res.status != PARSE_OK) {
+                diag("  parse result: %s", res.msg);
+            }
+            free(arg_array);
+        }
 
         struct mpd_connection c;
         memset(&c, 0, sizeof(c));
@@ -774,7 +879,8 @@ void test_connect_parse_host() {
         cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
                "connect_parse_host[%u]: connection successful", i);
 
-        free(str_port);
+        free(str_env_port);
+        list_free(&flags);
         mpd_connection_free(&c);
         options_free(&opts);
     }
