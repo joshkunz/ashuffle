@@ -270,3 +270,84 @@ func TestFromFile(t *testing.T) {
 
 	mpdi.Shutdown()
 }
+
+// Implements MPDAddress, wrapping the given MPDAddress with the appropriate
+// password.
+type mpdPasswordAddressWrapper struct {
+	wrap     ashuffle.MPDAddress
+	password string
+}
+
+func (m mpdPasswordAddressWrapper) Address() (string, string) {
+	wrap_host, wrap_port := m.wrap.Address()
+	host := m.password + "@" + wrap_host
+	return host, wrap_port
+}
+
+func TestPassword(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	mpdi, err := mpd.New(ctx, &mpd.Options{
+		LibraryRoot:        "/music",
+		DefaultPermissions: []string{"read"},
+		Passwords: []mpd.Password{
+			{
+				Password:    "super_secret_mpd_password",
+				Permissions: []string{"read", "add", "control", "admin"},
+			},
+			{
+				Password:    "anybody_can_see",
+				Permissions: []string{"read"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create mpd instance: %v", err)
+	}
+
+	// Step 1. Create an ashuffle client with the wrong password, it should
+	// fail gracefully.
+	as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
+		MPDAddress: mpdPasswordAddressWrapper{
+			wrap:     mpdi,
+			password: "anybody_can_see",
+		},
+	})
+	if err != nil {
+		t.Fatalf("[step 1] failed to create ashuffle: %v", err)
+	}
+
+	err = as.Shutdown(ashuffle.ShutdownSoft)
+	if err == nil {
+		t.Errorf("[step 1] ashuffle shutdown cleanly, wanted error")
+	} else if eErr, ok := err.(*exec.ExitError); ok {
+		if eErr.Success() {
+			t.Errorf("[step 1] ashuffle exited successfully, wanted error")
+		}
+	} else {
+		t.Errorf("[step 1] unexpected error: %v", err)
+	}
+
+	// Step 2. Create an ashuffle client with the correct password. It should
+	// work like the Basic test case.
+	as, err = ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
+		MPDAddress: mpdPasswordAddressWrapper{
+			wrap:     mpdi,
+			password: "super_secret_mpd_password",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create ashuffle instance: %v", err)
+	}
+
+	tryWaitFor(func() bool { return mpdi.PlayState() == mpd.StatePlay })
+
+	if state := mpdi.PlayState(); state != mpd.StatePlay {
+		t.Errorf("[step 2] want mpd state play, got %v", state)
+	}
+
+	if err := as.Shutdown(); err != nil {
+		t.Errorf("failed to shutdown ashuffle cleanly")
+	}
+	mpdi.Shutdown()
+}
