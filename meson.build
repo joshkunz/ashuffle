@@ -6,22 +6,22 @@ add_global_arguments([
 	language: 'c'
 )
 
-high_dep_sources = [
+high_dep_sources = files(
     'src/ashuffle.c',
-]
+)
 
-low_dep_sources = [
+low_dep_sources = files(
 	'src/args.c',
 	'src/getpass.c',
 	'src/list.c',
 	'src/rule.c',
     'src/shuffle.c',
     'src/util.c',
-]
+)
 
 sources = low_dep_sources + high_dep_sources
 
-executable_sources = sources + ['src/main.c']
+executable_sources = sources + files('src/main.c')
 
 src_inc = include_directories('src')
 root_inc = include_directories('.')
@@ -37,9 +37,7 @@ ashuffle = executable(
 
 if get_option('tidy_mode')
     clang_tidy = run_target('clang-tidy',
-        command : ['clang-tidy',
-                   '-p', meson.build_root(),
-                  ] + executable_sources,
+        command : files('scripts/run-clang-tidy') + executable_sources
     )
 endif
 

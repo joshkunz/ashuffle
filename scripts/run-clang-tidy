@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# meson generates a `-pipe` flag for some reason, which clang chokes on.
+sed -iE 's/-pipe//g' "${MESON_BUILD_ROOT}/compile_commands.json"
+if test $? -ne 0; then
+    echo "failed edit compile commands" >&2
+    exit 1
+fi
+
+exec clang-tidy -p "${MESON_BUILD_ROOT}" "$@"
