@@ -86,8 +86,6 @@ void options_init(struct ashuffle_options *opts) {
     opts->check_uris = true;
     list_init(&opts->ruleset);
     opts->queue_buffer = ARGS_QUEUE_BUFFER_NONE;  // 0
-    opts->host = NULL;
-    opts->port = 0;
 }
 
 /* "safe" string to unsigned conversion
@@ -254,6 +252,8 @@ void options_free(struct ashuffle_options *opts) {
         rule_free((struct song_rule *)list_at(&opts->ruleset, i)->data);
     }
     list_free(&opts->ruleset);
+    // Also need to free the host string, if it's been allocated.
+    free(opts->host);
 }
 
 static const char *HELP_MESSAGE =

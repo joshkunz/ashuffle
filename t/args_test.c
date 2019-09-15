@@ -72,6 +72,8 @@ void test_default() {
     cmp_ok(opts.check_uris, "==", true, "check_uris on by default");
     cmp_ok(opts.queue_buffer, "==", ARGS_QUEUE_BUFFER_NONE,
            "no queue buffer by default");
+    ok(opts.host == NULL, "no host by default");
+    cmp_ok(opts.port, "==", 0, "no port by default");
     cmp_ok(opts.test.print_all_songs_and_exit, "==", false,
            "no print_all_songs_and_exit by default");
 
@@ -88,7 +90,7 @@ void test_basic_short() {
     const char *test_args[] = {
         "ashuffle",    "-o", "5",         "-n",          "-q",
         "10",          "-e", "artist",    "test artist", "artist",
-        "another one", "-f", "/dev/zero",
+        "another one", "-f", "/dev/zero", "-p",          "1234",
     };
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -100,6 +102,7 @@ void test_basic_short() {
     ok(opts.file_in != NULL, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic short nocheck");
     cmp_ok(opts.queue_buffer, "==", 10, "basic short queue buffer");
+    cmp_ok(opts.port, "==", 1234);
 
     options_free(&opts);
 }
@@ -114,7 +117,8 @@ void test_basic_long() {
     const char *test_args[] = {
         "ashuffle",    "--only",         "5",      "--no-check",  "--file",
         "/dev/zero",   "--exclude",      "artist", "test artist", "artist",
-        "another one", "--queue-buffer", "10",
+        "another one", "--queue-buffer", "10",     "--host",      "foo",
+        "--port",      "1234",
     };
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -126,6 +130,8 @@ void test_basic_long() {
     ok(opts.file_in != NULL, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic long nocheck");
     cmp_ok(opts.queue_buffer, "==", 10, "basic long queue buffer");
+    is(opts.host, "foo", "basic long host");
+    cmp_ok(opts.port, "==", 1234, "basic long port");
 
     options_free(&opts);
 }
@@ -270,6 +276,14 @@ void test_partials() {
     TEST_PARTIAL("exclude long only match mutli",
                  PARSE_ONLY("--exclude", "artist", "whatever", "artist"),
                  "no value supplied for match 'artist'");
+
+    TEST_PARTIAL("host long", PARSE_ONLY("--host"),
+                 "no argument supplied for '--host'");
+    TEST_PARTIAL("port long", PARSE_ONLY("--port"),
+                 "no argument supplied for '--port'");
+    TEST_PARTIAL("port short ", PARSE_ONLY("-p"),
+                 "no argument supplied for '-p'");
+
     TEST_PARTIAL("test option no arg",
                  PARSE_ONLY("--test_enable_option_do_not_use"),
                  "no argument supplied for '--test_enable_option_do_not_use'");
