@@ -47,6 +47,7 @@ struct options_parse_result parse_only(const char *first, ...) {
 
     free(args_arr);
     list_free(&args);
+    options_free(&opts);
 
     return res;
 }
@@ -73,6 +74,8 @@ void test_default() {
            "no queue buffer by default");
     cmp_ok(opts.test.print_all_songs_and_exit, "==", false,
            "no print_all_songs_and_exit by default");
+
+    options_free(&opts);
 }
 
 void test_basic_short() {
@@ -97,6 +100,8 @@ void test_basic_short() {
     ok(opts.file_in != NULL, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic short nocheck");
     cmp_ok(opts.queue_buffer, "==", 10, "basic short queue buffer");
+
+    options_free(&opts);
 }
 
 void test_basic_long() {
@@ -121,6 +126,8 @@ void test_basic_long() {
     ok(opts.file_in != NULL, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic long nocheck");
     cmp_ok(opts.queue_buffer, "==", 10, "basic long queue buffer");
+
+    options_free(&opts);
 }
 
 void test_basic_mixed_long_short() {
@@ -145,6 +152,8 @@ void test_basic_mixed_long_short() {
     ok(opts.file_in != NULL, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic mixed nocheck");
     cmp_ok(opts.queue_buffer, "==", 10, "basic mixed queue buffer");
+
+    options_free(&opts);
 }
 
 void test_bad_strtou() {
@@ -194,6 +203,8 @@ void test_rule_basic() {
        "basic rule arg should not exclude other song");
 
     end_skip;
+
+    options_free(&opts);
 }
 
 void test_file_stdin() {
@@ -212,6 +223,8 @@ void test_file_stdin() {
         options_parse_result_free(&res);
 
         ok(opts.file_in == stdin, "%s parses as stdin", flag_under_test);
+
+        options_free(&opts);
     }
 }
 
@@ -317,6 +330,8 @@ void test_test_option() {
 
     cmp_ok(opts.test.print_all_songs_and_exit, "==", true,
            "test_option: print_all_songs_and_exit is set");
+
+    options_free(&opts);
 }
 
 int main() {

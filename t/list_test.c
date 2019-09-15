@@ -82,6 +82,8 @@ void test_leak() {
        "leak: remaing strings match original strings (a)");
     is(list_at_str(&t, 1), c,
        "leak: remaing strings match original strings (c)");
+
+    list_free(&t);
 }
 
 void test_empty() {

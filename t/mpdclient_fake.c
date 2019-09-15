@@ -90,7 +90,6 @@ void mpd_connection_set_server_error(struct mpd_connection *c,
 
 void mpd_connection_free(struct mpd_connection *connection) {
     free((void *)connection->error.msg);
-    // TODO: cleanup users
     list_free(&connection->pair_iter);
     list_free(&connection->song_iter);
     list_free(&connection->db);

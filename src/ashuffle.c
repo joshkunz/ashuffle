@@ -115,6 +115,10 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
         /* get the next uri */
         length = getline(&uri, &ignored, input);
     }
+    // Free any memory allocated by our final getline.
+    if (uri != NULL) {
+        free(uri);
+    }
     return 0;
 }
 

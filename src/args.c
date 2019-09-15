@@ -18,15 +18,15 @@ static const unsigned PORTLEN = 6;
 /* Enum representing the various state of the parser */
 enum parse_state {
     NO_STATE,      // Ready for anything!
+    HOST,          // expecting a hostname or ip address
+    IFILE,         // expecting song list input file
+    PORT,          // expecting a port number
+    QUEUE,         // expecting "queue_only" int value
+    QUEUE_BUFFER,  // expecting queue buffer value
+    RULE,          // expecting a rule matcher (like "artist")
     RULE_FIRST,    // expecting first rule matcher (see RULE). This is needed
                    // so that a bare `-e` or `--exclude` is not matched.
-    RULE,          // expecting a rule matcher (like "artist")
     RULE_VALUE,    // expecting rule value (like "modest mouse")
-    QUEUE,         // expecting "queue_only" int value
-    IFILE,         // expecting song list input file
-    QUEUE_BUFFER,  // expecting queue buffer value
-    HOST,          // expecting a hostname or ip address
-    PORT,          // expecting a port number
     TEST,          // expecting a test option
 };
 
@@ -113,11 +113,6 @@ static unsigned strtou(const char *str) {
     return (unsigned)value;
 }
 
-#define PARSE_FAIL(fmt, ...)                                        \
-    return (struct options_parse_result) {                          \
-        .status = PARSE_FAILURE, .msg = xsprintf(fmt, __VA_ARGS__), \
-    }
-
 struct options_parse_result options_parse(struct ashuffle_options *opts,
                                           int argc, const char *argv[]) {
     /* State for the state machine */
@@ -126,6 +121,13 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
 
     const char *match_field = NULL;
     struct song_rule rule;
+    rule_init(&rule);
+
+#define PARSE_FAIL(fmt, ...)                                        \
+    rule_free(&rule);                                               \
+    return (struct options_parse_result) {                          \
+        .status = PARSE_FAILURE, .msg = xsprintf(fmt, __VA_ARGS__), \
+    }
 
     int type_flag = -1;
 
@@ -212,6 +214,7 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
             if (opts->port == UINT_MAX) {
                 PARSE_FAIL("couldn't convert port '%s' to integer.", argv[i]);
             }
+            state = NO_STATE;
         } else if (state == TEST) {
             if (check_flags(argv[i], 1, "print_all_songs_and_exit")) {
                 opts->test.print_all_songs_and_exit = true;
@@ -241,6 +244,16 @@ void options_parse_result_free(struct options_parse_result *r) {
     if (r->msg != NULL) {
         free(r->msg);
     }
+}
+
+void options_free(struct ashuffle_options *opts) {
+    // The main thing that needs to be free'd is the ruleset. Free each rule's
+    // data individually, then free the list, which free's the rule structures
+    // themselves.
+    for (unsigned i = 0; i < opts->ruleset.length; i++) {
+        rule_free((struct song_rule *)list_at(&opts->ruleset, i)->data);
+    }
+    list_free(&opts->ruleset);
 }
 
 static const char *HELP_MESSAGE =

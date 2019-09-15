@@ -44,6 +44,9 @@ void options_init(struct ashuffle_options *);
 struct options_parse_result options_parse(struct ashuffle_options *, int argc,
                                           const char *argv[]);
 
+// Free all data stored by the given options.
+void options_free(struct ashuffle_options *);
+
 void options_help(FILE *output_stream);
 
 #endif

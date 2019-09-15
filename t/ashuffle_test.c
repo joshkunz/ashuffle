@@ -371,6 +371,10 @@ void test_shuffle_loop_init_empty() {
            "shuffle_loop_init_empty: playing after init");
     cmp_ok(c.state.queue_pos, "==", 0,
            "shuffle_loop_init_empty: queue position on first song");
+
+    mpd_connection_free(&c);
+    shuffle_free(&chain);
+    options_free(&options);
 }
 
 void test_shuffle_loop_init_playing() {
@@ -412,6 +416,10 @@ void test_shuffle_loop_init_playing() {
            "shuffle_loop_init_playing: playing after init");
     cmp_ok(c.state.queue_pos, "==", 0,
            "shuffle_loop_init_playing: queue position on first song");
+
+    mpd_connection_free(&c);
+    shuffle_free(&chain);
+    options_free(&options);
 }
 
 void test_shuffle_loop_init_stopped() {
@@ -454,6 +462,11 @@ void test_shuffle_loop_init_stopped() {
            "shuffle_loop_init_stopped: playing after init");
     cmp_ok(c.state.queue_pos, "==", 1,
            "shuffle_loop_init_stopped: queue position on second song");
+
+    list_free(&c.db);
+    list_free(&c.queue);
+    shuffle_free(&chain);
+    options_free(&options);
 }
 
 void test_shuffle_loop_basic() {
@@ -510,6 +523,10 @@ void test_shuffle_loop_basic() {
         is(mpd_playing(&c)->uri, song_a.uri,
            "shuffle_loop_basic: queued and played song_a");
     }
+
+    mpd_connection_free(&c);
+    shuffle_free(&chain);
+    options_free(&options);
 }
 
 void test_shuffle_loop_empty() {
@@ -558,6 +575,10 @@ void test_shuffle_loop_empty() {
         is(mpd_playing(&c)->uri, song_a.uri,
            "shuffle_loop_empty: queued and played song_a");
     }
+
+    mpd_connection_free(&c);
+    shuffle_free(&chain);
+    options_free(&options);
 }
 
 void test_shuffle_loop_empty_buffer() {
@@ -607,6 +628,10 @@ void test_shuffle_loop_empty_buffer() {
         is(mpd_playing(&c)->uri, song_a.uri,
            "shuffle_loop_empty_buffer: queued and played song_a");
     }
+
+    mpd_connection_free(&c);
+    shuffle_free(&chain);
+    options_free(&options);
 }
 
 void test_shuffle_loop_buffer_partial() {
@@ -663,6 +688,10 @@ void test_shuffle_loop_buffer_partial() {
         is(mpd_playing(&c)->uri, song_b.uri,
            "shuffle_loop_partial_buffer: playing the same song as before");
     }
+
+    mpd_connection_free(&c);
+    shuffle_free(&chain);
+    options_free(&options);
 }
 
 static char *failing_getpass_f() {
@@ -693,6 +722,9 @@ void test_connect_no_password() {
     ok(result == &c, "connect_no_password: connection matches set connection");
     cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
            "connect_no_password: connection successful");
+
+    mpd_connection_free(&c);
+    options_free(&opts);
 }
 
 void test_connect_parse_host() {
@@ -743,6 +775,8 @@ void test_connect_parse_host() {
                "connect_parse_host[%u]: connection successful", i);
 
         free(str_port);
+        mpd_connection_free(&c);
+        options_free(&opts);
     }
 }
 
@@ -769,6 +803,9 @@ void test_connect_env_password() {
     ok(result == &c, "connect_env_password: connection matches set connection");
     cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
            "connect_env_password: connection successful");
+
+    mpd_connection_free(&c);
+    options_free(&opts);
 }
 
 static unsigned _GOOD_PASSWORD_COUNT = 0;
@@ -800,6 +837,9 @@ void test_connect_env_bad_password() {
     // for a password. It should fail without ever calling good_password_f.
     dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
             "connect_env_bad_password: fail to connect with bad password");
+
+    mpd_connection_free(&c);
+    options_free(&opts);
 }
 
 void test_connect_env_ok_password_bad_perms() {
@@ -831,6 +871,9 @@ void test_connect_env_ok_password_bad_perms() {
     dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
             "connect_env_ok_password_bad_perms: fail to connect with bad "
             "permissions");
+
+    mpd_connection_free(&c);
+    options_free(&opts);
 }
 
 // If no password is supplied in the environment, but we have a restricted
@@ -868,6 +911,9 @@ void test_connect_bad_perms_ok_prompt() {
     cmp_ok(good_password_before, "==", good_password_after - 1,
            "connect_bad_perms_ok_prompt: password prompt should have been "
            "called once");
+
+    mpd_connection_free(&c);
+    options_free(&opts);
 }
 
 void test_connect_bad_perms_prompt_bad_perms() {
@@ -895,6 +941,9 @@ void test_connect_bad_perms_prompt_bad_perms() {
 
     dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
             "connect_bad_perms_ok_prompt: fails to connect");
+
+    mpd_connection_free(&c);
+    options_free(&opts);
 }
 
 int main() {
