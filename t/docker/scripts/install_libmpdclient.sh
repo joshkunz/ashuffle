@@ -2,26 +2,20 @@
 
 set -e
 
+SRC="$( dirname $(readlink -f "$0") )"
+. "$SRC/common.sh"
+
+MAKE_PARALLEL_JOBS=16
+
 PREFIX=/usr
 ROOT="/opt/libmpdclient"
-LATEST_VERSION=2.16
-
-diag() {
-    echo $@ >&2
-}
-
-die() {
-    echo $@ >&2
-    exit 1
-}
+GIT_URL="https://github.com/MusicPlayerDaemon/libmpdclient.git"
 
 do_meson() {
     meson . build --prefix="${PREFIX}" && \
     ninja -C build && \
     ninja -C build install
 }
-
-MAKE_PARALLEL_JOBS=16
 
 do_legacy() {
     errlog="$(tempfile)"
@@ -47,8 +41,9 @@ do_legacy() {
 
 VERSION="$1"
 if test "${VERSION}" = "latest"; then
-    diag "VERSION=latest, using VERSION=${LATEST_VERSION}"
-    VERSION="${LATEST_VERSION}"
+    latest_version="$(latest_version "${GIT_URL}")"
+    diag "VERSION=latest, using VERSION=${latest_version}"
+    VERSION="${latest_version}"
 fi
 
 MAJOR="$(echo "${VERSION}" | cut -d. -f1)"

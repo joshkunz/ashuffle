@@ -20,22 +20,21 @@ RUN apt-get update -y && \
 
 # Install Go
 
+COPY /t/docker/scripts/* /opt/helpers/
+
 ENV GO_VERSION 1.13
-COPY /t/docker/scripts/install_go.sh /opt/helpers/
 RUN /opt/helpers/install_go.sh ${GO_VERSION}
 
 # Install libmpdclient
 
 ARG LIBMPDCLIENT_VERSION
 ENV LIBMPDCLIENT_VERSION ${LIBMPDCLIENT_VERSION:-latest}
-COPY /t/docker/scripts/install_libmpdclient.sh /opt/helpers/
 RUN /opt/helpers/install_libmpdclient.sh ${LIBMPDCLIENT_VERSION}
 
 # Install MPD
 
 ARG MPD_VERSION
 ENV MPD_VERSION ${MPD_VERSION:-latest}
-COPY /t/docker/scripts/install_mpd.sh /opt/helpers/
 COPY /t/docker/patches/ /patches/
 RUN /opt/helpers/install_mpd.sh ${MPD_VERSION}
 
