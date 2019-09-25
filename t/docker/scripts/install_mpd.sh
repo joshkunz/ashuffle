@@ -2,19 +2,15 @@
 
 set -e
 
+SRC="$( dirname $(readlink -f "$0") )"
+. "$SRC/common.sh"
+
+MAKE_PARALLEL_JOBS=16
+
 PATCH_DIR=/patches
 PREFIX=/usr
 ROOT=/opt/mpd
-LATEST_VERSION="0.21.14"
-
-diag() {
-    echo $@ >&2
-}
-
-die() {
-    echo $@ >&2
-    exit 1
-}
+GIT_URL="https://github.com/MusicPlayerDaemon/MPD.git"
 
 apply_patches() {
     patch_major="$1"
@@ -31,8 +27,6 @@ do_meson() {
     ninja -C build/release && \
     ninja -C build/release install
 }
-
-MAKE_PARALLEL_JOBS=16
 
 do_legacy() {
     errlog="$(tempfile)"
@@ -56,8 +50,9 @@ do_legacy() {
 
 VERSION="$1"
 if test "${VERSION}" = "latest"; then
-    diag "VERSION=latest, using VERSION=${LATEST_VERSION}"
-    VERSION="${LATEST_VERSION}"
+    latest_version="$(latest_version "${GIT_URL}")"
+    diag "VERSION=latest, using VERSION=${latest_version}"
+    VERSION="${latest_version}"
 fi
 
 MAJOR="$(echo "${VERSION}" | cut -d. -f-2)"
