@@ -15,7 +15,7 @@ These tests run against only ashuffle sources (though they do depend on
 libmpdclient headers), and attempt to target individual ashuffle subsystems
 like "list", or "rule". You can run the unit tests like so:
 
-    meson build
+    meson -Dtests=enabled build
     ninja -C build test 
 
 Unit tests are located in the root of the testing directory. All unit-tests
