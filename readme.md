@@ -4,7 +4,7 @@ ashuffle
 [![Build Status](https://travis-ci.org/joshkunz/ashuffle.svg?branch=master)](https://travis-ci.org/joshkunz/ashuffle)
 [![GitHub](https://img.shields.io/github/license/joshkunz/ashuffle?color=informational)](LICENSE)
 
-**Notice:** [ashuffle-v2 has just been released!](https://github.com/joshkunz/ashuffle/releases/tag/v2.0.0)
+**Notice:** [ashuffle-v2 has just been released!](https://github.com/joshkunz/ashuffle/releases/tag/v2.0.1)
 Check out the release for a full description of the changes. Since this is a
 major version, it contains a couple backwards incompatible changes:
 
