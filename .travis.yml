@@ -1,0 +1,52 @@
+language: minimal
+dist: bionic
+
+services:
+  - docker
+
+stages:
+  - Check
+  - Unit Test
+  - Sanitizers
+  - Integration Test
+
+jobs:
+  include:
+    - stage: Check
+      script: scripts/travis/check-format
+      env:
+        - CHECK=format
+    - script: scripts/travis/lint
+      env:
+        - CHECK=lint
+    - stage: Unit Test
+      script: scripts/travis/unit-test
+      env:
+        - SANITIZER=none
+    - script: scripts/travis/unit-test
+      env:
+        - SANITIZER=asan
+    - script: scripts/travis/unit-test
+      env:
+        - SANITIZER=msan
+    - stage: Integration Test
+      script: scripts/run-integration
+      # Run using latest
+      env:
+        - MPD_VERSION=latest
+        - LIBMPDCLIENT_VERSION=latest
+    - script: scripts/run-integration
+      # Based on Ubuntu 16.04 LTS (xenial)
+      env:
+        - MPD_VERSION=0.19.12
+        - LIBMPDCLIENT_VERSION=2.9
+    - script: scripts/run-integration
+      # Based on Ubuntu 18.04 LTS (bionic)
+      env:
+        - MPD_VERSION=0.20.18
+        - LIBMPDCLIENT_VERSION=2.11
+    - script: scripts/run-integration
+      # Based on Ubuntu 19.04 (disco)
+      env:
+        - MPD_VERSION=0.21.4
+        - LIBMPDCLIENT_VERSION=2.16

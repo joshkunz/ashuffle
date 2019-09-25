@@ -1,4 +1,10 @@
-ashuffle
 ashuffle.dSYM
 *.o
 *.swp
+
+# Exclude generated Go packages.
+t/integration/pkg/**
+t/integration/src/github.com/**
+
+# Common meson build directory
+build/**

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+declare -a BAD_FORMAT
+
+function staged_modified_files() {
+    git status --porcelain=2 \
+        | egrep '^1 M' | awk '{ print $9 }'
+}
+
+function check_go() {
+    F=$1
+    cmp "$F" <(gofmt "$F") >/dev/null
+    if test $? -ne 0; then
+        BAD_FORMAT+=( "$F" )
+    fi
+}
+
+function check_c() {
+    F=$1
+    cmp "$F" <(clang-format "$F") >/dev/null
+    if test $? -ne 0; then
+        BAD_FORMAT+=( "$F" )
+    fi
+}
+
+
+while read F; do
+    if test -z "$F"; then continue; fi
+    case "$F" in
+        *.c|*.h)
+            check_c "$F"
+            ;;
+        *.go)
+            check_go "$F"
+            ;;
+    esac
+done <<<$( staged_modified_files )
+
+if test "${#BAD_FORMAT[@]}" -gt 0; then
+    echo "Unformatted files found:"
+    printf "  %s\n" "${BAD_FORMAT[@]}"
+    echo
+    echo "Fix by running:"
+    echo "  scripts/format \\"
+    echo "    " "${BAD_FORMAT[@]}"
+    echo
+    exit 1
+fi
+
+exit 0

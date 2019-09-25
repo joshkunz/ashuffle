@@ -1,0 +1,61 @@
+FROM ubuntu:latest
+
+RUN apt-get update -y && \
+    apt-get upgrade -y && \
+    apt-get install --no-install-recommends -y \
+        build-essential \
+        doxygen \
+        git \
+        libboost-all-dev \
+        libmad0-dev libid3tag0-dev \
+        ninja-build \
+        pkg-config \
+        python3 python3-pip python3-setuptools python3-wheel \
+        wget \
+        xz-utils && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    pip3 install \
+        meson
+
+# Install Go
+
+COPY /t/docker/scripts/* /opt/helpers/
+
+ENV GO_VERSION 1.13
+RUN /opt/helpers/install_go.sh ${GO_VERSION}
+
+# Install libmpdclient
+
+ARG LIBMPDCLIENT_VERSION
+ENV LIBMPDCLIENT_VERSION ${LIBMPDCLIENT_VERSION:-latest}
+RUN /opt/helpers/install_libmpdclient.sh ${LIBMPDCLIENT_VERSION}
+
+# Install MPD
+
+ARG MPD_VERSION
+ENV MPD_VERSION ${MPD_VERSION:-latest}
+COPY /t/docker/patches/ /patches/
+RUN /opt/helpers/install_mpd.sh ${MPD_VERSION}
+
+# Install our static test helpers
+
+COPY /t/static/tracks/*.mp3 /music/
+COPY /t/static/mpd.conf /conf
+
+# Copy in the integration test runner
+
+COPY /t/docker/scripts/run_integration.sh /exec/
+
+# The directory that contains the staged ashuffle source. If unset the
+# build directory (presumably the ashuffle root) is used. This has some
+# drawbacks, like potentially including a build directory that would conflict
+# with the container's build directory.
+ARG STAGE_DIR
+ENV STAGE_DIR ${STAGE_DIR:-./}
+
+# This archive is created automatically by the build script. Note, this archive
+# is automatically extracted by this rule.
+ADD ${STAGE_DIR}/ashuffle-archive.tar /ashuffle/
+
+CMD ["/exec/run_integration.sh"]

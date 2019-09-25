@@ -1,0 +1,54 @@
+FROM alpine:edge
+
+RUN apk update && \
+        apk upgrade && \
+        apk add \
+            alpine-sdk \
+            boost boost-dev \
+            busybox-extras \
+            gdb \
+            go \
+            libmad libmad-dev \
+            meson \
+            ninja \
+            xz
+
+ENV LIBMPDCLIENT_MAJOR_VERSION 2
+ENV LIBMPDCLIENT_VERSION 2.16
+ENV LIBMPDCLIENT_URL https://www.musicpd.org/download/libmpdclient/${LIBMPDCLIENT_MAJOR_VERSION}/libmpdclient-${LIBMPDCLIENT_VERSION}.tar.xz
+
+ADD ${LIBMPDCLIENT_URL} /opt/libmpdclient/archive.tar.xz
+RUN cd /opt/libmpdclient && \
+        tar --strip-components=1 -xJvf archive.tar.xz && \
+        rm archive.tar.xz && \
+        meson . build && \
+        ninja -C build && \
+        ninja -C build install
+
+ENV MPD_MAJOR_VERSION 0.21
+ENV MPD_VERSION 0.21.5
+ENV MPD_URL http://www.musicpd.org/download/mpd/${MPD_MAJOR_VERSION}/mpd-${MPD_VERSION}.tar.xz
+
+ADD ${MPD_URL} /opt/mpd/archive.tar.xz
+RUN cd /opt/mpd && \
+        tar --strip-components=1 -xJvf archive.tar.xz && \
+        rm archive.tar.xz && \
+        meson . build/release --buildtype=debugoptimized -Db_ndebug=true && \
+        ninja -C build/release && \
+        ninja -C build/release install
+
+COPY /t/static/tracks/*.mp3 /music/
+COPY /t/static/mpd.conf /conf
+COPY /t/docker/scripts/run_integration.sh /exec/
+
+# The directory that contains the staged ashuffle source. If unset the
+# build directory (presumably the ashuffle root) is used. This has some
+# drawbacks, like potentially including a build directory that would conflict
+# with the container's build directory.
+ARG STAGE_DIR
+ENV STAGE_DIR ${STAGE_DIR:-./}
+
+# This archive is created automatically by the build script.
+ADD ${STAGE_DIR}/ashuffle-archive.tar /ashuffle/
+
+CMD ["/exec/run_integration.sh"]

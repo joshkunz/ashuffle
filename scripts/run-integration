@@ -1,0 +1,8 @@
+#!/bin/bash
+die() {
+    echo "$@" >&2
+    exit 1
+}
+
+./scripts/build-test-image "$@" || die "couldn't build test image"
+exec docker run --name mpd_test --rm -it test/mpd:latest

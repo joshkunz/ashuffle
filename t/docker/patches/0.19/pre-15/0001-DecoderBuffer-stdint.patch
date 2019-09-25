@@ -1,0 +1,11 @@
+diff --unified -r a/src/decoder/DecoderBuffer.hxx b/src/decoder/DecoderBuffer.hxx
+--- a/src/decoder/DecoderBuffer.hxx	2019-09-14 06:42:41.240059873 +0000
++++ b/src/decoder/DecoderBuffer.hxx	2019-09-14 06:43:11.452152950 +0000
+@@ -25,6 +25,7 @@
+ #include "util/ConstBuffer.hxx"
+ 
+ #include <stddef.h>
++#include <cstdint>
+ 
+ struct Decoder;
+ class InputStream;

@@ -1,0 +1,73 @@
+#!/bin/bash
+
+TEMPDIR="./tmp"
+IMAGE_BASE=ubuntu
+
+function die() {
+    echo "$@" >&2
+    exit 1
+}
+
+# Use the environment variables by default.
+MPD_VERSION="${MPD_VERSION:-}"
+LIBMPDCLIENT_VERSION="${LIBMPDCLIENT_VERSION:-}"
+
+while (( "$#" )); do
+    case "$1" in
+        -m|--mpd-version)
+            MPD_VERSION="$2"
+            shift 2
+            ;;
+        -l|--libmpdclient-version)
+            LIBMPDCLIENT_VERSION="$2"
+            shift 2
+            ;;
+        *)
+            die "unrecognized option $1"
+            ;;
+    esac
+done
+
+cd $(git rev-parse --show-toplevel)
+
+if test -d "${TEMPDIR}"; then
+    die "Directory /tmp exists, can't create stage"
+fi
+
+mkdir "${TEMPDIR}"
+STAGE_DIR=$(mktemp -p "${TEMPDIR}" --directory)
+if test ! -d "${STAGE_DIR}"; then
+    rm -r "${TEMPDIR}"
+    die "Failed to create staging directory"
+fi
+
+# Why on earth git does not use the standard exlude rules for ls-files is
+# beyond me.
+echo "Building ashuffle archive..."
+tar -cf "${STAGE_DIR}/ashuffle-archive.tar" --files-from=<(git ls-files --exclude-standard -cmo)
+
+case "${IMAGE_BASE}" in
+    ubuntu)
+        args=()
+        if test -n "${MPD_VERSION}"; then
+            args+=( "--build-arg" "MPD_VERSION=${MPD_VERSION}" )
+        fi
+        if test -n "${LIBMPDCLIENT_VERSION}"; then
+            args+=( "--build-arg" "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" )
+        fi
+        docker build "${args[@]}" --build-arg "STAGE_DIR=${STAGE_DIR}" \
+            -t "test/mpd:latest" -f ./t/docker/Dockerfile.ubuntu .
+        ;;
+    alpine)
+        if test -n "${MPD_VERSION}" || test -n "${LIBMPDCLIENT_VERSION}"; then
+            die "alpine does not support setting mpd/libmpdclient version"
+        fi
+        docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
+            -t "test/mpd:latest" -f ./t/docker/Dockerfile.alpine .
+        ;;
+    *)
+        die "invalid image base: ${IMAGE_BASE}"
+esac
+
+rm -r "${STAGE_DIR}"
+rm -r "${TEMPDIR}"

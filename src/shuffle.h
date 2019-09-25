@@ -10,20 +10,23 @@ struct shuffle_chain {
 };
 
 /* initialize this shuffle chain */
-int shuffle_init(struct shuffle_chain *, unsigned window_size);
+void shuffle_init(struct shuffle_chain *, unsigned window_size);
 
 /* Add an the item pointed to by 'data' of size 'size' to
  * the given chain */
-int shuffle_add(struct shuffle_chain *, const void * data, size_t size);
+void shuffle_add(struct shuffle_chain *, const char *data);
 
 /* return the number of songs in the shuffle chain */
-int shuffle_length(struct shuffle_chain *);
+unsigned shuffle_length(struct shuffle_chain *);
 
 /* Randomly pick an element added via 'shuffle_add' and return
  * a pointer to it. */
-const void * shuffle_pick(struct shuffle_chain *);
+const char *shuffle_pick(struct shuffle_chain *);
+
+/* Copy all songs from from the shuffle chain into the list "out". */
+void shuffle_items(const struct shuffle_chain *, struct list *out);
 
 /* Free memory associated with the shuffle chain. */
-int shuffle_free(struct shuffle_chain *);
+void shuffle_free(struct shuffle_chain *);
 
 #endif

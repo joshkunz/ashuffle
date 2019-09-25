@@ -1,0 +1,1 @@
+option('tidy_mode', type : 'boolean', value : 'false')

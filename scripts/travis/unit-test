@@ -1,0 +1,44 @@
+#!/bin/sh
+
+BUILD_ROOT=build
+
+. "scripts/travis/common.sh"
+
+# Set the mode to the environment variable SANITIZER if set, otherwise,
+# use "default"
+SANITIZER="${SANITIZER:-none}"
+if test "$#" -gt 0; then
+    case $1 in
+        asan)
+            SANITIZER=asan
+            ;;
+        msan)
+            SANITIZER=msan
+            ;;
+        *)
+            die "unrecognized mode $1"
+    esac
+fi
+
+setup
+echo "Running with sanitizer ${SANITIZER}"
+case "${SANITIZER}" in
+    none)
+        meson "${BUILD_ROOT}" \
+        || die "couldn't run meson with sanitizer ${SANITIZER}"
+        ;;
+    asan)
+        env CC=clang LDFLAGS="-fsanitize=address" \
+            meson -Db_sanitize=address -Db_lundef=false "${BUILD_ROOT}" \
+            || die "couldn't run meson with sanitizer ${SANITIZER}"
+        ;;
+    msan)
+        env CC=clang LDFLAGS="-fsanitize=memory" \
+            meson -Db_sanitize=memory -Db_lundef=false "${BUILD_ROOT}" \
+            || die "couldn't run meson with sanitizer ${SANITIZER}"
+        ;;
+    *)
+        die "unrecognized sanitizer ${SANITIZER}"
+esac
+
+exec ninja -C "${BUILD_ROOT}" test
