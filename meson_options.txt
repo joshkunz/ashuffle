@@ -1,1 +1,2 @@
-option('tidy_mode', type : 'boolean', value : 'false')
+option('tidy_mode', type : 'feature', value : 'disabled')
+option('tests', type : 'feature', value : 'disabled')
