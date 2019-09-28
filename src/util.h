@@ -16,4 +16,8 @@ char *xsprintf(const char *fmt, ...);
 /* Exit the program after displaying the given error. */
 void die(const char *fmt, ...);
 
+/* Do an in-place qsort on the (const char *) array `arr`. `len` is the length
+ * of the array `arr`. */
+void qsort_str(const char *arr[], unsigned len);
+
 #endif

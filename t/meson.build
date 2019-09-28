@@ -14,10 +14,5 @@ clientfake_dep = declare_dependency(include_directories : [clientfake_inc, root_
                                     dependencies: clientlib_inc_dep)
 
 testhelpers_inc = include_directories('.')
-testhelpers = library('testhelpers',
-                      ['helpers.c'],
-                      include_directories : testhelpers_inc,
-                      dependencies : clientfake_dep)
-testhelpers_dep = declare_dependency(include_directories : testhelpers_inc,
-                                     link_with: testhelpers)
+testhelpers_dep = declare_dependency(include_directories : testhelpers_inc)
 

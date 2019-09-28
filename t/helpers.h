@@ -20,7 +20,4 @@
 #define TEST_SONG_URI(name) \
     struct mpd_song name = test_build_song(#name, NULL, 0)
 
-// Do an in-place qsort on the array `arr`. `len` is the length of array `arr`.
-void qsort_str(const char* arr[], unsigned len);
-
 #endif
