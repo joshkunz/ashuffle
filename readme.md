@@ -329,6 +329,6 @@ some way.
 
   [1]: https://github.com/Joshkunz/binfiles/blob/4a4e9b7c845b59ba1c0b68edc84e6cf1972dbc73/ashuffle
   [2]: https://mesonbuild.com/Quick-guide.html
-  [latest]: https://github.com/Joshkunz/ashuffle/releases/tag/v2.0.0
+  [latest]: https://github.com/Joshkunz/ashuffle/releases/tag/v2.0.1
   [announce]: https://groups.google.com/a/ashuffle.app/forum/#!forum/announce
   [users]: https://groups.google.com/a/ashuffle.app/forum/#!forum/users
