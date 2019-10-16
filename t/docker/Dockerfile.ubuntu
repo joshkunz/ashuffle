@@ -1,5 +1,7 @@
 FROM ubuntu:latest
 
+ENV MESON_VERSION 0.52.0
+
 RUN apt-get update -y && \
     apt-get upgrade -y && \
     apt-get install --no-install-recommends -y \
@@ -16,7 +18,7 @@ RUN apt-get update -y && \
     apt-get autoremove -y && \
     apt-get clean && \
     pip3 install \
-        meson
+        meson==${MESON_VERSION}
 
 # Install Go
 

@@ -1,3 +1,5 @@
+MESON_VERSION="0.52.0"
+
 die() {
     echo "$@" >&2
     exit 1
@@ -15,5 +17,5 @@ setup() {
             ninja-build \
             python3 python3-pip python3-setuptools python3-wheel \
     || die "couldn't apt-get required packages" 
-    sudo pip3 install meson || die "couldn't install meson"
+    sudo pip3 install meson=="${MESON_VERSION}" || die "couldn't install meson"
 }
