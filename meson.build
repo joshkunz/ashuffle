@@ -35,11 +35,9 @@ ashuffle = executable(
 	install: true
 )
 
-if get_option('tidy_mode').enabled()
-    clang_tidy = run_target('clang-tidy',
-        command : files('scripts/run-clang-tidy') + executable_sources
-    )
-endif
+clang_tidy = run_target('ashuffle-clang-tidy',
+    command : files('scripts/run-clang-tidy') + executable_sources
+)
 
 # We only generate tests if we are *not running in tidy mode
 if get_option('tests').enabled()
