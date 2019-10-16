@@ -12,7 +12,9 @@ function die() {
 MPD_VERSION="${MPD_VERSION:-}"
 LIBMPDCLIENT_VERSION="${LIBMPDCLIENT_VERSION:-}"
 
-while (( "$#" )); do
+
+declare -a DOCKER_ARGS
+while test "$#" -gt 0; do
     case "$1" in
         -m|--mpd-version)
             MPD_VERSION="$2"
@@ -23,7 +25,8 @@ while (( "$#" )); do
             shift 2
             ;;
         *)
-            die "unrecognized option $1"
+            DOCKER_ARGS+=( "$1" )
+            shift
             ;;
     esac
 done
@@ -48,7 +51,7 @@ tar -cf "${STAGE_DIR}/ashuffle-archive.tar" --files-from=<(git ls-files --exclud
 
 case "${IMAGE_BASE}" in
     ubuntu)
-        args=()
+        args=( "${DOCKER_ARGS[@]}" )
         if test -n "${MPD_VERSION}"; then
             args+=( "--build-arg" "MPD_VERSION=${MPD_VERSION}" )
         fi
