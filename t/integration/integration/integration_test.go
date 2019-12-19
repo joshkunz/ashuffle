@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"ashuffle"
-	"mpd"
+	"ashuffle/ashuffle"
+	"ashuffle/mpd"
 
 	"github.com/google/go-cmp/cmp"
 )
