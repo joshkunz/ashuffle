@@ -5,10 +5,14 @@ services:
   - docker
 
 stages:
-  - Check
-  - Unit Test
-  - Sanitizers
-  - Integration Test
+  - name: Check
+    if: type = pull_request OR branch = master OR tag IS present
+  - name: Unit Test
+    if: type = pull_request OR branch = master OR tag IS present
+  - name: Sanitizers
+    if: type = pull_request OR branch = master OR tag IS present
+  - name: Integration Test
+    if: type = pull_request OR branch = master OR tag IS present
 
 jobs:
   include:
