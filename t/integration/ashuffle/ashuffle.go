@@ -18,7 +18,7 @@ type Ashuffle struct {
 	Stdout *bytes.Buffer
 }
 
-const MaxShutdownWait = 500 * time.Millisecond
+const MaxShutdownWait = 5 * time.Second
 
 type ShutdownType uint
 
