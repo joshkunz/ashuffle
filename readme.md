@@ -4,7 +4,7 @@ ashuffle
 [![Build Status](https://travis-ci.org/joshkunz/ashuffle.svg?branch=master)](https://travis-ci.org/joshkunz/ashuffle)
 [![GitHub](https://img.shields.io/github/license/joshkunz/ashuffle?color=informational)](LICENSE)
 
-**Notice:** [ashuffle-v2 has just been released!](https://github.com/joshkunz/ashuffle/releases/tag/v2.1.0)
+**Notice:** [ashuffle-v2 has just been released!][latest]
 Check out the release for a full description of the changes. Since this is a
 major version, it contains a couple backwards incompatible changes:
 
@@ -329,6 +329,6 @@ some way.
 
   [1]: https://github.com/Joshkunz/binfiles/blob/4a4e9b7c845b59ba1c0b68edc84e6cf1972dbc73/ashuffle
   [2]: https://mesonbuild.com/Quick-guide.html
-  [latest]: https://github.com/Joshkunz/ashuffle/releases/tag/v2.1.0
+  [latest]: https://github.com/joshkunz/ashuffle/releases/latest
   [announce]: https://groups.google.com/a/ashuffle.app/forum/#!forum/announce
   [users]: https://groups.google.com/a/ashuffle.app/forum/#!forum/users
