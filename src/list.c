@@ -148,6 +148,19 @@ void list_leak(struct list *l, unsigned index, struct datum *out) {
     free(extracted);
 }
 
+const char **list_to_array_str(struct list *l) {
+    if (!l->length) {
+        return NULL;
+    }
+
+    const char **outa = xmalloc(sizeof(char *) * l->length);
+    struct node *cur = l->_list;
+    for (unsigned i = 0; cur; cur = cur->next, i++) {
+        outa[i] = (const char *)cur->data.data;
+    }
+    return outa;
+}
+
 /* free all elements of the list */
 void list_free(struct list *l) {
     while (l->_list != NULL) {

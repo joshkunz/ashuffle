@@ -84,6 +84,31 @@ bool ruleset_accepts_uri(struct mpd_connection *mpd, struct list *ruleset,
     return accepted;
 }
 
+static void mpd_song_uri_list(struct mpd_connection *mpd, struct list *uris) {
+    /* ask for a list of songs */
+    if (mpd_send_list_all_meta(mpd, NULL) != true) {
+        mpd_perror(mpd);
+    }
+
+    /* parse out the pairs */
+    struct mpd_song *song = mpd_recv_song(mpd);
+    const enum mpd_error err = mpd_connection_get_error(mpd);
+    if (err == MPD_ERROR_CLOSED) {
+        die("MPD server closed the connection while getting the list of\n"
+            "all songs. If MPD error logs say \"Output buffer is full\",\n"
+            "consider setting max_output_buffer_size to a higher value\n"
+            "(e.g. 32768) in your MPD config.");
+    } else if (err != MPD_ERROR_SUCCESS) {
+        mpd_perror(mpd);
+    }
+    for (; song; song = mpd_recv_song(mpd)) {
+        list_push_str(uris, mpd_song_get_uri(song));
+
+        /* free the current song */
+        mpd_song_free(song);
+    }
+}
+
 /* build the list of songs to shuffle from using
  * the supplied file. */
 int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
@@ -91,6 +116,18 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
     char *uri = NULL;
     ssize_t length = 0;
     size_t ignored = 0;
+    struct list all_uris;
+    const char **all_uris_array = NULL;
+    list_init(&all_uris);
+
+    if (check) {
+        mpd_song_uri_list(mpd, &all_uris);
+        all_uris_array = list_to_array_str(&all_uris);
+        if (all_uris_array) {
+            qsort_str(all_uris_array, all_uris.length);
+        }
+    }
+
     length = getline(&uri, &ignored, input);
     while (!feof(input) && !ferror(input)) {
         if (length < 1) {
@@ -104,9 +141,26 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
             uri[length] = '\0';
         }
 
-        if ((check && ruleset_accepts_uri(mpd, ruleset, uri)) || (!check)) {
-            shuffle_add(songs, uri);
+        if (check) {
+            if (!all_uris.length) {
+                // No URIs in MPD, so the song can't possibly exist.
+                goto skip_uri;
+            }
+            if (!bsearch_str(all_uris_array, all_uris.length, uri)) {
+                // We have some uris in `all_uris', but the given URI
+                // is not in there. Skip this URI.
+                goto skip_uri;
+            }
+            if (ruleset->length && !ruleset_accepts_uri(mpd, ruleset, uri)) {
+                // User-specified some rules, and they don't match this URI,
+                // so skip this uri.
+                goto skip_uri;
+            }
         }
+
+        shuffle_add(songs, uri);
+
+    skip_uri:
 
         /* free the temporary memory */
         free(uri);
@@ -119,6 +173,11 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
     if (uri != NULL) {
         free(uri);
     }
+
+    // This should be safe, even if `check` is false.
+    free(all_uris_array);
+    list_free(&all_uris);
+
     return 0;
 }
 
@@ -141,16 +200,13 @@ int build_songs_mpd(struct mpd_connection *mpd, struct list *ruleset,
     } else if (err != MPD_ERROR_SUCCESS) {
         mpd_perror(mpd);
     }
-    while (song) {
+    for (; song; song = mpd_recv_song(mpd)) {
         /* if this song is allowed, add it to the list */
         if (ruleset_accepts_song(ruleset, song)) {
             shuffle_add(songs, mpd_song_get_uri(song));
         }
         /* free the current song */
         mpd_song_free(song);
-
-        /* get the next song from the list */
-        song = mpd_recv_song(mpd);
     }
     return 0;
 }

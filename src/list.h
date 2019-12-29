@@ -50,6 +50,12 @@ void list_pop(struct list *, unsigned index);
  * by free'd by the caller. If 'index' is out of bounds, the program crashes. */
 void list_leak(struct list *, unsigned index, struct datum *out);
 
+/* Return an array of (char *) pointing to the data elements of the datums
+ * in this list. This is useful if you need to do a lot of indexed array
+ * accesses, or you want a sorted view of the list.
+ * Returns NULL if the given list is empty. */
+const char **list_to_array_str(struct list *);
+
 /* Free all elements of the list, and their datums. */
 void list_free(struct list *);
 

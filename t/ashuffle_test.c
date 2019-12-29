@@ -233,18 +233,39 @@ void test_build_songs_file_check() {
     TEST_SONG(song_a, TAG(MPD_TAG_ARTIST, "__artist__"));
     TEST_SONG(song_b, TAG(MPD_TAG_ARTIST, "__not_artist__"));
     TEST_SONG(song_c, TAG(MPD_TAG_ARTIST, "__artist__"));
+    // This song will not be present in the MPD library, so it doesn't need
+    // any tags.
+    TEST_SONG_URI(song_d);
 
-    // When matching each song URI against the rules, ashuffle executes
-    // mpd_recv_song twice. Once to receive the actual song object from
-    // libmpdclient, and once to "finish" the iteration. So, for each URI we
-    // want to test, we also need to insert an empty entry after it.
+    // When matching songs, ashuffle will first query for a list of songs,
+    // and then match against that static list. Only if a song is in the library
+    // will it be matched against the ruleset (since matching requires
+    // expensive MPD queries to resolve the URI).
     list_init(&c.song_iter);
+    list_push_song(&c.song_iter, &song_a);
+    list_push_song(&c.song_iter, &song_b);
+    list_push_song(&c.song_iter, &song_c);
+    // Don't push song_d, so we can validate that only songs in the MPD
+    // library are allowed.
+    // list_push_song(&c.song_iter, &song_d)
+
+    // Empty to terminate the list of songs from the `listall' query.
+    list_push_empty(&c.song_iter);
+
+    // For the songs that are actually in the database, we will check
+    // against the ruleset. When matching each song URI against the
+    // rules, ashuffle executes mpd_recv_song twice. Once to receive
+    // the actual song object from libmpdclient, and once to "finish"
+    // the iteration. So, for each URI we want to test, we also need to
+    // insert an empty entry after it.
     list_push_song(&c.song_iter, &song_a);
     list_push_empty(&c.song_iter);
     list_push_song(&c.song_iter, &song_b);
     list_push_empty(&c.song_iter);
     list_push_song(&c.song_iter, &song_c);
     list_push_empty(&c.song_iter);
+    // No song_d here, since we should never query for it, it should be
+    // filtered out earlier.
 
     // step 5. Set up our test input file, but writing the URIs of our songs.
     FILE *f = tmpfile();
@@ -256,6 +277,8 @@ void test_build_songs_file_check() {
     xfwriteln(f, song_a.uri);
     xfwriteln(f, song_b.uri);
     xfwriteln(f, song_c.uri);
+    // But we do want to write song_d here, so that ashuffle has to check it.
+    xfwriteln(f, song_d.uri);
 
     // rewind, so build_songs_file can see the URIs we've written.
     rewind(f);

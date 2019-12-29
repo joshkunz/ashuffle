@@ -108,6 +108,34 @@ void test_empty() {
     list_free(&t);
 }
 
+void test_str_array() {
+    struct list t;
+    list_init(&t);
+
+    const char** arr1 = list_to_array_str(&t);
+    ok(arr1 == NULL, "str_array: array of empty list is NULL");
+
+    const char* want[] = {"item a", "item b", "item c"};
+    list_push_str(&t, want[0]);
+    list_push_str(&t, want[1]);
+    list_push_str(&t, want[2]);
+
+    const char** arr2 = list_to_array_str(&t);
+
+    is(want[0], arr2[0], "str_array: want[0] == got[0]");
+    is(want[1], arr2[1], "str_array: want[1] == got[1]");
+    is(want[2], arr2[2], "str_array: want[2] == got[2]");
+
+    // Test that the array elements are actually pointing to the same data
+    // elements as the list.
+    ok(arr2[0] == list_at_str(&t, 0), "str_array: got[0] == list_at_str(0)");
+    ok(arr2[1] == list_at_str(&t, 1), "str_array: got[1] == list_at_str(1)");
+    ok(arr2[2] == list_at_str(&t, 2), "str_array: got[2] == list_at_str(2)");
+
+    free(arr2);
+    list_free(&t);
+}
+
 int main() {
     plan(NO_PLAN);
 
@@ -115,6 +143,7 @@ int main() {
     test_multi_push_pop();
     test_leak();
     test_empty();
+    test_str_array();
 
     done_testing();
 }

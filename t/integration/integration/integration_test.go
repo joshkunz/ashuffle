@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"ashuffle/mpd"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/montanaflynn/stats"
+	"golang.org/x/sync/semaphore"
 )
 
 const ashuffleBin = "/ashuffle/build/ashuffle"
@@ -53,6 +56,33 @@ func tryWaitFor(cond func() bool) {
 			}
 		}
 	}
+}
+
+type linesFile struct {
+	f *os.File
+}
+
+func (l linesFile) Path() string {
+	return l.f.Name()
+}
+
+func (l linesFile) Cleanup() error {
+	p := l.Path()
+	l.f.Close()
+	return os.Remove(p)
+}
+
+func writeLines(lines []string) (linesFile, error) {
+	inputF, err := ioutil.TempFile(os.TempDir(), "ashuffle-input")
+	if err != nil {
+		return linesFile{}, fmt.Errorf("couldn't open tempfile: %w", err)
+	}
+
+	if _, err := io.WriteString(inputF, strings.Join(lines, "\n")); err != nil {
+		return linesFile{}, fmt.Errorf("couldn't write lines into tempfile: %w", err)
+	}
+
+	return linesFile{inputF}, nil
 }
 
 func TestMain(m *testing.M) {
@@ -222,20 +252,11 @@ func TestFromFile(t *testing.T) {
 		"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3",
 	}
 
-	inputF, err := ioutil.TempFile(os.TempDir(), "ashuffle-input")
+	linesF, err := writeLines(db)
 	if err != nil {
-		t.Fatalf("couldn't open tempfile: %v", err)
+		t.Fatalf("couldn't write db lines to file: %v", err)
 	}
-	// Cleanup our input file after the test
-	defer func() {
-		loc := inputF.Name()
-		inputF.Close()
-		os.Remove(loc)
-	}()
-
-	if _, err := io.WriteString(inputF, strings.Join(db, "\n")); err != nil {
-		t.Fatalf("couldn't write db into tempfile: %v", err)
-	}
+	defer linesF.Cleanup()
 
 	as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
 		MPDAddress: mpdi,
@@ -245,7 +266,7 @@ func TestFromFile(t *testing.T) {
 			// work.
 			"--exclude", "artist", "jahzzar", "album", "traveller",
 			// Pass in our list of songs.
-			"-f", inputF.Name(),
+			"-f", linesF.Path(),
 			// Then, we make ashuffle just print the list of songs and quit
 			"--test_enable_option_do_not_use", "print_all_songs_and_exit",
 		},
@@ -350,4 +371,118 @@ func TestPassword(t *testing.T) {
 		t.Errorf("failed to shutdown ashuffle cleanly")
 	}
 	mpdi.Shutdown()
+}
+
+// TestFastStartup verifies that ashuffle can load the "huge" music
+// library (see the ashuffle root container for details of how it is created)
+// and startup within a set threshold. This test is designed to detect
+// performance regresssions in ashuffle startup.
+// This test closely mirrors the "ShuffleOnce" test.
+func TestFastStartup(t *testing.T) {
+	// No t.Parallel(), since this benchmark is performance sensitive. We want
+	// to avoid CPU or I/O starvation from other tests.
+	ctx := context.Background()
+
+	// Parallelism controls the number of parallel startup tests that are
+	// allowed to run at once.
+	parallelism := 10
+	// Trials controls the number of startup time samples that will be
+	// collected.
+	trials := 50
+	// Threshold is the level at which the 95th percentile startup time is
+	// considered a "failure" for the purposes of this test. Right now it
+	// is pegged to 400ms. Note: making this threshold less than 1ms may not
+	// work, since the 95th percentile is calculated in milliseconds.
+	threshold := 400 * time.Millisecond
+
+	// Start up MPD and read out the DB, so we can build a file list for the
+	// "from file" test. We will immediately shut down this instance, because
+	// we only need it to fetch the DB.
+	mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music.huge"})
+	if err != nil {
+		t.Fatalf("failed to create new MPD instance: %v", err)
+	}
+	dbF, err := writeLines(mpdi.Db())
+	if err != nil {
+		t.Fatalf("failed to build db file: %v", err)
+	}
+	defer dbF.Cleanup()
+	mpdi.Shutdown()
+
+	tests := []struct {
+		name string
+		args []string
+		once func(*testing.T) time.Duration
+	}{
+		{
+			name: "from mpd",
+			args: []string{"-o", "1"},
+		},
+		{
+			name: "from file",
+			args: []string{"-f", dbF.Path(), "-o", "1"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sem := semaphore.NewWeighted(int64(parallelism))
+			wg := new(sync.WaitGroup)
+			ch := make(chan time.Duration)
+
+			runOnce := func() {
+				sem.Acquire(ctx, 1)
+				defer wg.Done()
+				defer sem.Release(1)
+
+				mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music.huge"})
+				if err != nil {
+					t.Fatalf("failed to create new MPD instance: %v", err)
+				}
+				defer mpdi.Shutdown()
+
+				start := time.Now()
+				as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
+					MPDAddress: mpdi,
+					Args:       test.args,
+				})
+				if err != nil {
+					t.Fatalf("failed to create new ashuffle instance")
+				}
+
+				if err := as.Shutdown(ashuffle.ShutdownSoft); err != nil {
+					t.Fatalf("ashuffle did not shut down cleanly: %v", err)
+				}
+				ch <- time.Since(start)
+
+				if !mpdi.IsOk() {
+					t.Fatalf("mpd communication error: %v", mpdi.Errors)
+				}
+			}
+
+			for i := 0; i < trials; i++ {
+				wg.Add(1)
+				go runOnce()
+			}
+
+			go func() {
+				wg.Wait()
+				close(ch)
+			}()
+
+			var runtimesMs []float64
+			for result := range ch {
+				runtimesMs = append(runtimesMs, float64(result.Milliseconds()))
+			}
+
+			pct95, err := stats.Percentile(runtimesMs, 95)
+			if err != nil {
+				t.Fatalf("failed to calculate 95th percentile: %v", err)
+			}
+
+			if d95 := time.Duration(pct95) * time.Millisecond; d95 > threshold {
+				t.Errorf("ashuffle took %v to startup, want %v or less.", d95, threshold)
+			}
+		})
+	}
 }

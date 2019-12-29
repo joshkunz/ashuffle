@@ -53,3 +53,22 @@ void die(const char *fmt, ...) {
     va_end(rest);
     exit(1);
 }
+
+// "a" and "b" *point* to the objects (strings) being compared, so we
+// dereference and adapt the types.
+static int compare_str(const void *a, const void *b) {
+    return strcmp(*((const char **)a), *((const char **)b));
+}
+
+void qsort_str(const char *arr[], unsigned len) {
+    qsort(arr, len, sizeof(arr[0]), compare_str);
+}
+
+const char *bsearch_str(const char *haystack[], unsigned len,
+                        const char *needle) {
+    // Note: we take &needle here because we want to be able to use the same
+    // "compare_str" routine across qsort and compare_str. The extra
+    // dereference is no big deal.
+    return (const char *)bsearch(&needle, haystack, len, sizeof(haystack[0]),
+                                 compare_str);
+}
