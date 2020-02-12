@@ -74,7 +74,7 @@ int main(int argc, const char *argv[]) {
 
     /* dispose of the rules used to build the song-list */
     for (unsigned i = 0; i < options.ruleset.length; i++) {
-        rule_free(list_at(&options.ruleset, i)->data);
+        rule_free((struct song_rule *)list_at(&options.ruleset, i)->data);
     }
     list_free(&options.ruleset);
 

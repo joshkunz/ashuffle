@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <errno.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -73,8 +72,8 @@ static void flush_rule(enum parse_state state, struct ashuffle_options *opts,
     if (state == RULE && rule->matchers.length > 0) {
         /* add the rule to the ruleset */
         struct datum rule_datum = {
-            .data = rule,
             .length = sizeof(struct song_rule),
+            .data = rule
         };
         list_push(&opts->ruleset, &rule_datum);
     }
@@ -232,10 +231,7 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
     }
     /* if we're provisioning a rule right now, flush it */
     flush_rule(state, opts, &rule);
-    return (struct options_parse_result){
-        .status = PARSE_OK,
-        .msg = NULL,
-    };
+    return (struct options_parse_result){.status = PARSE_OK, .msg = NULL};
 }
 
 void options_parse_result_free(struct options_parse_result *r) {

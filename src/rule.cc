@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-
 #include <assert.h>
 #include <mpd/client.h>
 #include <stdbool.h>
@@ -37,8 +35,8 @@ int rule_add_criteria(struct song_rule *rule, const char *field,
     matcher.value = xstrdup(expected_value);
     /* add our matcher to the array */
     struct datum rule_datum = {
-        .data = &matcher,
         .length = sizeof(matcher),
+        .data = &matcher,
     };
     list_push(&rule->matchers, &rule_datum);
     return 0;
@@ -48,7 +46,7 @@ bool rule_match(struct song_rule *rule, const struct mpd_song *song) {
     struct rule_field *current_matcher = NULL;
     const char *tag_value = NULL;
     for (unsigned i = 0; i < rule->matchers.length; i++) {
-        current_matcher = list_at(&rule->matchers, i)->data;
+        current_matcher = (struct rule_field*) list_at(&rule->matchers, i)->data;
         /* get the first result for this tag */
         tag_value = mpd_song_get_tag(song, current_matcher->tag, 0);
         /* if the tag doesn't exist, we can't match on it. */

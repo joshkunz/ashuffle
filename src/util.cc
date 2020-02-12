@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-#define _POSIX_C_SOURCE 201904L
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,7 +42,7 @@ void die(const char *fmt, ...) {
     va_start(rest, fmt);
 
     // +2 = 1 (newline) + 1 (null)
-    char *fmt_nl = xmalloc(strlen(fmt) + 2);
+    char *fmt_nl = (char *)xmalloc(strlen(fmt) + 2);
     strcpy(fmt_nl, fmt);
     strcat(fmt_nl, "\n");
 

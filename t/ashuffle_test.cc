@@ -1,5 +1,3 @@
-#define _GNU_SOURCE
-#define _POSIX_C_SOURCE 201908L
 #include <assert.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -95,8 +93,8 @@ void test_build_songs_mpd_filter() {
     // Exclude all songs with the artist "__not_artist__".
     rule_add_criteria(&artist_match, "artist", "__not_artist__");
     struct datum artist_match_d = {
-        .data = (void *)&artist_match,
         .length = sizeof(struct song_rule),
+        .data = (void *)&artist_match,
     };
     list_push(&ruleset, &artist_match_d);
 
@@ -128,7 +126,7 @@ void xfwrite(FILE *f, const char *msg) {
 
 void xfwriteln(FILE *f, const char *msg) {
     // +2 for \n\0
-    char *nl = xmalloc(strlen(msg) + 2);
+    char *nl = (char *) xmalloc(strlen(msg) + 2);
     strcpy(nl, msg);
     strncat(nl, "\n", 2);
     xfwrite(f, nl);
@@ -218,8 +216,8 @@ void test_build_songs_file_check() {
     // Exclude all songs with the artist "__not_artist__".
     rule_add_criteria(&artist_match, "artist", "__not_artist__");
     struct datum artist_match_d = {
-        .data = (void *)&artist_match,
         .length = sizeof(struct song_rule),
+        .data = (void *)&artist_match,
     };
     list_push(&ruleset, &artist_match_d);
 
@@ -346,7 +344,7 @@ void test_shuffle_single() {
     cmp_ok(c.queue.length, "==", 1,
            "shuffle_single: queue length 1 after song added");
 
-    struct mpd_song *queue_head = list_at(&c.queue, 0)->data;
+    struct mpd_song *queue_head = (struct mpd_song *) list_at(&c.queue, 0)->data;
     is(queue_head->uri, song_a.uri,
        "shuffle_single: ensure that song_a was added");
 
@@ -382,6 +380,7 @@ void test_shuffle_loop_init_empty() {
     list_push_song(&c.db, &song_a);
 
     struct shuffle_test_delegate delegate = {
+        .skip_init = false,
         .until_f = only_init_f,
     };
 
@@ -424,6 +423,7 @@ void test_shuffle_loop_init_playing() {
     c.state.queue_pos = 0;
 
     struct shuffle_test_delegate delegate = {
+        .skip_init = false,
         .until_f = only_init_f,
     };
 
@@ -471,6 +471,7 @@ void test_shuffle_loop_init_stopped() {
     c.state.play_state = MPD_STATE_STOP;
 
     struct shuffle_test_delegate delegate = {
+        .skip_init = false,
         .until_f = only_init_f,
     };
 
@@ -795,8 +796,8 @@ void test_connect_parse_host() {
         // MPD_HOST is a unix socket, MPD_PORT unset.
         [3] =
             {
-                .want.host = "/test/mpd.socket",
-                .want.port = 6600,  // Needed for test, unused by libmpdclient
+                // port is Needed for test, unused by libmpdclient
+                .want = {"/test/mpd.socket", 6600},
                 .password = NULL,
                 .env = {"/test/mpd.socket", 0},
                 .flag = {NULL, 0},
@@ -804,8 +805,8 @@ void test_connect_parse_host() {
         // MPD_HOST is a unix socket, with a password.
         [4] =
             {
-                .want.host = "/another/mpd.socket",
-                .want.port = 6600,  // Needed for test, unused by libmpdclient
+                // port is Needed for test, unused by libmpdclient
+                .want = {"/another/mpd.socket", 6600},
                 .password = "with_pass",
                 .env = {"with_pass@/another/mpd.socket", 0},
                 .flag = {NULL, 0},
@@ -874,7 +875,7 @@ void test_connect_parse_host() {
         options_init(&opts);
 
         if (flags.length > 0) {
-            const char **arg_array = xmalloc(sizeof(char *) * flags.length);
+            const char **arg_array = (const char **) xmalloc(sizeof(char *) * flags.length);
             for (unsigned j = 0; j < flags.length; j++) {
                 arg_array[j] = list_at_str(&flags, j);
             }
@@ -941,7 +942,7 @@ static unsigned _GOOD_PASSWORD_COUNT = 0;
 
 char *good_password_f() {
     _GOOD_PASSWORD_COUNT += 1;
-    return "good_password";
+    return xstrdup("good_password");
 }
 
 void test_connect_env_bad_password() {

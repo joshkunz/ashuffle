@@ -90,7 +90,7 @@ void list_push(struct list *l, const struct datum *d) {
     if (d == NULL) {
         return;
     }
-    struct node *node = xmalloc(sizeof(struct node));
+    struct node *node = (struct node*) xmalloc(sizeof(struct node));
     datum_copy_into(&node->data, d);
     list_node_push(l, node);
 }
@@ -98,7 +98,7 @@ void list_push(struct list *l, const struct datum *d) {
 /* Push the given null-terminated string onto the list. A new datum is
  * created automatically. */
 void list_push_str(struct list *l, const char *s) {
-    struct node *node = xmalloc(sizeof(struct node));
+    struct node *node = (struct node*) xmalloc(sizeof(struct node));
     node->data.length = strlen(s) + 1;
     node->data.data = xmalloc(node->data.length);
     memcpy(node->data.data, s, node->data.length);
@@ -153,7 +153,7 @@ const char **list_to_array_str(struct list *l) {
         return NULL;
     }
 
-    const char **outa = xmalloc(sizeof(char *) * l->length);
+    const char **outa = (const char**) xmalloc(sizeof(char *) * l->length);
     struct node *cur = l->_list;
     for (unsigned i = 0; cur; cur = cur->next, i++) {
         outa[i] = (const char *)cur->data.data;

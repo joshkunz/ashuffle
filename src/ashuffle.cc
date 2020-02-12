@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -45,7 +44,7 @@ void mpd_perror_if_error(struct mpd_connection *mpd) {
 bool ruleset_accepts_song(struct list *ruleset, struct mpd_song *song) {
     struct song_rule *rule = NULL;
     for (unsigned i = 0; i < ruleset->length; i++) {
-        rule = list_at(ruleset, i)->data;
+        rule = (struct song_rule *)list_at(ruleset, i)->data;
         if (!rule_match(rule, song)) {
             return false;
         }
@@ -320,7 +319,7 @@ int shuffle_loop(struct mpd_connection *mpd, struct shuffle_chain *songs,
                  struct shuffle_test_delegate *test_d) {
     static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
                   "QUEUE Now different signal.");
-    int idle_mask = MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER;
+    enum mpd_idle idle_mask = (enum mpd_idle) (MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER);
 
     // If the test delegate's `skip_init` is set to true, then skip the
     // initializer.
@@ -457,7 +456,7 @@ struct mpd_connection *ashuffle_connect(struct ashuffle_options *options,
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
     char *mpd_host_raw =
         options->host ? options->host
-                      : getenv("MPD_HOST") ? getenv("MPD_HOST") : "localhost";
+                      : getenv("MPD_HOST") ? getenv("MPD_HOST") : xstrdup("localhost");
     struct mpd_host mpd_host;
     parse_mpd_host(mpd_host_raw, &mpd_host);
 

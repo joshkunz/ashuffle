@@ -11,7 +11,7 @@ void test_basic() {
     cmp_ok(test_list.length, "==", 0, "new list length is zero");
     dies_ok({ list_pop(&test_list, 0); }, "pop on empty crashes");
 
-    char* test_str = "This is a test string";
+    const char* test_str = "This is a test string";
     list_push_str(&test_list, test_str);
     cmp_ok(test_list.length, "==", 1, "list length 1 after append");
     is(list_at_str(&test_list, 0), test_str,
@@ -33,9 +33,9 @@ void test_basic() {
 void test_multi_push_pop() {
     struct list test_list;
     list_init(&test_list);
-    char* sa = "test str A";
-    char* sb = "test str B";
-    char* sc = "test str C";
+    const char* sa = "test str A";
+    const char* sb = "test str B";
+    const char* sc = "test str C";
     list_push_str(&test_list, sa);
     list_push_str(&test_list, sb);
     list_push_str(&test_list, sc);
@@ -55,9 +55,9 @@ void test_multi_push_pop() {
 void test_leak() {
     struct list t;
     list_init(&t);
-    char* a = "test str A";
-    char* b = "test str B";
-    char* c = "test str C";
+    const char* a = "test str A";
+    const char* b = "test str B";
+    const char* c = "test str C";
     list_push_str(&t, a);
     list_push_str(&t, b);
     list_push_str(&t, c);
@@ -72,7 +72,7 @@ void test_leak() {
         "leak: fail to leak out of bounds");
     struct datum outa;
     list_leak(&t, 1, &outa);
-    is(outa.data, b, "leak: popped item 1 matches string 2");
+    is((const char *) outa.data, b, "leak: popped item 1 matches string 2");
     cmp_ok((size_t)outa.data, "!=", (size_t)a,
            "leak: popped value is owned by the caller");
     free(outa.data);

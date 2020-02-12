@@ -43,7 +43,7 @@ const char *shuffle_pick(struct shuffle_chain *s) {
     data = list_at_str(&s->window, 0);
     /* push the retrived element back into the pool */
     list_pop_push(&s->window, &s->pool, 0);
-    return data;
+    return (const char *) data;
 }
 
 void shuffle_items(const struct shuffle_chain *s, struct list *out) {

@@ -1,27 +1,21 @@
-project('ashuffle', 'c', default_options: ['c_std=c11'])
-
-add_global_arguments([
-	'-Wextra',
-	'-pedantic' ],
-	language: 'c'
-)
+project('ashuffle', ['c', 'cpp'], default_options: ['cpp_std=c++14', 'warning_level=2'])
 
 high_dep_sources = files(
-    'src/ashuffle.c',
+    'src/ashuffle.cc',
 )
 
 low_dep_sources = files(
-	'src/args.c',
-	'src/getpass.c',
-	'src/list.c',
-	'src/rule.c',
-    'src/shuffle.c',
-    'src/util.c',
+	'src/args.cc',
+	'src/getpass.cc',
+	'src/list.cc',
+	'src/rule.cc',
+    'src/shuffle.cc',
+    'src/util.cc',
 )
 
 sources = low_dep_sources + high_dep_sources
 
-executable_sources = sources + files('src/main.c')
+executable_sources = sources + files('src/main.cc')
 
 src_inc = include_directories('src')
 root_inc = include_directories('.')
@@ -45,7 +39,6 @@ if get_option('tests').enabled()
 subdir('t')
 
 test_c_args = [
-    '-Wall', '-Wextra', '-pedantic',
 ]
 
 test_options = [
@@ -55,11 +48,11 @@ test_options = [
 ]
 
 tests = {
-    'args': ['t/args_test.c'],
-    'ashuffle': ['src/ashuffle.c', 't/ashuffle_test.c'],
-    'list': ['t/list_test.c'],
-    'rule': ['t/rule_test.c'],
-    'shuffle': ['t/shuffle_test.c'],
+    'args': ['t/args_test.cc'],
+    'ashuffle': ['src/ashuffle.cc', 't/ashuffle_test.cc'],
+    'list': ['t/list_test.cc'],
+    'rule': ['t/rule_test.cc'],
+    'shuffle': ['t/shuffle_test.cc'],
 }
 
 foreach test_name, test_sources : tests

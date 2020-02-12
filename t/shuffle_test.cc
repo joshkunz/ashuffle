@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -179,7 +178,7 @@ void test_items() {
     cmp_ok(got.length, "==", 3, "items: shuffle chain should have 3 items");
 
     // In-order to qsort, we need an array, not a list.
-    const char** res_array = xmalloc(sizeof(char*) * got.length);
+    const char** res_array = (const char**) xmalloc(sizeof(char*) * got.length);
     for (unsigned i = 0; i < got.length; i++) {
         res_array[i] = list_at_str(&got, i);
     }

@@ -5,7 +5,7 @@
 #ifndef ASHUFFLE_ARGS_H
 #define ASHUFFLE_ARGS_H
 
-const unsigned ARGS_QUEUE_BUFFER_NONE;  // 0
+static const unsigned ARGS_QUEUE_BUFFER_NONE = 0;
 
 struct ashuffle_test_options {
     bool print_all_songs_and_exit;
