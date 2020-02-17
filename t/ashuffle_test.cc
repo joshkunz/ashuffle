@@ -63,21 +63,19 @@ void test_build_songs_mpd_basic() {
     memset(&c, 0, sizeof(c));
 
     ShuffleChain chain;
-    struct list ruleset;
-    list_init(&ruleset);
+    std::vector<Rule> ruleset;
 
     TEST_SONG_URI(song_a);
     TEST_SONG_URI(song_b);
     list_push_song(&c.song_iter, &song_a);
     list_push_song(&c.song_iter, &song_b);
 
-    int result = build_songs_mpd(&c, &ruleset, &chain);
+    int result = build_songs_mpd(&c, ruleset, &chain);
     cmp_ok(result, "==", 0, "build_songs_mpd basic returns ok");
     cmp_ok(chain.Len(), "==", 2,
            "build_songs_mpd_basic: 2 songs added to shuffle chain");
 
     mpd_connection_free(&c);
-    list_free(&ruleset);
 }
 
 void test_build_songs_mpd_filter() {
@@ -85,19 +83,13 @@ void test_build_songs_mpd_filter() {
     memset(&c, 0, sizeof(c));
 
     ShuffleChain chain;
-    struct list ruleset;
-    list_init(&ruleset);
+    std::vector<Rule> ruleset;
 
-    struct song_rule artist_match;
-    rule_init(&artist_match);
+    Rule artist_match;
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
     // Exclude all songs with the artist "__not_artist__".
-    rule_add_criteria(&artist_match, "artist", "__not_artist__");
-    struct datum artist_match_d = {
-        .length = sizeof(struct song_rule),
-        .data = (void *)&artist_match,
-    };
-    list_push(&ruleset, &artist_match_d);
+    artist_match.AddPattern("artist", "__not_artist__");
+    ruleset.push_back(artist_match);
 
     TEST_SONG(song_a, TAG(MPD_TAG_ARTIST, "__artist__"));
     TEST_SONG(song_b, TAG(MPD_TAG_ARTIST, "__not_artist__"));
@@ -107,14 +99,12 @@ void test_build_songs_mpd_filter() {
     list_push_song(&c.song_iter, &song_b);
     list_push_song(&c.song_iter, &song_c);
 
-    int result = build_songs_mpd(&c, &ruleset, &chain);
+    int result = build_songs_mpd(&c, ruleset, &chain);
     cmp_ok(result, "==", 0, "build_songs_mpd filter returns ok");
     cmp_ok(chain.Len(), "==", 2,
            "build_songs_mpd_filter: 2 songs added to shuffle chain");
 
     mpd_connection_free(&c);
-    rule_free(&artist_match);
-    list_free(&ruleset);
 }
 
 void xfwrite(FILE *f, const char *msg) {
@@ -161,7 +151,8 @@ void test_build_songs_file_nocheck() {
     // rewind, so build_songs_file can see the URIs we've written.
     rewind(f);
 
-    int result = build_songs_file(&c, NULL, f, &chain, false);
+    std::vector<Rule> empty_ruleset;
+    int result = build_songs_file(&c, empty_ruleset, f, &chain, false);
     cmp_ok(result, "==", 0, "build_songs_file nocheck returns ok");
     cmp_ok(chain.Len(), "==", 3,
            "build_songs_file_nocheck: 3 songs added to shuffle chain");
@@ -196,19 +187,13 @@ void test_build_songs_file_check() {
     memset(&c, 0, sizeof(c));
 
     // step 2. Build the ruleset, and add an exclusions for __not_artist__
-    struct list ruleset;
-    list_init(&ruleset);
+    std::vector<Rule> ruleset;
 
-    struct song_rule artist_match;
-    rule_init(&artist_match);
+    Rule artist_match;
     set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
     // Exclude all songs with the artist "__not_artist__".
-    rule_add_criteria(&artist_match, "artist", "__not_artist__");
-    struct datum artist_match_d = {
-        .length = sizeof(struct song_rule),
-        .data = (void *)&artist_match,
-    };
-    list_push(&ruleset, &artist_match_d);
+    artist_match.AddPattern("artist", "__not_artist__");
+    ruleset.push_back(artist_match);
 
     // step 3. Prepare the shuffle_chain.
     const unsigned window_size = 2;
@@ -271,7 +256,7 @@ void test_build_songs_file_check() {
 
     // step 6. Run! (and validate)
 
-    int result = build_songs_file(&c, &ruleset, f, &chain, true);
+    int result = build_songs_file(&c, ruleset, f, &chain, true);
     cmp_ok(result, "==", 0, "build_songs_file check returns ok");
     cmp_ok(chain.Len(), "==", 2,
            "build_songs_file_check: 2 songs added to shuffle chain");
@@ -296,8 +281,6 @@ void test_build_songs_file_check() {
     fclose(f);
 
     mpd_connection_free(&c);
-    rule_free(&artist_match);
-    list_free(&ruleset);
 }
 
 void test_shuffle_single() {

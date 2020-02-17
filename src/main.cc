@@ -32,11 +32,11 @@ int main(int argc, const char *argv[]) {
 
     /* build the list of songs to shuffle through */
     if (options.file_in != NULL) {
-        build_songs_file(mpd, &options.ruleset, options.file_in, &songs,
+        build_songs_file(mpd, options.ruleset, options.file_in, &songs,
                          options.check_uris);
         fclose(options.file_in);
     } else {
-        build_songs_mpd(mpd, &options.ruleset, &songs);
+        build_songs_mpd(mpd, options.ruleset, &songs);
     }
 
     // For integration testing, we sometimes just want to have ashuffle
@@ -69,12 +69,6 @@ int main(int argc, const char *argv[]) {
     } else {
         shuffle_loop(mpd, &songs, &options, NULL);
     }
-
-    /* dispose of the rules used to build the song-list */
-    for (unsigned i = 0; i < options.ruleset.length; i++) {
-        rule_free((struct song_rule *)list_at(&options.ruleset, i)->data);
-    }
-    list_free(&options.ruleset);
 
     mpd_connection_free(mpd);
     return 0;

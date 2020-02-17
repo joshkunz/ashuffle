@@ -1,83 +1,47 @@
-#include <assert.h>
+#include <cassert>
+#include <string>
+#include <cctype>
+#include <algorithm>
+
 #include <mpd/client.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
-#include "list.h"
 #include "rule.h"
-#include "util.h"
 
-struct rule_field {
-    enum mpd_tag_type tag;
-    char *value;
-};
-
-void rule_init(struct song_rule *rule) {
-    /* set the type */
-    rule->type = RULE_EXCLUDE;
-
-    /* allocate the field list */
-    list_init(&rule->matchers);
-}
-
-int rule_add_criteria(struct song_rule *rule, const char *field,
-                      const char *expected_value) {
-    struct rule_field matcher;
-    /* try and parse out the tag to match on */
-    matcher.tag = mpd_tag_name_iparse(field);
-    if (matcher.tag == MPD_TAG_UNKNOWN) {
-        return -1;
+Rule::Status Rule::AddPattern(const std::string &field, std::string value) {
+    Pattern p;
+    p.tag = mpd_tag_name_iparse(field.data());
+    if (p.tag == MPD_TAG_UNKNOWN) {
+        return Status::kFail;
     }
-
-    /* copy the string to match on */
-    matcher.value = xstrdup(expected_value);
-    /* add our matcher to the array */
-    struct datum rule_datum = {
-        .length = sizeof(matcher),
-        .data = &matcher,
-    };
-    list_push(&rule->matchers, &rule_datum);
-    return 0;
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    p.value = value;
+    patterns_.push_back(p);
+    return Status::kOK;
 }
 
-bool rule_match(struct song_rule *rule, const struct mpd_song *song) {
-    struct rule_field *current_matcher = NULL;
-    const char *tag_value = NULL;
-    for (unsigned i = 0; i < rule->matchers.length; i++) {
-        current_matcher = (struct rule_field*) list_at(&rule->matchers, i)->data;
-        /* get the first result for this tag */
-        tag_value = mpd_song_get_tag(song, current_matcher->tag, 0);
-        /* if the tag doesn't exist, we can't match on it. */
-        if (tag_value == NULL) {
-            continue;
-        }
-        /* if our match value is at least a substring of the tag's
-         * value, we have a match. e.g. de matches 'De La Soul'.
-         * If the output of strstr is NULL we don't have a substring
-         * match. */
-        if (strcasestr(tag_value, current_matcher->value) == NULL) {
+bool Rule::Accepts(const struct mpd_song *song) const {
+    assert(type_ == Rule::Type::kExclude &&
+           "only exclusion rules are supported");
+    for (const Pattern &p : patterns_) {
+        const char * raw_tag_value = mpd_song_get_tag(song, p.tag, 0);
+        if (raw_tag_value == nullptr) {
+            // If the tag doesn't exist, we can't match on it. Just skip this
+            // pattern.
             continue;
         }
 
-        /* On exclusion matches, if any tag check succeeds, we have
-         * a failed match. */
-        if (rule->type == RULE_EXCLUDE) {
-            return false;
+        std::string tag_value(raw_tag_value);
+        // Lowercase the tag value, to make sure our comparison is not
+        // case sensitive.
+        std::transform(tag_value.begin(), tag_value.end(), tag_value.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (tag_value.find(p.value) == std::string::npos) {
+            // No substring match, this pattern does not match.
+            continue;
         }
+
+        return false;
     }
-    /* If we've passed all the tests, we have a match */
     return true;
-}
-
-void rule_free(struct song_rule *rule) {
-    struct rule_field *field;
-    for (unsigned i = 0; i < rule->matchers.length; i++) {
-        const struct datum *item = list_at(&rule->matchers, i);
-        assert(item != NULL && "in-bound matcher should never be NULL");
-        field = (struct rule_field *)item->data;
-        free(field->value);
-    }
-    list_free(&rule->matchers);
 }

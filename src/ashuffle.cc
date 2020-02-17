@@ -43,18 +43,16 @@ void mpd_perror_if_error(struct mpd_connection *mpd) {
 }
 
 /* check wheter a song is allowed by the given ruleset */
-bool ruleset_accepts_song(struct list *ruleset, struct mpd_song *song) {
-    struct song_rule *rule = NULL;
-    for (unsigned i = 0; i < ruleset->length; i++) {
-        rule = (struct song_rule *)list_at(ruleset, i)->data;
-        if (!rule_match(rule, song)) {
+bool ruleset_accepts_song(const std::vector<Rule>& ruleset, struct mpd_song *song) {
+    for (const Rule& rule : ruleset) {
+        if (!rule.Accepts(song)) {
             return false;
         }
     }
     return true;
 }
 
-bool ruleset_accepts_uri(struct mpd_connection *mpd, struct list *ruleset,
+bool ruleset_accepts_uri(struct mpd_connection *mpd, const std::vector<Rule> &ruleset,
                          char *uri) {
     bool accepted = false;
     /* search for the song URI in MPD */
@@ -112,7 +110,7 @@ static void mpd_song_uri_list(struct mpd_connection *mpd, struct list *uris) {
 
 /* build the list of songs to shuffle from using
  * the supplied file. */
-int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
+int build_songs_file(struct mpd_connection *mpd, const std::vector<Rule> &ruleset,
                      FILE *input, ShuffleChain *songs, bool check) {
     char *uri = NULL;
     ssize_t length = 0;
@@ -152,7 +150,7 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
                 // is not in there. Skip this URI.
                 goto skip_uri;
             }
-            if (ruleset->length && !ruleset_accepts_uri(mpd, ruleset, uri)) {
+            if (!ruleset.empty() && !ruleset_accepts_uri(mpd, ruleset, uri)) {
                 // User-specified some rules, and they don't match this URI,
                 // so skip this uri.
                 goto skip_uri;
@@ -183,7 +181,7 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
 }
 
 /* build the list of songs to shuffle from using MPD */
-int build_songs_mpd(struct mpd_connection *mpd, struct list *ruleset,
+int build_songs_mpd(struct mpd_connection *mpd, const std::vector<Rule> &ruleset,
                     ShuffleChain *songs) {
     /* ask for a list of songs */
     if (mpd_send_list_all_meta(mpd, NULL) != true) {
@@ -346,7 +344,7 @@ int shuffle_loop(struct mpd_connection *mpd, ShuffleChain *songs,
          * MPD. */
         if (idle_db && options->file_in == NULL) {
             songs->Empty();
-            build_songs_mpd(mpd, &options->ruleset, songs);
+            build_songs_mpd(mpd, options->ruleset, songs);
             printf("Picking random songs out of a pool of %u.\n", songs->Len());
         } else if (idle_queue || idle_player) {
             if (try_enqueue(mpd, songs, options) != 0) {

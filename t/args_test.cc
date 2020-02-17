@@ -61,7 +61,7 @@ void test_default() {
     cmp_ok(res.status, "==", PARSE_OK, "empty parse works");
     options_parse_result_free(&res);
 
-    cmp_ok(opts.ruleset.length, "==", 0, "no rules by default");
+    ok(opts.ruleset.empty(), "no rules by default");
     cmp_ok(opts.queue_only, "==", 0, "no 'queue only' by default");
     ok(opts.file_in == NULL, "no input file by default");
     cmp_ok(opts.check_uris, "==", true, "check_uris on by default");
@@ -92,7 +92,7 @@ void test_basic_short() {
     cmp_ok(res.status, "==", PARSE_OK, "basic parse works OK");
     options_parse_result_free(&res);
 
-    cmp_ok(opts.ruleset.length, ">=", 1, "basic short detected rule");
+    cmp_ok(opts.ruleset.size(), ">=", 1, "basic short detected rule");
     cmp_ok(opts.queue_only, "==", 5, "basic short queue only");
     ok(opts.file_in != NULL, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic short nocheck");
@@ -120,7 +120,7 @@ void test_basic_long() {
     cmp_ok(res.status, "==", PARSE_OK, "basic parse works OK");
     options_parse_result_free(&res);
 
-    cmp_ok(opts.ruleset.length, ">=", 1, "basic long detected rule");
+    cmp_ok(opts.ruleset.size(), ">=", 1, "basic long detected rule");
     cmp_ok(opts.queue_only, "==", 5, "basic long queue only");
     ok(opts.file_in != NULL, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic long nocheck");
@@ -147,7 +147,7 @@ void test_basic_mixed_long_short() {
     cmp_ok(res.status, "==", PARSE_OK, "basic parse works OK");
     options_parse_result_free(&res);
 
-    cmp_ok(opts.ruleset.length, ">=", 1, "basic mixed detected rule");
+    cmp_ok(opts.ruleset.size(), ">=", 1, "basic mixed detected rule");
     cmp_ok(opts.queue_only, "==", 5, "basic mixed queue only");
     ok(opts.file_in != NULL, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic mixed nocheck");
@@ -182,24 +182,19 @@ void test_rule_basic() {
     cmp_ok(res.status, "==", PARSE_OK, "parse basic rule OK");
     options_parse_result_free(&res);
 
-    cmp_ok(opts.ruleset.length, ">=", 1, "basic rule parsed at least one rule");
+    cmp_ok(opts.ruleset.size(), ">=", 1, "basic rule parsed at least one rule");
 
-    skip(opts.ruleset.length < 1, 2, "skipping rule tests, no rule parsed");
+    skip(opts.ruleset.size() < 1, 2, "skipping rule tests, no rule parsed");
 
     // Now we pull out the first rule, and then check it against our
     // test songs.
-    const struct datum *d = list_at(&opts.ruleset, 0);
-    assert(d != NULL && "list_at should never return NULL");
-    assert(d->length == sizeof(struct song_rule) &&
-           "datum should contain a song rule");
-
-    struct song_rule *r = (struct song_rule *)d->data;
+    Rule &r = opts.ruleset[0];
 
     TEST_SONG(matching, TAG(MPD_TAG_ARTIST, "__artist__"));
     TEST_SONG(not_matching, TAG(MPD_TAG_ARTIST, "not artist"));
 
-    ok(!rule_match(r, &matching), "basic rule arg should exclude match song");
-    ok(rule_match(r, &not_matching),
+    ok(!r.Accepts(&matching), "basic rule arg should exclude match song");
+    ok(r.Accepts(&not_matching),
        "basic rule arg should not exclude other song");
 
     end_skip;

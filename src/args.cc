@@ -46,45 +46,30 @@ static bool check_flags(const char *to_check, unsigned count, ...) {
     return out;
 }
 
-/* get the enum rule_type type from the option if possible.
- * Otherwise, return -1 */
-static int rule_type_from_flag(const char *option) {
-    if (check_flags(option, 2, "--exclude", "-e")) {
-        return RULE_EXCLUDE;
-    } else {
-        return -1;
-    }
-}
-
 /* check and see if we can transition to a new top-level
  * state from our current state */
 static bool state_can_trans(enum parse_state state) {
-    if (state == NO_STATE || state == RULE) {
-        return true;
-    }
-    return false;
+    return state == NO_STATE || state == RULE;
 }
 
 /* if we're in a correct state, then add the rule to the
  * ruleset in the list of options */
 static void flush_rule(enum parse_state state, struct ashuffle_options *opts,
-                       struct song_rule *rule) {
-    if (state == RULE && rule->matchers.length > 0) {
-        /* add the rule to the ruleset */
-        struct datum rule_datum = {
-            .length = sizeof(struct song_rule),
-            .data = rule
-        };
-        list_push(&opts->ruleset, &rule_datum);
+                       const Rule &rule) {
+    if (state != RULE || rule.Empty()) {
+        return;
     }
+    opts->ruleset.push_back(rule);
 }
 
 void options_init(struct ashuffle_options *opts) {
-    // Zero out all fields by default.
-    memset(opts, 0, sizeof(struct ashuffle_options));
+    opts->queue_only = 0;
+    opts->file_in = nullptr;
     opts->check_uris = true;
-    list_init(&opts->ruleset);
     opts->queue_buffer = ARGS_QUEUE_BUFFER_NONE;  // 0
+    opts->host = nullptr;
+    opts->port = 0;
+    memset(&opts->test, 0, sizeof(opts->test));
 }
 
 /* "safe" string to unsigned conversion
@@ -117,22 +102,15 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
     bool transable = false;
 
     const char *match_field = NULL;
-    struct song_rule rule;
-    rule_init(&rule);
+    Rule rule;
 
 #define PARSE_FAIL(fmt, ...)                                        \
-    rule_free(&rule);                                               \
     return (struct options_parse_result) {                          \
         .status = PARSE_FAILURE, .msg = xsprintf(fmt, __VA_ARGS__), \
     }
 
-    int type_flag = -1;
-
     for (int i = 0; i < argc; i++) {
         transable = state_can_trans(state);
-        if (transable) {
-            type_flag = rule_type_from_flag(argv[i]);
-        }
 
         /* check we should print the help text */
         if (check_flags(argv[i], 3, "--help", "-h", "-?")) {
@@ -140,42 +118,41 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
                 .status = PARSE_HELP,
                 .msg = NULL,
             };
-        } else if (type_flag != -1) {
-            flush_rule(state, opts, &rule);
-            rule_init(&rule);
-            type_flag = -1;
+        } else if (transable && check_flags(argv[i], 2, "--exclude", "-e")) {
+            flush_rule(state, opts, rule);
+            rule = Rule();
             state = RULE_FIRST;
         } else if (transable && check_flags(argv[i], 2, "--no-check", "-n")) {
-            flush_rule(state, opts, &rule);
+            flush_rule(state, opts, rule);
             opts->check_uris = false;
             state = NO_STATE;
         } else if (transable &&
                    check_flags(argv[i], 2, "--queue-buffer", "-q")) {
-            flush_rule(state, opts, &rule);
+            flush_rule(state, opts, rule);
             state = QUEUE_BUFFER;
         } else if (transable && opts->queue_only == 0 &&
                    check_flags(argv[i], 2, "--only", "-o")) {
-            flush_rule(state, opts, &rule);
+            flush_rule(state, opts, rule);
             state = QUEUE;
         } else if (transable && opts->file_in == NULL &&
                    check_flags(argv[i], 2, "--file", "-f")) {
-            flush_rule(state, opts, &rule);
+            flush_rule(state, opts, rule);
             state = IFILE;
         } else if (transable && check_flags(argv[i], 1, "--host")) {
-            flush_rule(state, opts, &rule);
+            flush_rule(state, opts, rule);
             state = HOST;
         } else if (transable && check_flags(argv[i], 2, "--port", "-p")) {
-            flush_rule(state, opts, &rule);
+            flush_rule(state, opts, rule);
             state = PORT;
         } else if (transable &&
                    check_flags(argv[i], 1, "--test_enable_option_do_not_use")) {
-            flush_rule(state, opts, &rule);
+            flush_rule(state, opts, rule);
             state = TEST;
         } else if (state == RULE || state == RULE_FIRST) {
             match_field = argv[i];
             state = RULE_VALUE;
         } else if (state == RULE_VALUE) {
-            rule_add_criteria(&rule, match_field, argv[i]);
+            rule.AddPattern(match_field, argv[i]);
             match_field = NULL;
             state = RULE;
         } else if (state == QUEUE) {
@@ -230,7 +207,7 @@ struct options_parse_result options_parse(struct ashuffle_options *opts,
         PARSE_FAIL("no argument supplied for '%s'", argv[argc - 1]);
     }
     /* if we're provisioning a rule right now, flush it */
-    flush_rule(state, opts, &rule);
+    flush_rule(state, opts, rule);
     return (struct options_parse_result){.status = PARSE_OK, .msg = NULL};
 }
 
@@ -241,13 +218,6 @@ void options_parse_result_free(struct options_parse_result *r) {
 }
 
 void options_free(struct ashuffle_options *opts) {
-    // The main thing that needs to be free'd is the ruleset. Free each rule's
-    // data individually, then free the list, which free's the rule structures
-    // themselves.
-    for (unsigned i = 0; i < opts->ruleset.length; i++) {
-        rule_free((struct song_rule *)list_at(&opts->ruleset, i)->data);
-    }
-    list_free(&opts->ruleset);
     // Also need to free the host string, if it's been allocated.
     free(opts->host);
 }

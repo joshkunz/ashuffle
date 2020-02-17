@@ -1,9 +1,9 @@
+#ifndef __ASHUFFLE_ARGS_H__
+#define __ASHUFFLE_ARGS_H__
+
 #include <stdbool.h>
 #include <stdio.h>
-#include "list.h"
-
-#ifndef ASHUFFLE_ARGS_H
-#define ASHUFFLE_ARGS_H
+#include "rule.h"
 
 static const unsigned ARGS_QUEUE_BUFFER_NONE = 0;
 
@@ -12,7 +12,7 @@ struct ashuffle_test_options {
 };
 
 struct ashuffle_options {
-    struct list ruleset;
+    std::vector<Rule> ruleset;
     unsigned queue_only;
     FILE *file_in;
     bool check_uris;

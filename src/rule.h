@@ -1,32 +1,61 @@
+#ifndef __ASHUFFLE_RULE_H__
+#define __ASHUFFLE_RULE_H__
+
+#include <string>
+#include <vector>
+
 #include <mpd/client.h>
-#include <stdbool.h>
-#include "list.h"
 
-#ifndef ASHUFFLE_RULE_H
-#define ASHUFFLE_RULE_H
-
-enum rule_type {
-    RULE_EXCLUDE,
+// Internal API.
+struct Pattern {
+    enum mpd_tag_type tag;
+    std::string value;
 };
 
-struct song_rule {
-    enum rule_type type;
-    struct list matchers;
+// Rule represents a set of patterns (song attribute/value pairs) that should
+// be matched against song values.
+class Rule {
+   public:
+    // Type represents the type of this rule.
+    enum Type {
+        // kExclude is the type of "exclusion" rules. Songs are only accepted
+        // by exclusion rules when no rule patterns match. All songs match
+        // the empty rule.
+        kExclude,
+    };
+
+    // Construct a new exclusion rule.
+    Rule() : Rule(Type::kExclude){};
+
+    // Construct a new rule with the specific type.
+    Rule(Type t) : type_(t){};
+
+    // Type returns the type of this rule.
+    Type GetType() const { return type_; }
+
+    // Empty returns true when this rule matches no patterns.
+    inline bool Empty() const { return patterns_.empty(); }
+
+    // Status is the type returned from AddPattern. If the pattern was
+    // successfully added, kOK is returned. If we failed to add the pattern,
+    // we return kFail.
+    enum Status {
+        kOK,
+        kFail,
+    };
+
+    // Add the given pattern to this rule.
+    Status AddPattern(const std::string &field, std::string value);
+
+    // Returns true if the given song is "accepted" by the rule. Whether or
+    // not a song is accepted depends on the "type" of the rule. E.g., for an
+    // exclude rule (type kExclude) if the song matched a rule pattern, the
+    // song would *not* be accepted.
+    bool Accepts(const struct mpd_song *song) const;
+
+   private:
+    std::vector<Pattern> patterns_;
+    Type type_;
 };
-
-/* Initialize a rule */
-void rule_init(struct song_rule *rule);
-
-/* Add some criteria for this rule to match on */
-int rule_add_criteria(struct song_rule *rule, const char *field,
-                      const char *expected_value);
-
-/* Returns true if the given song is "legal" or "included" occording tho
- * the given rule. For example, an exclude rule for the artist "Kimbra" would
- * return "false" for a song with the artist "Kimbra". */
-bool rule_match(struct song_rule *rule, const struct mpd_song *song);
-
-/* Free the memory used to store this rule */
-void rule_free(struct song_rule *rule);
 
 #endif
