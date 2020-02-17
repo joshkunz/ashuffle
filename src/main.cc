@@ -1,4 +1,7 @@
 #include <stdlib.h>
+#include <iostream>
+#include <string>
+#include <vector>
 
 #include <mpd/client.h>
 
@@ -42,11 +45,9 @@ int main(int argc, const char *argv[]) {
     // For integration testing, we sometimes just want to have ashuffle
     // dump the list of songs in its shuffle chain.
     if (options.test.print_all_songs_and_exit) {
-        struct list all_songs;
-        list_init(&all_songs);
-        songs.LegacyUnsafeItems(&all_songs);
-        for (unsigned i = 0; i < all_songs.length; i++) {
-            puts(list_at_str(&all_songs, i));
+        std::vector<std::string> all_songs = songs.Items();
+        for (auto song : all_songs) {
+            std::cout << song << std::endl;
         }
         return 0;
     }

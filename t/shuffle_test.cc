@@ -121,21 +121,11 @@ void test_items() {
     // We want to make sure shuffle_chain also picks up songs in the window.
     (void)chain.Pick();
 
-    struct list got;
-    list_init(&got);
-    chain.LegacyUnsafeItems(&got);
+    std::vector<std::string> got = chain.Items();
+    cmp_ok(got.size(), "==", 3, "items: shuffle chain should have 3 items");
+    std::sort(got.begin(), got.end());
 
-    cmp_ok(got.length, "==", 3, "items: shuffle chain should have 3 items");
-
-    std::vector<std::string> got_uris;
-    for (unsigned i = 0; i < got.length; i++) {
-        got_uris.push_back(list_at_str(&got, i));
-    }
-    std::sort(got_uris.begin(), got_uris.end());
-
-    ok(test_uris == got_uris, "items: shuffle chain should only contain inserted items");
-
-    list_free(&got);
+    ok(test_uris == got, "items: shuffle chain should only contain inserted items");
 }
 
 int main() {

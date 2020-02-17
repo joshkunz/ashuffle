@@ -1,8 +1,8 @@
-#include <assert.h>
-#include <stdlib.h>
-#include <iostream>
+#include <cassert>
+#include <cstdlib>
+#include <vector>
+#include <string>
 
-#include "list.h"
 #include "shuffle.h"
 
 void ShuffleChain::Empty() {
@@ -29,10 +29,7 @@ void ShuffleChain::FillWindow() {
 }
 
 std::string ShuffleChain::Pick() {
-    if (Len() == 0) {
-        std::cerr << "shuffle_pick: cannot pick from empty chain." << std::endl;
-        abort();
-    }
+    assert(Len() != 0 && "cannot pick from empty chain");
     FillWindow();
     std::string picked = _window[0];
     _window.pop_front();
@@ -40,14 +37,9 @@ std::string ShuffleChain::Pick() {
     return picked;
 }
 
-void ShuffleChain::LegacyUnsafeItems(struct list *out) {
-    assert(out != NULL && "output list must not be null");
-    assert(out->length == 0 && "output list must be empty");
-
-    for (auto it = _window.begin(); it != _window.end(); it++) {
-        list_push_str(out, it->data());
-    }
-    for (auto it = _pool.begin(); it != _pool.end(); it++) {
-        list_push_str(out, it->data());
-    }
+std::vector<std::string> ShuffleChain::Items() {
+    std::vector<std::string> items;
+    items.insert(items.end(), _window.begin(), _window.end());
+    items.insert(items.end(), _pool.begin(), _pool.end());
+    return items;
 }

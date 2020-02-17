@@ -4,6 +4,8 @@
 #include <deque>
 #include <string>
 
+class ShuffleChainIter;
+
 class ShuffleChain {
    public:
     // By default, create a new shuffle chain with a window-size of 1.
@@ -25,9 +27,10 @@ class ShuffleChain {
     // Pick a random song out of this chain.
     std::string Pick();
 
-    // Fill the given list `out` with references to all the songs in this
-    // chain.
-    void LegacyUnsafeItems(struct list *out);
+    // Items returns a vector of all items in this chain. This operation is
+    // extremely heavyweight, since it copies most of the storage used by
+    // the chain. Use with caution.
+    std::vector<std::string> Items();
 
    private:
     void FillWindow();
