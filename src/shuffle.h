@@ -1,32 +1,40 @@
-#include "list.h"
+#ifndef __ASHUFFLE_SHUFFLE_H__
+#define __ASHUFFLE_SHUFFLE_H__
 
-#ifndef ASHUFFLE_SHUFFLE_H
-#define ASHUFFLE_SHUFFLE_H
+#include <deque>
+#include <string>
 
-struct shuffle_chain {
-    unsigned max_window;
-    struct list window;
-    struct list pool;
+class ShuffleChain {
+   public:
+    // By default, create a new shuffle chain with a window-size of 1.
+    ShuffleChain() : ShuffleChain(1){};
+
+    // Create a new ShuffleChain with the given window length.
+    ShuffleChain(unsigned window) : _max_window(window){};
+
+    // Empty this shuffle chain, removing anypreviously added songs.
+    void Empty();
+
+    // Add a string to the pool of songs that can be picked out of this
+    // chain.
+    void Add(std::string);
+
+    // Return the total length (window + pool) of this chain.
+    unsigned Len();
+
+    // Pick a random song out of this chain.
+    std::string Pick();
+
+    // Fill the given list `out` with references to all the songs in this
+    // chain.
+    void LegacyUnsafeItems(struct list *out);
+
+   private:
+    void FillWindow();
+
+    unsigned _max_window;
+    std::deque<std::string> _window;
+    std::deque<std::string> _pool;
 };
-
-/* initialize this shuffle chain */
-void shuffle_init(struct shuffle_chain *, unsigned window_size);
-
-/* Add an the item pointed to by 'data' of size 'size' to
- * the given chain */
-void shuffle_add(struct shuffle_chain *, const char *data);
-
-/* return the number of songs in the shuffle chain */
-unsigned shuffle_length(struct shuffle_chain *);
-
-/* Randomly pick an element added via 'shuffle_add' and return
- * a pointer to it. */
-const char *shuffle_pick(struct shuffle_chain *);
-
-/* Copy all songs from from the shuffle chain into the list "out". */
-void shuffle_items(const struct shuffle_chain *, struct list *out);
-
-/* Free memory associated with the shuffle chain. */
-void shuffle_free(struct shuffle_chain *);
 
 #endif

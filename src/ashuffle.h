@@ -20,15 +20,15 @@ struct mpd_connection* ashuffle_connect(struct ashuffle_options* options,
 
 // Build a `shuffle_chain` of songs from URIs in the given file.
 int build_songs_file(struct mpd_connection* mpd, struct list* ruleset,
-                     FILE* input, struct shuffle_chain* songs, bool check);
+                     FILE* input, ShuffleChain* songs, bool check);
 
 // Build a `shuffle_chain` of songs, by querying the given MPD instance.
 int build_songs_mpd(struct mpd_connection* mpd, struct list* ruleset,
-                    struct shuffle_chain* songs);
+                    ShuffleChain* songs);
 
 // Add a single random song from the given shuffle chain to the given MPD
 // instance.
-void shuffle_single(struct mpd_connection* mpd, struct shuffle_chain* songs);
+void shuffle_single(struct mpd_connection* mpd, ShuffleChain* songs);
 
 struct shuffle_test_delegate {
     bool skip_init;
@@ -39,7 +39,7 @@ struct shuffle_test_delegate {
 // queue finishes playing. This is the core loop of `ashuffle`. The tests
 // delegate is used during tests to observe loop effects. It should be set to
 // NULL during normal operations.
-int shuffle_loop(struct mpd_connection* mpd, struct shuffle_chain* songs,
+int shuffle_loop(struct mpd_connection* mpd, ShuffleChain* songs,
                  struct ashuffle_options* options,
                  struct shuffle_test_delegate*);
 #endif

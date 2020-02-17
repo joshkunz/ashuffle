@@ -1,4 +1,4 @@
-project('ashuffle', ['c', 'cpp'], default_options: ['cpp_std=c++14', 'warning_level=2'])
+project('ashuffle', ['c', 'cpp'], default_options: ['cpp_std=c++17', 'warning_level=2'])
 
 high_dep_sources = files(
     'src/ashuffle.cc',

@@ -1,65 +1,53 @@
 #include <assert.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
 
 #include "list.h"
 #include "shuffle.h"
 
-void shuffle_init(struct shuffle_chain *s, unsigned window_size) {
-    list_init(&s->pool);
-    list_init(&s->window);
-    s->max_window = window_size;
+void ShuffleChain::Empty() {
+    _window.clear();
+    _pool.clear();
 }
 
-/* get then number of songs in the shuffle chain */
-unsigned shuffle_length(struct shuffle_chain *s) {
-    return s->pool.length + s->window.length;
+void ShuffleChain::Add(std::string val) {
+    _pool.push_back(val);
 }
 
-/* add an item to the chain by pushing it into the pool */
-void shuffle_add(struct shuffle_chain *s, const char *item) {
-    list_push_str(&s->pool, item);
+unsigned ShuffleChain::Len() {
+    return _window.size() + _pool.size();
 }
 
 /* ensure that our window is as full as it can possibly be. */
-static void fill_window(struct shuffle_chain *s) {
-    /* while our window isn't full and there's songs in the pool */
-    while (s->window.length <= s->max_window && s->pool.length > 0) {
+void ShuffleChain::FillWindow() {
+    while (_window.size() <= _max_window && _pool.size() > 0) {
         /* push a random song from the pool onto the end of the window */
-        list_pop_push(&s->pool, &s->window, rand() % s->pool.length);
+        unsigned idx = rand() % _pool.size();
+        _window.push_back(_pool[idx]);
+        _pool.erase(_pool.begin()+idx);
     }
 }
 
-/* Randomly pick an element added via 'shuffle_add' and return
- * a pointer to it. */
-const char *shuffle_pick(struct shuffle_chain *s) {
-    const void *data = NULL;
-    if (shuffle_length(s) == 0) {
-        fprintf(stderr, "shuffle_pick: cannot pick from empty chain.");
+std::string ShuffleChain::Pick() {
+    if (Len() == 0) {
+        std::cerr << "shuffle_pick: cannot pick from empty chain." << std::endl;
         abort();
     }
-    fill_window(s);
-    /* get the first element off the window */
-    data = list_at_str(&s->window, 0);
-    /* push the retrived element back into the pool */
-    list_pop_push(&s->window, &s->pool, 0);
-    return (const char *) data;
+    FillWindow();
+    std::string picked = _window[0];
+    _window.pop_front();
+    _pool.push_back(picked);
+    return picked;
 }
 
-void shuffle_items(const struct shuffle_chain *s, struct list *out) {
+void ShuffleChain::LegacyUnsafeItems(struct list *out) {
     assert(out != NULL && "output list must not be null");
     assert(out->length == 0 && "output list must be empty");
 
-    for (unsigned i = 0; i < s->window.length; i++) {
-        list_push_str(out, list_at_str(&s->window, i));
+    for (auto it = _window.begin(); it != _window.end(); it++) {
+        list_push_str(out, it->data());
     }
-    for (unsigned i = 0; i < s->pool.length; i++) {
-        list_push_str(out, list_at_str(&s->pool, i));
+    for (auto it = _pool.begin(); it != _pool.end(); it++) {
+        list_push_str(out, it->data());
     }
-}
-
-/* Free memory associated with the shuffle chain. */
-void shuffle_free(struct shuffle_chain *s) {
-    list_free(&s->pool);
-    list_free(&s->window);
 }

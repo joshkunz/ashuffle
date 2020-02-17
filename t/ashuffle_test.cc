@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include <vector>
+#include <algorithm>
+#include <string>
+
 #include <mpd/client.h>
 #include <tap.h>
 
@@ -58,8 +62,7 @@ void test_build_songs_mpd_basic() {
     struct mpd_connection c;
     memset(&c, 0, sizeof(c));
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
+    ShuffleChain chain;
     struct list ruleset;
     list_init(&ruleset);
 
@@ -70,11 +73,10 @@ void test_build_songs_mpd_basic() {
 
     int result = build_songs_mpd(&c, &ruleset, &chain);
     cmp_ok(result, "==", 0, "build_songs_mpd basic returns ok");
-    cmp_ok(shuffle_length(&chain), "==", 2,
+    cmp_ok(chain.Len(), "==", 2,
            "build_songs_mpd_basic: 2 songs added to shuffle chain");
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
     list_free(&ruleset);
 }
 
@@ -82,8 +84,7 @@ void test_build_songs_mpd_filter() {
     struct mpd_connection c;
     memset(&c, 0, sizeof(c));
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
+    ShuffleChain chain;
     struct list ruleset;
     list_init(&ruleset);
 
@@ -108,12 +109,11 @@ void test_build_songs_mpd_filter() {
 
     int result = build_songs_mpd(&c, &ruleset, &chain);
     cmp_ok(result, "==", 0, "build_songs_mpd filter returns ok");
-    cmp_ok(shuffle_length(&chain), "==", 2,
+    cmp_ok(chain.Len(), "==", 2,
            "build_songs_mpd_filter: 2 songs added to shuffle chain");
 
     mpd_connection_free(&c);
     rule_free(&artist_match);
-    shuffle_free(&chain);
     list_free(&ruleset);
 }
 
@@ -141,9 +141,8 @@ void test_build_songs_file_nocheck() {
         &c, MPD_ERROR_ARGUMENT,
         "ashuffle should not dial MPD when check is false");
 
-    struct shuffle_chain chain;
     const unsigned window_size = 3;
-    shuffle_init(&chain, window_size);
+    ShuffleChain chain(window_size);
 
     TEST_SONG_URI(song_a);
     TEST_SONG_URI(song_b);
@@ -164,41 +163,31 @@ void test_build_songs_file_nocheck() {
 
     int result = build_songs_file(&c, NULL, f, &chain, false);
     cmp_ok(result, "==", 0, "build_songs_file nocheck returns ok");
-    cmp_ok(shuffle_length(&chain), "==", 3,
+    cmp_ok(chain.Len(), "==", 3,
            "build_songs_file_nocheck: 3 songs added to shuffle chain");
 
     // To make sure we parsed the file correctly, pick three songs out of the
     // shuffle chain, and make sure they match the three URIs we wrote. This
     // should be stable because we set a window size equal to the number of
     // song URIs, and sort the URIs we receive from shuffle_pick.
-    const char *want[] = {song_a.uri, song_b.uri, song_c.uri};
-    const char *got[3];
-    got[0] = shuffle_pick(&chain);
-    got[1] = shuffle_pick(&chain);
-    got[2] = shuffle_pick(&chain);
+    std::vector<std::string> want = {song_a.uri, song_b.uri, song_c.uri};
+    std::vector<std::string> got;
+    got.push_back(chain.Pick());
+    got.push_back(chain.Pick());
+    got.push_back(chain.Pick());
 
-    qsort_str(want, STATIC_ARRAY_LEN(want));
-    qsort_str(got, STATIC_ARRAY_LEN(got));
+    std::sort(want.begin(), want.end());
+    std::sort(got.begin(), got.end());
 
-    assert(STATIC_ARRAY_LEN(want) == window_size &&
+    assert(want.size() == window_size &&
            "number of wanted URIs should match the window size");
-    static_assert(STATIC_ARRAY_LEN(want) == STATIC_ARRAY_LEN(got),
-                  "length of want and got should be equal so all elements can "
-                  "be compared");
 
-    for (unsigned i = 0; i < STATIC_ARRAY_LEN(want); i++) {
-        bool equal = strcmp(want[i], got[i]) == 0;
-        ok(equal, "build_songs_file_nocheck: want == got at %u", i);
-        if (!equal) {
-            diag("(want) %s != (got) %s", want[i], got[i]);
-        }
-    }
+    ok(want == got, "build_songs_file_nocheck, want == got"); 
 
     // tmpfile is automatically cleaned up here.
     fclose(f);
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
 }
 
 void test_build_songs_file_check() {
@@ -222,9 +211,8 @@ void test_build_songs_file_check() {
     list_push(&ruleset, &artist_match_d);
 
     // step 3. Prepare the shuffle_chain.
-    struct shuffle_chain chain;
     const unsigned window_size = 2;
-    shuffle_init(&chain, window_size);
+    ShuffleChain chain(window_size);
 
     // step 4. Prepare our songs/song list. The song_list will be used for
     // subsequent calls to `mpd_recv_song`.
@@ -285,39 +273,29 @@ void test_build_songs_file_check() {
 
     int result = build_songs_file(&c, &ruleset, f, &chain, true);
     cmp_ok(result, "==", 0, "build_songs_file check returns ok");
-    cmp_ok(shuffle_length(&chain), "==", 2,
+    cmp_ok(chain.Len(), "==", 2,
            "build_songs_file_check: 2 songs added to shuffle chain");
 
     // This check works like the nocheck case, but instead of expecting us
     // to pick all 3 songs that were written into the input file, we only want
     // to pick song_a and song_c which are not excluded by the ruleset
-    const char *want[] = {song_a.uri, song_c.uri};
-    const char *got[2];
-    got[0] = shuffle_pick(&chain);
-    got[1] = shuffle_pick(&chain);
+    std::vector<std::string> want = {song_a.uri, song_c.uri};
+    std::vector<std::string> got;
+    got.push_back(chain.Pick());
+    got.push_back(chain.Pick());
 
-    qsort_str(want, STATIC_ARRAY_LEN(want));
-    qsort_str(got, STATIC_ARRAY_LEN(got));
+    std::sort(want.begin(), want.end());
+    std::sort(got.begin(), got.end());
 
-    assert(STATIC_ARRAY_LEN(want) == window_size &&
+    assert(want.size() == window_size &&
            "number of wanted URIs should match the window size");
-    static_assert(STATIC_ARRAY_LEN(want) == STATIC_ARRAY_LEN(got),
-                  "length of want and got should be equal so all elements can "
-                  "be compared");
 
-    for (unsigned i = 0; i < STATIC_ARRAY_LEN(want); i++) {
-        bool equal = strcmp(want[i], got[i]) == 0;
-        ok(equal, "build_songs_file_check: want == got at %u", i);
-        if (!equal) {
-            diag("(want) %s != (got) %s", want[i], got[i]);
-        }
-    }
+    ok(want == got, "build_songs_file_nocheck, want == got"); 
 
     // cleanup.
     fclose(f);
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
     rule_free(&artist_match);
     list_free(&ruleset);
 }
@@ -333,9 +311,8 @@ void test_shuffle_single() {
     list_push_song(&c.db, &song_a);
     list_push_song(&c.db, &song_b);
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    shuffle_add(&chain, song_a.uri);
+    ShuffleChain chain;
+    chain.Add(song_a.uri);
 
     cmp_ok(c.queue.length, "==", 0,
            "shuffle_single: queue empty before song added");
@@ -349,7 +326,6 @@ void test_shuffle_single() {
        "shuffle_single: ensure that song_a was added");
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
 }
 
 // This function returns true, false, true, false... etc for each call. It
@@ -372,9 +348,8 @@ void test_shuffle_loop_init_empty() {
     struct ashuffle_options options;
     options_init(&options);
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    shuffle_add(&chain, song_a.uri);
+    ShuffleChain chain;
+    chain.Add(song_a.uri);
 
     list_init(&c.db);
     list_push_song(&c.db, &song_a);
@@ -395,7 +370,6 @@ void test_shuffle_loop_init_empty() {
            "shuffle_loop_init_empty: queue position on first song");
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
     options_free(&options);
 }
 
@@ -408,9 +382,8 @@ void test_shuffle_loop_init_playing() {
     struct ashuffle_options options;
     options_init(&options);
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    shuffle_add(&chain, song_a.uri);
+    ShuffleChain chain;
+    chain.Add(song_a.uri);
 
     list_init(&c.db);
     list_push_song(&c.db, &song_a);
@@ -441,7 +414,6 @@ void test_shuffle_loop_init_playing() {
            "shuffle_loop_init_playing: queue position on first song");
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
     options_free(&options);
 }
 
@@ -455,9 +427,8 @@ void test_shuffle_loop_init_stopped() {
     struct ashuffle_options options;
     options_init(&options);
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    shuffle_add(&chain, song_a.uri);
+    ShuffleChain chain;
+    chain.Add(song_a.uri);
 
     list_init(&c.db);
     list_push_song(&c.db, &song_a);
@@ -489,7 +460,6 @@ void test_shuffle_loop_init_stopped() {
 
     list_free(&c.db);
     list_free(&c.queue);
-    shuffle_free(&chain);
     options_free(&options);
 }
 
@@ -503,9 +473,8 @@ void test_shuffle_loop_basic() {
     struct ashuffle_options options;
     options_init(&options);
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    shuffle_add(&chain, song_a.uri);
+    ShuffleChain chain;
+    chain.Add(song_a.uri);
 
     list_init(&c.db);
     list_push_song(&c.db, &song_a);
@@ -549,7 +518,6 @@ void test_shuffle_loop_basic() {
     }
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
     options_free(&options);
 }
 
@@ -562,9 +530,8 @@ void test_shuffle_loop_empty() {
     struct ashuffle_options options;
     options_init(&options);
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    shuffle_add(&chain, song_a.uri);
+    ShuffleChain chain;
+    chain.Add(song_a.uri);
 
     list_init(&c.db);
     list_push_song(&c.db, &song_a);
@@ -601,7 +568,6 @@ void test_shuffle_loop_empty() {
     }
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
     options_free(&options);
 }
 
@@ -615,9 +581,8 @@ void test_shuffle_loop_empty_buffer() {
     options_init(&options);
     options.queue_buffer = 3;
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    shuffle_add(&chain, song_a.uri);
+    ShuffleChain chain;
+    chain.Add(song_a.uri);
 
     list_init(&c.db);
     list_push_song(&c.db, &song_a);
@@ -654,7 +619,6 @@ void test_shuffle_loop_empty_buffer() {
     }
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
     options_free(&options);
 }
 
@@ -669,9 +633,8 @@ void test_shuffle_loop_buffer_partial() {
     options_init(&options);
     options.queue_buffer = 3;
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    shuffle_add(&chain, song_a.uri);
+    ShuffleChain chain;
+    chain.Add(song_a.uri);
 
     list_init(&c.db);
     list_push_song(&c.db, &song_a);
@@ -714,7 +677,6 @@ void test_shuffle_loop_buffer_partial() {
     }
 
     mpd_connection_free(&c);
-    shuffle_free(&chain);
     options_free(&options);
 }
 

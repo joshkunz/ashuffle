@@ -28,8 +28,7 @@ int main(int argc, const char *argv[]) {
     /* attempt to connect to MPD */
     struct mpd_connection *mpd = ashuffle_connect(&options, NULL);
 
-    struct shuffle_chain songs;
-    shuffle_init(&songs, WINDOW_SIZE);
+    ShuffleChain songs(WINDOW_SIZE);
 
     /* build the list of songs to shuffle through */
     if (options.file_in != NULL) {
@@ -45,19 +44,18 @@ int main(int argc, const char *argv[]) {
     if (options.test.print_all_songs_and_exit) {
         struct list all_songs;
         list_init(&all_songs);
-        shuffle_items(&songs, &all_songs);
+        songs.LegacyUnsafeItems(&all_songs);
         for (unsigned i = 0; i < all_songs.length; i++) {
             puts(list_at_str(&all_songs, i));
         }
         return 0;
     }
 
-    if (shuffle_length(&songs) == 0) {
+    if (songs.Len() == 0) {
         puts("Song pool is empty.");
         return -1;
     }
-    printf("Picking random songs out of a pool of %u.\n",
-           shuffle_length(&songs));
+    printf("Picking random songs out of a pool of %u.\n", songs.Len());
 
     /* Seed the random number generator */
     srand(time(NULL));
@@ -78,8 +76,6 @@ int main(int argc, const char *argv[]) {
     }
     list_free(&options.ruleset);
 
-    /* free-up our songs */
-    shuffle_free(&songs);
     mpd_connection_free(mpd);
     return 0;
 }

@@ -6,6 +6,8 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <string>
+
 #include <mpd/client.h>
 
 #include "args.h"
@@ -111,7 +113,7 @@ static void mpd_song_uri_list(struct mpd_connection *mpd, struct list *uris) {
 /* build the list of songs to shuffle from using
  * the supplied file. */
 int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
-                     FILE *input, struct shuffle_chain *songs, bool check) {
+                     FILE *input, ShuffleChain *songs, bool check) {
     char *uri = NULL;
     ssize_t length = 0;
     size_t ignored = 0;
@@ -157,7 +159,7 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
             }
         }
 
-        shuffle_add(songs, uri);
+        songs->Add(std::string(uri));
 
     skip_uri:
 
@@ -182,7 +184,7 @@ int build_songs_file(struct mpd_connection *mpd, struct list *ruleset,
 
 /* build the list of songs to shuffle from using MPD */
 int build_songs_mpd(struct mpd_connection *mpd, struct list *ruleset,
-                    struct shuffle_chain *songs) {
+                    ShuffleChain *songs) {
     /* ask for a list of songs */
     if (mpd_send_list_all_meta(mpd, NULL) != true) {
         mpd_perror(mpd);
@@ -202,7 +204,7 @@ int build_songs_mpd(struct mpd_connection *mpd, struct list *ruleset,
     for (; song; song = mpd_recv_song(mpd)) {
         /* if this song is allowed, add it to the list */
         if (ruleset_accepts_song(ruleset, song)) {
-            shuffle_add(songs, mpd_song_get_uri(song));
+            songs->Add(mpd_song_get_uri(song));
         }
         /* free the current song */
         mpd_song_free(song);
@@ -212,13 +214,13 @@ int build_songs_mpd(struct mpd_connection *mpd, struct list *ruleset,
 
 /* Append a random song from the given list of
  * songs to the queue */
-void shuffle_single(struct mpd_connection *mpd, struct shuffle_chain *songs) {
-    if (mpd_run_add(mpd, shuffle_pick(songs)) != true) {
+void shuffle_single(struct mpd_connection *mpd, ShuffleChain *songs) {
+    if (mpd_run_add(mpd, songs->Pick().c_str()) != true) {
         mpd_perror(mpd);
     }
 }
 
-int try_first(struct mpd_connection *mpd, struct shuffle_chain *songs) {
+int try_first(struct mpd_connection *mpd, ShuffleChain *songs) {
     struct mpd_status *status;
     status = mpd_run_status(mpd);
     if (status == NULL) {
@@ -237,7 +239,7 @@ int try_first(struct mpd_connection *mpd, struct shuffle_chain *songs) {
     return 0;
 }
 
-int try_enqueue(struct mpd_connection *mpd, struct shuffle_chain *songs,
+int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
                 struct ashuffle_options *options) {
     struct mpd_status *status = mpd_run_status(mpd);
 
@@ -314,7 +316,7 @@ int try_enqueue(struct mpd_connection *mpd, struct shuffle_chain *songs,
 }
 
 /* Keep adding songs when the queue runs out */
-int shuffle_loop(struct mpd_connection *mpd, struct shuffle_chain *songs,
+int shuffle_loop(struct mpd_connection *mpd, ShuffleChain *songs,
                  struct ashuffle_options *options,
                  struct shuffle_test_delegate *test_d) {
     static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
@@ -343,10 +345,9 @@ int shuffle_loop(struct mpd_connection *mpd, struct shuffle_chain *songs,
         /* Only update the database if our original list was built from
          * MPD. */
         if (idle_db && options->file_in == NULL) {
-            shuffle_free(songs);
+            songs->Empty();
             build_songs_mpd(mpd, &options->ruleset, songs);
-            printf("Picking random songs out of a pool of %u.\n",
-                   shuffle_length(songs));
+            printf("Picking random songs out of a pool of %u.\n", songs->Len());
         } else if (idle_queue || idle_player) {
             if (try_enqueue(mpd, songs, options) != 0) {
                 return -1;

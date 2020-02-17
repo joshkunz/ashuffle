@@ -1,124 +1,79 @@
 #include <errno.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <string.h>
+
+#include <unordered_set>
+#include <vector>
+#include <algorithm>
+#include <iostream>
 
 #include <tap.h>
 
-#include "list.h"
 #include "shuffle.h"
 #include "util.h"
 
 #include "t/helpers.h"
 
+
 void test_basic() {
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
-    const char* test_str = "test";
-    shuffle_add(&chain, test_str);
-    is(shuffle_pick(&chain), test_str, "pick returns only string");
+    ShuffleChain chain;
+    std::string test_str("test");
+    chain.Add(test_str);
+    ok(chain.Pick() == test_str, "pick returns only string");
 
     /* Bit of explanation here: If we have a 1-item chain, it should
      * be OK to run `pick` twice (having it return the same string both
      * times). */
-    lives_ok({ (void)shuffle_pick(&chain); }, "double-pick 1-item chain");
-    is(shuffle_pick(&chain), test_str, "double-pick on 1-item chain matches");
-    shuffle_free(&chain);
-}
-
-// Returns true if the list `lst` contains the string `a`.
-bool check_contains(const char* a, const char* lst[], size_t lst_len) {
-    for (size_t i = 0; i < lst_len; i++) {
-        if (strcmp(a, lst[i]) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// Returns true if all items in `lst` are unique.
-bool check_unique(const char* lst[], size_t lst_len) {
-    for (size_t i = 0; i < lst_len; i++) {
-        for (size_t j = i + 1; j < lst_len; j++) {
-            if (strcmp(lst[i], lst[j]) == 0) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
-// Returns true if `lst_a` and `lst_b` contain identical strings.
-bool check_array_equal_str(const char* lst_a[], size_t lst_a_len,
-                           const char* lst_b[], size_t lst_b_len) {
-    if (lst_a_len != lst_b_len) {
-        return false;
-    }
-    for (size_t i = 0; i < lst_a_len; i++) {
-        if (strcmp(lst_a[i], lst_b[i]) != 0) {
-            diag("  Arrays differ at index %u", i);
-            return false;
-        }
-    }
-    return true;
+    lives_ok({ (void)chain.Pick(); }, "double-pick 1-item chain");
+    ok(chain.Pick() == test_str, "double-pick on 1-item chain matches");
 }
 
 void test_multi() {
-    unsigned test_rounds = 5000;
+    constexpr unsigned test_rounds = 5000;
+    const std::unordered_set<std::string> test_items{"item 1", "item 2", "item 3"};
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 1);
+    ShuffleChain chain;
 
-    const char* test_items[] = {"item 1", "item 2", "item 3"};
-
-    shuffle_add(&chain, test_items[0]);
-    shuffle_add(&chain, test_items[1]);
-    shuffle_add(&chain, test_items[2]);
+    for (auto s : test_items) {
+        chain.Add(s);
+    }
 
     for (unsigned i = 0; i < 5000; i++) {
-        const char* item = shuffle_pick(&chain);
-        if (!check_contains(item, test_items, 3)) {
+        std::string item = chain.Pick();
+        if (test_items.find(item) == test_items.end()) {
             fail("pick %u rounds", test_rounds);
             diag("  fail on round: %u", i);
-            diag("  input: \"%s\"", item);
-            goto fail;
+            diag("  input: \"%s\"", item.data());
+            return;
         }
     }
     pass("pick %u rounds", test_rounds);
-fail:
-    shuffle_free(&chain);
 }
 
 void test_window_of_size(const unsigned window_size) {
-    struct shuffle_chain chain;
-    shuffle_init(&chain, window_size);
+    ShuffleChain chain(window_size);
 
     for (unsigned i = 0; i < window_size; i++) {
         char* item = xsprintf("item %u", i);
-        shuffle_add(&chain, item);
+        chain.Add(std::string(item));
         free(item);
     }
 
-    // Our buffer of picked items needs to be one larger than the window size
-    // so we can test that there is at least one repeat.
-    const char* picked[window_size + 1];
-
-    for (unsigned i = 0; i < window_size + 1; i++) {
-        picked[i] = shuffle_pick(&chain);
+    // The first window_size items should all be unique, so when we check the
+    // length of "picked", it should match window_size.
+    std::unordered_set<std::string> picked;
+    for (unsigned i = 0; i < window_size; i++) {
+        picked.insert(chain.Pick());
     }
 
-    // Just looking at the first `window_size` items, they should all be
-    // unique, since they came out of the window.
-    ok(check_unique(picked, window_size),
+    ok(picked.size() == window_size,
        "pick window_size (%u) items, all are unique", window_size);
 
-    // If we check all items there should be at least one repeat. Since
-    // we just checked that the first three items are unique, then we know
-    // that the last item is the repeat, as we expect.
-    ok(!check_unique(picked, window_size + 1),
+    // Since we only put in window_size songs, we should now be forced to get
+    // a repeat by picking one more song.
+    picked.insert(chain.Pick());
+    ok(picked.size() == window_size,
        "pick window_size (%u) + 1 items, there is one repeat", window_size);
-
-    shuffle_free(&chain);
 }
 
 void test_windowing() {
@@ -141,58 +96,46 @@ void test_windowing() {
 void test_random() {
     srand(4);
 
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 2);
+    ShuffleChain chain(2);
 
-    shuffle_add(&chain, "test a");
-    shuffle_add(&chain, "test b");
-    shuffle_add(&chain, "test c");
+    chain.Add("test a");
+    chain.Add("test b");
+    chain.Add("test c");
 
-    is(shuffle_pick(&chain), "test b", "pick 1 is random");
-    is(shuffle_pick(&chain), "test c", "pick 2 is random");
-    is(shuffle_pick(&chain), "test a", "pick 3 is random");
-    is(shuffle_pick(&chain), "test b", "pick 4 is random");
-
-    shuffle_free(&chain);
+    ok(chain.Pick() == "test b", "pick 1 is random");
+    ok(chain.Pick() == "test c", "pick 2 is random");
+    ok(chain.Pick() == "test a", "pick 3 is random");
+    ok(chain.Pick() == "test b", "pick 4 is random");
 }
 
 void test_items() {
-    struct shuffle_chain chain;
-    shuffle_init(&chain, 2);
+    ShuffleChain chain(2);
 
-    const char* test_uris[] = {"test a", "test b", "test c"};
+    const std::vector<std::string> test_uris{"test a", "test b", "test c"};
 
-    shuffle_add(&chain, test_uris[0]);
-    shuffle_add(&chain, test_uris[1]);
-    shuffle_add(&chain, test_uris[2]);
+    chain.Add(test_uris[0]);
+    chain.Add(test_uris[1]);
+    chain.Add(test_uris[2]);
 
     // This is a gross hack to ensure that we've initialized the window pool.
     // We want to make sure shuffle_chain also picks up songs in the window.
-    (void)shuffle_pick(&chain);
+    (void)chain.Pick();
 
     struct list got;
     list_init(&got);
-
-    shuffle_items(&chain, &got);
+    chain.LegacyUnsafeItems(&got);
 
     cmp_ok(got.length, "==", 3, "items: shuffle chain should have 3 items");
 
-    // In-order to qsort, we need an array, not a list.
-    const char** res_array = (const char**) xmalloc(sizeof(char*) * got.length);
+    std::vector<std::string> got_uris;
     for (unsigned i = 0; i < got.length; i++) {
-        res_array[i] = list_at_str(&got, i);
+        got_uris.push_back(list_at_str(&got, i));
     }
+    std::sort(got_uris.begin(), got_uris.end());
 
-    qsort_str(test_uris, STATIC_ARRAY_LEN(test_uris));
-    qsort_str(res_array, got.length);
+    ok(test_uris == got_uris, "items: shuffle chain should only contain inserted items");
 
-    ok(check_array_equal_str(test_uris, STATIC_ARRAY_LEN(test_uris), res_array,
-                             got.length),
-       "items: shuffle chain should only contain inserted items");
-
-    free(res_array);
     list_free(&got);
-    shuffle_free(&chain);
 }
 
 int main() {
