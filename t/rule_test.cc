@@ -14,13 +14,13 @@
 static void test_basic() {
     Rule rule;
 
-    set_tag_name_iparse_result("don't care", MPD_TAG_UNKNOWN);
+    SetTagNameIParse("don't care", MPD_TAG_UNKNOWN);
     Rule::Status res = rule.AddPattern("don't care", "don't care");
     cmp_ok(res, "==", Rule::Status::kFail,
            "add_criteria should fail on MPD_TAG_UNKNOWN");
     ok(rule.Empty(), "no matchers after failed add_critera");
 
-    set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
+    SetTagNameIParse("artist", MPD_TAG_ARTIST);
     res = rule.AddPattern("artist", "foo fighters");
     cmp_ok(res, "==", Rule::Status::kOK, "add_criteria with regular tag works");
 
@@ -34,7 +34,7 @@ static void test_basic() {
 static void test_submatch() {
     Rule rule;
 
-    set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
+    SetTagNameIParse("artist", MPD_TAG_ARTIST);
     Rule::Status res = rule.AddPattern("artist", "foo");
     cmp_ok(res, "==", Rule::Status::kOK);
 
@@ -54,10 +54,10 @@ static void test_multi() {
 
     Rule rule;
 
-    set_tag_name_iparse_result("album", MPD_TAG_ALBUM);
+    SetTagNameIParse("album", MPD_TAG_ALBUM);
     res = rule.AddPattern("album", "__album__");
     cmp_ok(res, "==", Rule::Status::kOK);
-    set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
+    SetTagNameIParse("artist", MPD_TAG_ARTIST);
     res = rule.AddPattern("artist", "__artist__");
     cmp_ok(res, "==", Rule::Status::kOK);
 

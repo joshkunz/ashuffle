@@ -81,7 +81,7 @@ void test_basic_short() {
 
     options_init(&opts);
 
-    set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
+    SetTagNameIParse("artist", MPD_TAG_ARTIST);
 
     const char *test_args[] = {
         "-o", "5",         "-n",          "-q",     "10",
@@ -108,7 +108,7 @@ void test_basic_long() {
 
     options_init(&opts);
 
-    set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
+    SetTagNameIParse("artist", MPD_TAG_ARTIST);
 
     const char *test_args[] = {
         "--only",    "5",           "--no-check",     "--file",
@@ -137,7 +137,7 @@ void test_basic_mixed_long_short() {
 
     options_init(&opts);
 
-    set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
+    SetTagNameIParse("artist", MPD_TAG_ARTIST);
 
     const char *test_args[] = {
         "-o", "5",         "--file", "/dev/zero",   "-n",     "--queue-buffer",
@@ -176,7 +176,7 @@ void test_rule_basic() {
     options_init(&opts);
     const char *test_args[] = {"-e", "artist", "__artist__"};
 
-    set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
+    SetTagNameIParse("artist", MPD_TAG_ARTIST);
 
     struct options_parse_result res =
         options_parse(&opts, STATIC_ARRAY_LEN(test_args), test_args);
@@ -234,7 +234,7 @@ void test_partials() {
         options_parse_result_free(&res);                 \
     } while (0)
 
-    set_tag_name_iparse_result("artist", MPD_TAG_ARTIST);
+    SetTagNameIParse("artist", MPD_TAG_ARTIST);
 
     TEST_PARTIAL("only short", PARSE_ONLY("-o"),
                  "no argument supplied for '-o'");
