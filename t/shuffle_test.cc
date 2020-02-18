@@ -2,10 +2,10 @@
 #include <stdarg.h>
 #include <string.h>
 
-#include <unordered_set>
-#include <vector>
 #include <algorithm>
 #include <iostream>
+#include <unordered_set>
+#include <vector>
 
 #include <tap.h>
 
@@ -13,7 +13,6 @@
 #include "util.h"
 
 #include "t/helpers.h"
-
 
 void test_basic() {
     ShuffleChain chain;
@@ -30,7 +29,8 @@ void test_basic() {
 
 void test_multi() {
     constexpr unsigned test_rounds = 5000;
-    const std::unordered_set<std::string> test_items{"item 1", "item 2", "item 3"};
+    const std::unordered_set<std::string> test_items{"item 1", "item 2",
+                                                     "item 3"};
 
     ShuffleChain chain;
 
@@ -125,7 +125,8 @@ void test_items() {
     cmp_ok(got.size(), "==", 3, "items: shuffle chain should have 3 items");
     std::sort(got.begin(), got.end());
 
-    ok(test_uris == got, "items: shuffle chain should only contain inserted items");
+    ok(test_uris == got,
+       "items: shuffle chain should only contain inserted items");
 }
 
 int main() {

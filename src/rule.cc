@@ -1,7 +1,7 @@
-#include <cassert>
-#include <string>
-#include <cctype>
 #include <algorithm>
+#include <cassert>
+#include <cctype>
+#include <string>
 
 #include <mpd/client.h>
 
@@ -24,7 +24,7 @@ bool Rule::Accepts(const struct mpd_song *song) const {
     assert(type_ == Rule::Type::kExclude &&
            "only exclusion rules are supported");
     for (const Pattern &p : patterns_) {
-        const char * raw_tag_value = mpd_song_get_tag(song, p.tag, 0);
+        const char *raw_tag_value = mpd_song_get_tag(song, p.tag, 0);
         if (raw_tag_value == nullptr) {
             // If the tag doesn't exist, we can't match on it. Just skip this
             // pattern.

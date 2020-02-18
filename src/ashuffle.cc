@@ -43,8 +43,9 @@ void mpd_perror_if_error(struct mpd_connection *mpd) {
 }
 
 /* check wheter a song is allowed by the given ruleset */
-bool ruleset_accepts_song(const std::vector<Rule>& ruleset, struct mpd_song *song) {
-    for (const Rule& rule : ruleset) {
+bool ruleset_accepts_song(const std::vector<Rule> &ruleset,
+                          struct mpd_song *song) {
+    for (const Rule &rule : ruleset) {
         if (!rule.Accepts(song)) {
             return false;
         }
@@ -52,8 +53,8 @@ bool ruleset_accepts_song(const std::vector<Rule>& ruleset, struct mpd_song *son
     return true;
 }
 
-bool ruleset_accepts_uri(struct mpd_connection *mpd, const std::vector<Rule> &ruleset,
-                         char *uri) {
+bool ruleset_accepts_uri(struct mpd_connection *mpd,
+                         const std::vector<Rule> &ruleset, char *uri) {
     bool accepted = false;
     /* search for the song URI in MPD */
     mpd_search_db_songs(mpd, true);
@@ -110,8 +111,9 @@ static void mpd_song_uri_list(struct mpd_connection *mpd, struct list *uris) {
 
 /* build the list of songs to shuffle from using
  * the supplied file. */
-int build_songs_file(struct mpd_connection *mpd, const std::vector<Rule> &ruleset,
-                     FILE *input, ShuffleChain *songs, bool check) {
+int build_songs_file(struct mpd_connection *mpd,
+                     const std::vector<Rule> &ruleset, FILE *input,
+                     ShuffleChain *songs, bool check) {
     char *uri = NULL;
     ssize_t length = 0;
     size_t ignored = 0;
@@ -181,8 +183,8 @@ int build_songs_file(struct mpd_connection *mpd, const std::vector<Rule> &rulese
 }
 
 /* build the list of songs to shuffle from using MPD */
-int build_songs_mpd(struct mpd_connection *mpd, const std::vector<Rule> &ruleset,
-                    ShuffleChain *songs) {
+int build_songs_mpd(struct mpd_connection *mpd,
+                    const std::vector<Rule> &ruleset, ShuffleChain *songs) {
     /* ask for a list of songs */
     if (mpd_send_list_all_meta(mpd, NULL) != true) {
         mpd_perror(mpd);
@@ -319,7 +321,8 @@ int shuffle_loop(struct mpd_connection *mpd, ShuffleChain *songs,
                  struct shuffle_test_delegate *test_d) {
     static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
                   "QUEUE Now different signal.");
-    enum mpd_idle idle_mask = (enum mpd_idle) (MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER);
+    enum mpd_idle idle_mask =
+        (enum mpd_idle)(MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER);
 
     // If the test delegate's `skip_init` is set to true, then skip the
     // initializer.
@@ -454,8 +457,9 @@ struct mpd_connection *ashuffle_connect(struct ashuffle_options *options,
     /* Attempt to get host from command line if available. Otherwise use
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
     char *mpd_host_raw =
-        options->host ? options->host
-                      : getenv("MPD_HOST") ? getenv("MPD_HOST") : xstrdup("localhost");
+        options->host
+            ? options->host
+            : getenv("MPD_HOST") ? getenv("MPD_HOST") : xstrdup("localhost");
     struct mpd_host mpd_host;
     parse_mpd_host(mpd_host_raw, &mpd_host);
 

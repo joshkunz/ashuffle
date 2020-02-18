@@ -72,7 +72,7 @@ void test_leak() {
         "leak: fail to leak out of bounds");
     struct datum outa;
     list_leak(&t, 1, &outa);
-    is((const char *) outa.data, b, "leak: popped item 1 matches string 2");
+    is((const char*)outa.data, b, "leak: popped item 1 matches string 2");
     cmp_ok((size_t)outa.data, "!=", (size_t)a,
            "leak: popped value is owned by the caller");
     free(outa.data);

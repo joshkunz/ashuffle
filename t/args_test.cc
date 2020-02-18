@@ -35,7 +35,8 @@ struct options_parse_result parse_only(const char *first, ...) {
     }
     va_end(rest);
 
-    const char **args_arr = (const char**) xmalloc(sizeof(const char *) * args.length);
+    const char **args_arr =
+        (const char **)xmalloc(sizeof(const char *) * args.length);
     for (unsigned i = 0; i < args.length; i++) {
         args_arr[i] = list_at_str(&args, i);
     }

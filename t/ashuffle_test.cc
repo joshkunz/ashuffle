@@ -4,9 +4,9 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include <vector>
 #include <algorithm>
 #include <string>
+#include <vector>
 
 #include <mpd/client.h>
 #include <tap.h>
@@ -116,7 +116,7 @@ void xfwrite(FILE *f, const char *msg) {
 
 void xfwriteln(FILE *f, const char *msg) {
     // +2 for \n\0
-    char *nl = (char *) xmalloc(strlen(msg) + 2);
+    char *nl = (char *)xmalloc(strlen(msg) + 2);
     strcpy(nl, msg);
     strncat(nl, "\n", 2);
     xfwrite(f, nl);
@@ -173,7 +173,7 @@ void test_build_songs_file_nocheck() {
     assert(want.size() == window_size &&
            "number of wanted URIs should match the window size");
 
-    ok(want == got, "build_songs_file_nocheck, want == got"); 
+    ok(want == got, "build_songs_file_nocheck, want == got");
 
     // tmpfile is automatically cleaned up here.
     fclose(f);
@@ -275,7 +275,7 @@ void test_build_songs_file_check() {
     assert(want.size() == window_size &&
            "number of wanted URIs should match the window size");
 
-    ok(want == got, "build_songs_file_nocheck, want == got"); 
+    ok(want == got, "build_songs_file_nocheck, want == got");
 
     // cleanup.
     fclose(f);
@@ -304,7 +304,7 @@ void test_shuffle_single() {
     cmp_ok(c.queue.length, "==", 1,
            "shuffle_single: queue length 1 after song added");
 
-    struct mpd_song *queue_head = (struct mpd_song *) list_at(&c.queue, 0)->data;
+    struct mpd_song *queue_head = (struct mpd_song *)list_at(&c.queue, 0)->data;
     is(queue_head->uri, song_a.uri,
        "shuffle_single: ensure that song_a was added");
 
@@ -820,7 +820,8 @@ void test_connect_parse_host() {
         options_init(&opts);
 
         if (flags.length > 0) {
-            const char **arg_array = (const char **) xmalloc(sizeof(char *) * flags.length);
+            const char **arg_array =
+                (const char **)xmalloc(sizeof(char *) * flags.length);
             for (unsigned j = 0; j < flags.length; j++) {
                 arg_array[j] = list_at_str(&flags, j);
             }

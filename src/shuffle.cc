@@ -1,7 +1,7 @@
 #include <cassert>
 #include <cstdlib>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "shuffle.h"
 
@@ -10,13 +10,9 @@ void ShuffleChain::Empty() {
     _pool.clear();
 }
 
-void ShuffleChain::Add(std::string val) {
-    _pool.push_back(val);
-}
+void ShuffleChain::Add(std::string val) { _pool.push_back(val); }
 
-unsigned ShuffleChain::Len() {
-    return _window.size() + _pool.size();
-}
+unsigned ShuffleChain::Len() { return _window.size() + _pool.size(); }
 
 /* ensure that our window is as full as it can possibly be. */
 void ShuffleChain::FillWindow() {
@@ -24,7 +20,7 @@ void ShuffleChain::FillWindow() {
         /* push a random song from the pool onto the end of the window */
         unsigned idx = rand() % _pool.size();
         _window.push_back(_pool[idx]);
-        _pool.erase(_pool.begin()+idx);
+        _pool.erase(_pool.begin() + idx);
     }
 }
 

@@ -191,7 +191,8 @@ bool mpd_run_play_pos(struct mpd_connection *connection, unsigned song_pos) {
 }
 
 struct mpd_status *mpd_run_status(struct mpd_connection *c) {
-    struct mpd_status *ret = (struct mpd_status*) xmalloc(sizeof(struct mpd_status));
+    struct mpd_status *ret =
+        (struct mpd_status *)xmalloc(sizeof(struct mpd_status));
     ret->queue_length = c->queue.length;
     ret->single = c->state.single;
     ret->song_pos = c->state.queue_pos;
