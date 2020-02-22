@@ -1,8 +1,5 @@
-#include <assert.h>
-#include <errno.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <string.h>
+#include <cassert>
+#include <cstring>
 
 #include <algorithm>
 #include <string>
@@ -15,7 +12,6 @@
 #include "ashuffle.h"
 #include "rule.h"
 #include "shuffle.h"
-#include "util.h"
 
 #include "t/helpers.h"
 #include "t/mpdclient_fake.h"
@@ -566,8 +562,8 @@ void test_shuffle_loop_buffer_partial() {
 }
 
 static char *failing_getpass_f() {
-    die("called failing getpass!");
-    return NULL;  // unreachable
+    fail("called failing getpass!");
+    return strdup("");  // unreachable
 }
 
 void test_connect_no_password() {
@@ -742,7 +738,7 @@ static unsigned _GOOD_PASSWORD_COUNT = 0;
 
 char *good_password_f() {
     _GOOD_PASSWORD_COUNT += 1;
-    return xstrdup("good_password");
+    return strdup("good_password");
 }
 
 void test_connect_env_bad_password() {

@@ -1,13 +1,12 @@
-#include <assert.h>
-#include <mpd/client.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <algorithm>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
 
-#include "src/util.h"
+#include "absl/strings/str_format.h"
+
+#include <mpd/client.h>
 
 #include "mpdclient_fake.h"
 
@@ -37,7 +36,8 @@ mpd_song::mpd_song(std::string_view in_uri, std::vector<TagValue> tvs) {
     uri = in_uri;
     for (const TagValue &t : tvs) {
         if (tags.find(t.tag) != tags.end()) {
-            die("tag value %d already defined", t.tag);
+            std::cerr << absl::StrFormat("tag value %d already defined", t.tag)
+                      << std::endl;
         }
         tags[t.tag] = t.value;
     }

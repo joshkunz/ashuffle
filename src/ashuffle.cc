@@ -10,6 +10,8 @@
 #include <iostream>
 #include <string>
 
+#include "absl/strings/str_format.h"
+
 #include <mpd/client.h>
 
 #include "args.h"
@@ -17,7 +19,18 @@
 #include "getpass.h"
 #include "rule.h"
 #include "shuffle.h"
-#include "util.h"
+
+namespace {
+
+// Die logs the given message as if it was printed via `absl::StrFormat`,
+// and then terminates the program with with an error status code.
+template <typename... Args>
+void Die(Args... strs) {
+    std::cerr << absl::StrFormat(strs...) << std::endl;
+    std::exit(EXIT_FAILURE);
+}
+
+}  // namespace
 
 /* 25 seconds is the default timeout */
 static const int TIMEOUT = 25000;
@@ -33,7 +46,7 @@ constexpr std::array<std::string_view, 5> kRequiredCommands = {
 void mpd_perror(struct mpd_connection *mpd) {
     assert(mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS &&
            "must be an error present");
-    die("MPD error: %s", mpd_connection_get_error_message(mpd));
+    Die("MPD error: %s", mpd_connection_get_error_message(mpd));
 }
 
 void mpd_perror_if_error(struct mpd_connection *mpd) {
@@ -96,7 +109,7 @@ static std::vector<std::string> mpd_song_uri_list(struct mpd_connection *mpd) {
     struct mpd_song *song = mpd_recv_song(mpd);
     const enum mpd_error err = mpd_connection_get_error(mpd);
     if (err == MPD_ERROR_CLOSED) {
-        die("MPD server closed the connection while getting the list of\n"
+        Die("MPD server closed the connection while getting the list of\n"
             "all songs. If MPD error logs say \"Output buffer is full\",\n"
             "consider setting max_output_buffer_size to a higher value\n"
             "(e.g. 32768) in your MPD config.");
@@ -130,7 +143,7 @@ int build_songs_file(struct mpd_connection *mpd,
     length = getline(&uri, &ignored, input);
     while (!feof(input) && !ferror(input)) {
         if (length < 1) {
-            die("invalid URI in input stream");
+            Die("invalid URI in input stream");
         }
 
         /* if this line has terminating newline attached, set it
@@ -188,7 +201,7 @@ int build_songs_mpd(struct mpd_connection *mpd,
     struct mpd_song *song = mpd_recv_song(mpd);
     const enum mpd_error err = mpd_connection_get_error(mpd);
     if (err == MPD_ERROR_CLOSED) {
-        die("MPD server closed the connection while getting the list of\n"
+        Die("MPD server closed the connection while getting the list of\n"
             "all songs. If MPD error logs say \"Output buffer is full\",\n"
             "consider setting max_output_buffer_size to a higher value\n"
             "(e.g. 32768) in your MPD config.");
@@ -435,7 +448,7 @@ struct mpd_connection *ashuffle_connect(const Options &options,
     std::string mpd_host_raw =
         options.host.has_value()
             ? *options.host
-            : getenv("MPD_HOST") ? getenv("MPD_HOST") : xstrdup("localhost");
+            : getenv("MPD_HOST") ? getenv("MPD_HOST") : "localhost";
     MPDHost mpd_host(mpd_host_raw);
 
     /* Same thing for the port, use the command line defined port, environment
@@ -449,9 +462,9 @@ struct mpd_connection *ashuffle_connect(const Options &options,
     mpd = mpd_connection_new(mpd_host.host.data(), mpd_port, TIMEOUT);
 
     if (mpd == NULL) {
-        die("Could not connect due to lack of memory.");
+        Die("Could not connect due to lack of memory.");
     } else if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        die("Could not connect to %s:%u.", mpd_host.host.data(), mpd_port);
+        Die("Could not connect to %s:%u.", mpd_host.host.data(), mpd_port);
     }
 
     /* Password Workflow:
@@ -468,13 +481,13 @@ struct mpd_connection *ashuffle_connect(const Options &options,
     }
     bool need_mpd_password = is_mpd_password_needed(mpd);
     if (mpd_host.password.has_value() && need_mpd_password) {
-        die("password applied, but required command still not allowed.");
+        Die("password applied, but required command still not allowed.");
     }
     if (need_mpd_password) {
         get_mpd_password(mpd, getpass_f);
     }
     if (is_mpd_password_needed(mpd)) {
-        die("password applied, but required command still not allowed.");
+        Die("password applied, but required command still not allowed.");
     }
     return mpd;
 }

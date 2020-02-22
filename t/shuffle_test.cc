@@ -1,16 +1,13 @@
-#include <errno.h>
-#include <stdarg.h>
-#include <string.h>
-
 #include <algorithm>
 #include <iostream>
 #include <unordered_set>
 #include <vector>
 
+#include "absl/strings/str_cat.h"
+
 #include <tap.h>
 
 #include "shuffle.h"
-#include "util.h"
 
 #include "t/helpers.h"
 
@@ -54,9 +51,7 @@ void test_window_of_size(const unsigned window_size) {
     ShuffleChain chain(window_size);
 
     for (unsigned i = 0; i < window_size; i++) {
-        char* item = xsprintf("item %u", i);
-        chain.Add(std::string(item));
-        free(item);
+        chain.Add(absl::StrCat("item ", i));
     }
 
     // The first window_size items should all be unique, so when we check the
