@@ -29,7 +29,6 @@ high_dep_sources = files(
 low_dep_sources = files(
 	'src/args.cc',
 	'src/getpass.cc',
-	'src/list.cc',
 	'src/rule.cc',
     'src/shuffle.cc',
     'src/util.cc',
@@ -70,7 +69,6 @@ test_options = [
 tests = {
     'args': ['t/args_test.cc'],
     'ashuffle': ['src/ashuffle.cc', 't/ashuffle_test.cc'],
-    'list': ['t/list_test.cc'],
     'rule': ['t/rule_test.cc'],
     'shuffle': ['t/shuffle_test.cc'],
 }

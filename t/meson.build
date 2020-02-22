@@ -6,7 +6,7 @@ libtap_dep = declare_dependency(include_directories : libtap_inc,
 clientlib_inc_dep = libmpdclient.partial_dependency(includes : true)
 clientfake_inc = include_directories('.')
 clientfake = library('clientfake',
-                     ['mpdclient_fake.cc', '../src/util.cc', '../src/list.cc'],
+                     ['mpdclient_fake.cc', '../src/util.cc'],
                      include_directories : [clientfake_inc, root_inc],
                      dependencies : clientlib_inc_dep)
 clientfake_dep = declare_dependency(include_directories : [clientfake_inc, root_inc],

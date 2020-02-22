@@ -8,7 +8,6 @@
 #include <tap.h>
 
 #include "args.h"
-#include "list.h"
 #include "rule.h"
 #include "util.h"
 

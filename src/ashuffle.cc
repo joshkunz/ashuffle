@@ -5,7 +5,9 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-
+#include <algorithm>
+#include <array>
+#include <iostream>
 #include <string>
 
 #include <mpd/client.h>
@@ -13,7 +15,6 @@
 #include "args.h"
 #include "ashuffle.h"
 #include "getpass.h"
-#include "list.h"
 #include "rule.h"
 #include "shuffle.h"
 #include "util.h"
@@ -25,9 +26,8 @@ static const int TIMEOUT = 25000;
 const int WINDOW_SIZE = 7;
 
 /* These MPD commands are required for ashuffle to run */
-const char *REQUIRED_COMMANDS[] = {
+constexpr std::array<std::string_view, 5> kRequiredCommands = {
     "add", "status", "play", "pause", "idle",
-    NULL,  // sentinel, do not remove
 };
 
 void mpd_perror(struct mpd_connection *mpd) {
@@ -84,11 +84,13 @@ bool ruleset_accepts_uri(struct mpd_connection *mpd,
     return accepted;
 }
 
-static void mpd_song_uri_list(struct mpd_connection *mpd, struct list *uris) {
+static std::vector<std::string> mpd_song_uri_list(struct mpd_connection *mpd) {
     /* ask for a list of songs */
     if (mpd_send_list_all_meta(mpd, NULL) != true) {
         mpd_perror(mpd);
     }
+
+    std::vector<std::string> result;
 
     /* parse out the pairs */
     struct mpd_song *song = mpd_recv_song(mpd);
@@ -102,11 +104,12 @@ static void mpd_song_uri_list(struct mpd_connection *mpd, struct list *uris) {
         mpd_perror(mpd);
     }
     for (; song; song = mpd_recv_song(mpd)) {
-        list_push_str(uris, mpd_song_get_uri(song));
+        result.push_back(mpd_song_get_uri(song));
 
         /* free the current song */
         mpd_song_free(song);
     }
+    return result;
 }
 
 /* build the list of songs to shuffle from using
@@ -117,16 +120,11 @@ int build_songs_file(struct mpd_connection *mpd,
     char *uri = NULL;
     ssize_t length = 0;
     size_t ignored = 0;
-    struct list all_uris;
-    const char **all_uris_array = NULL;
-    list_init(&all_uris);
+    std::vector<std::string> all_uris;
 
     if (check) {
-        mpd_song_uri_list(mpd, &all_uris);
-        all_uris_array = list_to_array_str(&all_uris);
-        if (all_uris_array) {
-            qsort_str(all_uris_array, all_uris.length);
-        }
+        all_uris = mpd_song_uri_list(mpd);
+        std::sort(all_uris.begin(), all_uris.end());
     }
 
     length = getline(&uri, &ignored, input);
@@ -143,11 +141,11 @@ int build_songs_file(struct mpd_connection *mpd,
         }
 
         if (check) {
-            if (!all_uris.length) {
+            if (all_uris.empty()) {
                 // No URIs in MPD, so the song can't possibly exist.
                 goto skip_uri;
             }
-            if (!bsearch_str(all_uris_array, all_uris.length, uri)) {
+            if (!std::binary_search(all_uris.begin(), all_uris.end(), uri)) {
                 // We have some uris in `all_uris', but the given URI
                 // is not in there. Skip this URI.
                 goto skip_uri;
@@ -174,10 +172,6 @@ int build_songs_file(struct mpd_connection *mpd,
     if (uri != NULL) {
         free(uri);
     }
-
-    // This should be safe, even if `check` is false.
-    free(all_uris_array);
-    list_free(&all_uris);
 
     return 0;
 }
@@ -387,18 +381,6 @@ static void get_mpd_password(struct mpd_connection *mpd, char *(*getpass_f)()) {
     }
 }
 
-/* Check if string "s" is contained in the list 'l'. */
-bool list_contains_string(struct list *l, const char *s) {
-    for (size_t i = 0; i < l->length; i++) {
-        const char *val = list_at_str(l, i);
-        assert(val != NULL && "all items in the list should have values");
-        if (strcmp(s, val) == 0) {
-            return true;
-        }
-    }
-    return false;
-}
-
 /* If a password is required, "password" is used if not null, otherwise
  * a password is obtained from stdin. */
 bool is_mpd_password_needed(struct mpd_connection *mpd) {
@@ -407,27 +389,25 @@ bool is_mpd_password_needed(struct mpd_connection *mpd) {
     if (!mpd_send_disallowed_commands(mpd)) {
         mpd_perror(mpd);
     }
-    struct list disallowed_commands;
-    list_init(&disallowed_commands);
+    std::vector<std::string> disallowed_commands;
     struct mpd_pair *command = mpd_recv_command_pair(mpd);
     while (command != NULL) {
-        list_push_str(&disallowed_commands, command->value);
+        disallowed_commands.push_back(command->value);
         mpd_return_pair(mpd, command);
         command = mpd_recv_command_pair(mpd);
     }
     mpd_perror_if_error(mpd);
 
     bool password_needed = false;
-    for (size_t i = 0; REQUIRED_COMMANDS[i] != NULL; i++) {
-        const char *cmd = REQUIRED_COMMANDS[i];
-        if (list_contains_string(&disallowed_commands, cmd)) {
+    for (std::string_view cmd : kRequiredCommands) {
+        if (std::find(disallowed_commands.begin(), disallowed_commands.end(),
+                      cmd) != disallowed_commands.end()) {
             fprintf(stderr, "required MPD command \"%s\" not allowed by MPD.\n",
-                    cmd);
+                    cmd.data());
             password_needed = true;
             break;
         }
     }
-    list_free(&disallowed_commands);
     return password_needed;
 }
 
