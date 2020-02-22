@@ -1,3 +1,6 @@
 [submodule "src/t/libtap"]
 	path = t/libtap
 	url = https://github.com/zorgnax/libtap
+[submodule "subprojects/absl"]
+	path = subprojects/absl
+	url = git@github.com:abseil/abseil-cpp.git

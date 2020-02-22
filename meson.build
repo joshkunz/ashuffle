@@ -1,5 +1,27 @@
 project('ashuffle', ['c', 'cpp'], default_options: ['cpp_std=c++17', 'warning_level=2'])
 
+cmake = import('cmake')
+
+absl = cmake.subproject('absl', cmake_options: [
+  '-DCMAKE_CXX_STANDARD=17',
+])
+
+# Note: Unfortunately, meson does not pull in the "dependent" libraries
+# correctly so we have to list them here. If you take a dependency on some
+# addtional absl features, you will probably need to add more `dependency`
+# lines here. This could also be broken on upgrades.
+absl_all = [
+    # Via Base:
+    absl.dependency('raw_logging_internal'),
+
+    # Via Strings:
+    absl.dependency('int128'),
+    absl.dependency('str_format_internal'),
+    absl.dependency('strings'),
+]
+
+libmpdclient = dependency('libmpdclient')
+
 high_dep_sources = files(
     'src/ashuffle.cc',
 )
@@ -20,12 +42,10 @@ executable_sources = sources + files('src/main.cc')
 src_inc = include_directories('src')
 root_inc = include_directories('.')
 
-clientlib = dependency('libmpdclient')
-
 ashuffle = executable(
 	'ashuffle',
 	executable_sources,
-	dependencies: clientlib,
+	dependencies: absl_all + [libmpdclient],
 	install: true
 )
 
@@ -60,7 +80,7 @@ foreach test_name, test_sources : tests
         test_name + '_test',
         low_dep_sources + test_sources,
         include_directories : src_inc,
-        dependencies : [libtap_dep, testhelpers_dep, clientfake_dep],
+        dependencies : absl_all + [libtap_dep, testhelpers_dep, clientfake_dep],
         c_args : test_c_args,
         override_options : test_options,
     )
