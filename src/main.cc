@@ -1,6 +1,8 @@
 #include <stdlib.h>
+#include <cassert>
 #include <iostream>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <mpd/client.h>
@@ -8,28 +10,35 @@
 #include "args.h"
 #include "ashuffle.h"
 #include "getpass.h"
-#include "list.h"
 #include "rule.h"
 #include "shuffle.h"
 
 int main(int argc, const char *argv[]) {
-    /* attempt to parse out options given on the command line */
-    struct ashuffle_options options;
-    options_init(&options);
-    // Parse the arguments with the program name stripped.
-    struct options_parse_result parse_r =
-        options_parse(&options, argc - 1, &argv[1]);
-    if (parse_r.status != PARSE_OK) {
-        if (parse_r.msg != NULL) {
-            fprintf(stderr, "error: %s\n", parse_r.msg);
+    std::variant<Options, ParseError> parse = Options::ParseFromC(argv, argc);
+    if (ParseError *err = std::get_if<ParseError>(&parse); err != nullptr) {
+        switch (err->type) {
+            case ParseError::Type::kUnknown:
+                fprintf(stderr,
+                        "unknown option parsing error. Please file a bug "
+                        "at https://github.com/joshkunz/ashuffle");
+                break;
+            case ParseError::Type::kHelp:
+                // We always print the help, so just break here.
+                break;
+            case ParseError::Type::kGeneric:
+                fprintf(stderr, "error: %s\n", err->msg.data());
+                break;
+            default:
+                assert(false && "unreachable");
         }
-        options_help(stderr);
-        exit(1);
+        PrintHelp(stderr);
+        exit(EXIT_FAILURE);
     }
-    options_parse_result_free(&parse_r);
+
+    Options options = std::get<Options>(parse);
 
     /* attempt to connect to MPD */
-    struct mpd_connection *mpd = ashuffle_connect(&options, NULL);
+    struct mpd_connection *mpd = ashuffle_connect(options, NULL);
 
     ShuffleChain songs(WINDOW_SIZE);
 
@@ -68,7 +77,7 @@ int main(int argc, const char *argv[]) {
         }
         printf("Added %u songs.\n", options.queue_only);
     } else {
-        shuffle_loop(mpd, &songs, &options, NULL);
+        shuffle_loop(mpd, &songs, options, NULL);
     }
 
     mpd_connection_free(mpd);

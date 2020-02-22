@@ -272,7 +272,7 @@ can be installed like so:
 Download the [latest release][latest], untar/unzip it and then cd into the
 source directory and run:
 
-    meson build
+    meson -Dbuildtype=release build
 
 Then run
 
@@ -281,7 +281,7 @@ Then run
 to install the binary. If you want to use a prefix other than `/usr/local` you
 can supply an alternate by running `meson` like so:
 
-    meson build --prefix <prefix>
+    meson build -Dbuildtype=release --prefix <prefix>
 
 You can uninstall the program later by running
 

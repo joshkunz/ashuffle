@@ -17,7 +17,7 @@ extern const int WINDOW_SIZE;
 // be found in MPD_HOST, then `getpass_f' will be used to prompt the user
 // for a password. If `getpass_f' is NULL, the a default password prompt
 // (based on getpass) will be used.
-struct mpd_connection* ashuffle_connect(struct ashuffle_options* options,
+struct mpd_connection* ashuffle_connect(const Options& options,
                                         char* (*getpass_f)());
 
 // Build a `shuffle_chain` of songs from URIs in the given file.
@@ -43,6 +43,5 @@ struct shuffle_test_delegate {
 // delegate is used during tests to observe loop effects. It should be set to
 // NULL during normal operations.
 int shuffle_loop(struct mpd_connection* mpd, ShuffleChain* songs,
-                 struct ashuffle_options* options,
-                 struct shuffle_test_delegate*);
+                 const Options& options, struct shuffle_test_delegate*);
 #endif

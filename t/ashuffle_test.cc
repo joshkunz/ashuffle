@@ -279,8 +279,7 @@ void test_shuffle_loop_init_empty() {
 
     struct mpd_song song_a("song_a");
 
-    struct ashuffle_options options;
-    options_init(&options);
+    Options options;
 
     ShuffleChain chain;
     chain.Add(song_a.uri);
@@ -292,7 +291,7 @@ void test_shuffle_loop_init_empty() {
         .until_f = only_init_f,
     };
 
-    int result = shuffle_loop(&c, &chain, &options, &delegate);
+    int result = shuffle_loop(&c, &chain, options, &delegate);
 
     cmp_ok(result, "==", 0, "shuffle_loop_init_empty: shuffle_loop returns 0");
     cmp_ok(c.queue.size(), "==", 1,
@@ -301,8 +300,6 @@ void test_shuffle_loop_init_empty() {
            "shuffle_loop_init_empty: playing after init");
     cmp_ok(c.state.queue_pos, "==", 0,
            "shuffle_loop_init_empty: queue position on first song");
-
-    options_free(&options);
 }
 
 void test_shuffle_loop_init_playing() {
@@ -310,8 +307,7 @@ void test_shuffle_loop_init_playing() {
 
     struct mpd_song song_a("song_a");
 
-    struct ashuffle_options options;
-    options_init(&options);
+    Options options;
 
     ShuffleChain chain;
     chain.Add(song_a.uri);
@@ -328,7 +324,7 @@ void test_shuffle_loop_init_playing() {
         .until_f = only_init_f,
     };
 
-    int result = shuffle_loop(&c, &chain, &options, &delegate);
+    int result = shuffle_loop(&c, &chain, options, &delegate);
 
     // We shouldn't add anything to the queue if we're already playing,
     // ashuffle should start silently.
@@ -340,8 +336,6 @@ void test_shuffle_loop_init_playing() {
            "shuffle_loop_init_playing: playing after init");
     cmp_ok(c.state.queue_pos, "==", 0,
            "shuffle_loop_init_playing: queue position on first song");
-
-    options_free(&options);
 }
 
 void test_shuffle_loop_init_stopped() {
@@ -350,8 +344,7 @@ void test_shuffle_loop_init_stopped() {
     struct mpd_song song_a("song_a");
     struct mpd_song song_b("song_b");
 
-    struct ashuffle_options options;
-    options_init(&options);
+    Options options;
 
     ShuffleChain chain;
     chain.Add(song_a.uri);
@@ -370,7 +363,7 @@ void test_shuffle_loop_init_stopped() {
         .until_f = only_init_f,
     };
 
-    int result = shuffle_loop(&c, &chain, &options, &delegate);
+    int result = shuffle_loop(&c, &chain, options, &delegate);
 
     // We should add a new item to the queue, and start playing.
     cmp_ok(result, "==", 0,
@@ -381,8 +374,6 @@ void test_shuffle_loop_init_stopped() {
            "shuffle_loop_init_stopped: playing after init");
     cmp_ok(c.state.queue_pos, "==", 1,
            "shuffle_loop_init_stopped: queue position on second song");
-
-    options_free(&options);
 }
 
 void test_shuffle_loop_basic() {
@@ -391,8 +382,7 @@ void test_shuffle_loop_basic() {
     struct mpd_song song_a("song_a");
     struct mpd_song song_b("song_b");
 
-    struct ashuffle_options options;
-    options_init(&options);
+    Options options;
 
     ShuffleChain chain;
     chain.Add(song_a.uri);
@@ -417,7 +407,7 @@ void test_shuffle_loop_basic() {
         .until_f = once_f,
     };
 
-    int result = shuffle_loop(&c, &chain, &options, &delegate);
+    int result = shuffle_loop(&c, &chain, options, &delegate);
 
     // We should add a new item to the queue, and start playing.
     cmp_ok(result, "==", 0, "shuffle_loop_basic: shuffle_loop returns 0");
@@ -435,8 +425,6 @@ void test_shuffle_loop_basic() {
         ok(c.Playing()->uri == song_a.uri,
            "shuffle_loop_basic: queued and played song_a");
     }
-
-    options_free(&options);
 }
 
 void test_shuffle_loop_empty() {
@@ -444,8 +432,7 @@ void test_shuffle_loop_empty() {
 
     struct mpd_song song_a("song_a");
 
-    struct ashuffle_options options;
-    options_init(&options);
+    Options options;
 
     ShuffleChain chain;
     chain.Add(song_a.uri);
@@ -463,7 +450,7 @@ void test_shuffle_loop_empty() {
         .until_f = once_f,
     };
 
-    int result = shuffle_loop(&c, &chain, &options, &delegate);
+    int result = shuffle_loop(&c, &chain, options, &delegate);
 
     // We should add a new item to the queue, and start playing.
     cmp_ok(result, "==", 0, "shuffle_loop_empty: shuffle_loop returns 0");
@@ -481,8 +468,6 @@ void test_shuffle_loop_empty() {
         ok(c.Playing()->uri == song_a.uri,
            "shuffle_loop_empty: queued and played song_a");
     }
-
-    options_free(&options);
 }
 
 void test_shuffle_loop_empty_buffer() {
@@ -490,8 +475,7 @@ void test_shuffle_loop_empty_buffer() {
 
     struct mpd_song song_a("song_a");
 
-    struct ashuffle_options options;
-    options_init(&options);
+    Options options;
     options.queue_buffer = 3;
 
     ShuffleChain chain;
@@ -510,7 +494,7 @@ void test_shuffle_loop_empty_buffer() {
         .until_f = once_f,
     };
 
-    int result = shuffle_loop(&c, &chain, &options, &delegate);
+    int result = shuffle_loop(&c, &chain, options, &delegate);
 
     // We should add 4 new items to the queue, and start playing on the first
     // one.
@@ -528,8 +512,6 @@ void test_shuffle_loop_empty_buffer() {
         ok(c.Playing()->uri == song_a.uri,
            "shuffle_loop_empty_buffer: queued and played song_a");
     }
-
-    options_free(&options);
 }
 
 void test_shuffle_loop_buffer_partial() {
@@ -538,8 +520,7 @@ void test_shuffle_loop_buffer_partial() {
     struct mpd_song song_a("song_a");
     struct mpd_song song_b("song_b");
 
-    struct ashuffle_options options;
-    options_init(&options);
+    Options options;
     options.queue_buffer = 3;
 
     ShuffleChain chain;
@@ -564,7 +545,7 @@ void test_shuffle_loop_buffer_partial() {
         .until_f = once_f,
     };
 
-    int result = shuffle_loop(&c, &chain, &options, &delegate);
+    int result = shuffle_loop(&c, &chain, options, &delegate);
 
     cmp_ok(result, "==", 0,
            "shuffle_loop_partial_buffer: shuffle_loop returns 0");
@@ -582,8 +563,6 @@ void test_shuffle_loop_buffer_partial() {
         ok(c.Playing()->uri == song_b.uri,
            "shuffle_loop_partial_buffer: playing the same song as before");
     }
-
-    options_free(&options);
 }
 
 static char *failing_getpass_f() {
@@ -597,8 +576,7 @@ void test_connect_no_password() {
     // Default host/port;
     SetServer("localhost", 6600, 0);
 
-    struct ashuffle_options opts;
-    options_init(&opts);
+    Options opts;
 
     struct mpd_connection c;
 
@@ -607,13 +585,11 @@ void test_connect_no_password() {
 
     SetConnection(c);
 
-    struct mpd_connection *result = ashuffle_connect(&opts, failing_getpass_f);
+    struct mpd_connection *result = ashuffle_connect(opts, failing_getpass_f);
 
     ok(result == &c, "connect_no_password: connection matches set connection");
     cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
            "connect_no_password: connection successful");
-
-    options_free(&opts);
 }
 
 struct HostPort {
@@ -714,24 +690,15 @@ void test_connect_parse_host() {
             flags.push_back(std::to_string(test.flag.port));
         }
 
-        struct ashuffle_options opts;
-        options_init(&opts);
+        Options opts;
 
         if (flags.size() > 0) {
-            const char **arg_array =
-                (const char **)xmalloc(sizeof(char *) * flags.size());
-            unsigned j = 0;
-            for (const std::string &f : flags) {
-                arg_array[j++] = f.data();
+            auto parse = Options::Parse(flags);
+            if (auto err = std::get_if<ParseError>(&parse); err != nullptr) {
+                fail("connect_parse_host[%u]: failed to parse flags", i);
+                diag("  parse result: %s", err->msg.data());
             }
-            struct options_parse_result res;
-            res = options_parse(&opts, flags.size(), arg_array);
-            cmp_ok(res.status, "==", PARSE_OK,
-                   "connect_parse_host[%u]: failed to parse option flags", i);
-            if (res.status != PARSE_OK) {
-                diag("  parse result: %s", res.msg);
-            }
-            free(arg_array);
+            opts = std::get<Options>(parse);
         }
 
         struct mpd_connection c;
@@ -741,13 +708,11 @@ void test_connect_parse_host() {
         SetConnection(c);
 
         struct mpd_connection *result =
-            ashuffle_connect(&opts, failing_getpass_f);
+            ashuffle_connect(opts, failing_getpass_f);
         ok(result == &c,
            "connect_parse_host[%u]: connection matches set connection", i);
         cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
                "connect_parse_host[%u]: connection successful", i);
-
-        options_free(&opts);
     }
 }
 
@@ -759,21 +724,18 @@ void test_connect_env_password() {
     // set our password in the environment
     xsetenv("MPD_HOST", "test_password@localhost");
 
-    struct ashuffle_options opts;
-    options_init(&opts);
+    Options opts;
 
     struct mpd_connection c;
     c.password = "test_password";
 
     SetConnection(c);
 
-    struct mpd_connection *result = ashuffle_connect(&opts, failing_getpass_f);
+    struct mpd_connection *result = ashuffle_connect(opts, failing_getpass_f);
 
     ok(result == &c, "connect_env_password: connection matches set connection");
     cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
            "connect_env_password: connection successful");
-
-    options_free(&opts);
 }
 
 static unsigned _GOOD_PASSWORD_COUNT = 0;
@@ -791,8 +753,7 @@ void test_connect_env_bad_password() {
     // set our password in the environment
     xsetenv("MPD_HOST", "bad_password@localhost");
 
-    struct ashuffle_options opts;
-    options_init(&opts);
+    Options opts;
 
     struct mpd_connection c;
 
@@ -802,10 +763,8 @@ void test_connect_env_bad_password() {
 
     // using good_password_f, just in-case ashuffle_connect decides to prompt
     // for a password. It should fail without ever calling good_password_f.
-    dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
+    dies_ok({ (void)ashuffle_connect(opts, good_password_f); },
             "connect_env_bad_password: fail to connect with bad password");
-
-    options_free(&opts);
 }
 
 void test_connect_env_ok_password_bad_perms() {
@@ -816,8 +775,7 @@ void test_connect_env_ok_password_bad_perms() {
     // set our password in the environment
     xsetenv("MPD_HOST", "good_password@localhost");
 
-    struct ashuffle_options opts;
-    options_init(&opts);
+    Options opts;
 
     struct mpd_connection c;
 
@@ -832,11 +790,9 @@ void test_connect_env_ok_password_bad_perms() {
     // We should terminate after seeing the bad permissions. If we end up
     // re-prompting (and getting a good password), we should succeed, and fail
     // the test.
-    dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
+    dies_ok({ (void)ashuffle_connect(opts, good_password_f); },
             "connect_env_ok_password_bad_perms: fail to connect with bad "
             "permissions");
-
-    options_free(&opts);
 }
 
 // If no password is supplied in the environment, but we have a restricted
@@ -847,8 +803,7 @@ void test_connect_bad_perms_ok_prompt() {
     xclearenv();
     SetServer("localhost", 6600, 0);
 
-    struct ashuffle_options opts;
-    options_init(&opts);
+    Options opts;
 
     struct mpd_connection c;
 
@@ -861,7 +816,7 @@ void test_connect_bad_perms_ok_prompt() {
 
     unsigned good_password_before = _GOOD_PASSWORD_COUNT;
 
-    struct mpd_connection *result = ashuffle_connect(&opts, good_password_f);
+    struct mpd_connection *result = ashuffle_connect(opts, good_password_f);
 
     unsigned good_password_after = _GOOD_PASSWORD_COUNT;
 
@@ -872,16 +827,13 @@ void test_connect_bad_perms_ok_prompt() {
     cmp_ok(good_password_before, "==", good_password_after - 1,
            "connect_bad_perms_ok_prompt: password prompt should have been "
            "called once");
-
-    options_free(&opts);
 }
 
 void test_connect_bad_perms_prompt_bad_perms() {
     xclearenv();
     SetServer("localhost", 6600, 0);
 
-    struct ashuffle_options opts;
-    options_init(&opts);
+    Options opts;
 
     struct mpd_connection c;
 
@@ -897,10 +849,8 @@ void test_connect_bad_perms_prompt_bad_perms() {
 
     SetConnection(c);
 
-    dies_ok({ (void)ashuffle_connect(&opts, good_password_f); },
+    dies_ok({ (void)ashuffle_connect(opts, good_password_f); },
             "connect_bad_perms_ok_prompt: fails to connect");
-
-    options_free(&opts);
 }
 
 int main() {

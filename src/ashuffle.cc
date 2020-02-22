@@ -240,7 +240,7 @@ int try_first(struct mpd_connection *mpd, ShuffleChain *songs) {
 }
 
 int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
-                struct ashuffle_options *options) {
+                const Options &options) {
     struct mpd_status *status = mpd_run_status(mpd);
 
     /* Check for error while fetching the status */
@@ -265,8 +265,8 @@ int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
         /* Always add if we've progressed past the last song. Even if
          * --queue_buffer, we should have already enqueued a song by now. */
         should_add = true;
-    } else if (options->queue_buffer != ARGS_QUEUE_BUFFER_NONE &&
-               queue_songs_remaining < options->queue_buffer) {
+    } else if (options.queue_buffer != 0 &&
+               queue_songs_remaining < options.queue_buffer) {
         /* If a queue buffer is set, check to see how any songs are left. If
          * we're past the end of our queue buffer, allow enquing a song. */
         should_add = true;
@@ -277,8 +277,8 @@ int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
 
     /* Add another song to the list and restart the player */
     if (should_add) {
-        if (options->queue_buffer != ARGS_QUEUE_BUFFER_NONE) {
-            unsigned to_enqueue = options->queue_buffer;
+        if (options.queue_buffer != 0) {
+            unsigned to_enqueue = options.queue_buffer;
             // If we're not currently "on" a song, then we need to not only
             // enqueue options->queue_buffer songs, but also the song we're
             // about to play, so increment the `to_enqueue' count by one.
@@ -317,8 +317,7 @@ int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
 
 /* Keep adding songs when the queue runs out */
 int shuffle_loop(struct mpd_connection *mpd, ShuffleChain *songs,
-                 struct ashuffle_options *options,
-                 struct shuffle_test_delegate *test_d) {
+                 const Options &options, struct shuffle_test_delegate *test_d) {
     static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
                   "QUEUE Now different signal.");
     enum mpd_idle idle_mask =
@@ -345,9 +344,9 @@ int shuffle_loop(struct mpd_connection *mpd, ShuffleChain *songs,
         bool idle_player = !!(event & MPD_IDLE_PLAYER);
         /* Only update the database if our original list was built from
          * MPD. */
-        if (idle_db && options->file_in == NULL) {
+        if (idle_db && options.file_in == NULL) {
             songs->Empty();
-            build_songs_mpd(mpd, options->ruleset, songs);
+            build_songs_mpd(mpd, options.ruleset, songs);
             printf("Picking random songs out of a pool of %u.\n", songs->Len());
         } else if (idle_queue || idle_player) {
             if (try_enqueue(mpd, songs, options) != 0) {
@@ -432,51 +431,47 @@ bool is_mpd_password_needed(struct mpd_connection *mpd) {
     return password_needed;
 }
 
-struct mpd_host {
-    char *host;
-    char *password;
+struct MPDHost {
+    std::string host;
+    std::optional<std::string> password;
+
+    MPDHost(std::string_view in) {
+        std::size_t idx = in.find("@");
+        if (idx != std::string_view::npos) {
+            password = in.substr(0, idx);
+            host = in.substr(idx + 1, in.size() - idx);
+        } else {
+            host = in;
+        }
+    }
 };
 
-void parse_mpd_host(char *mpd_host, struct mpd_host *o_mpd_host) {
-    char *at = strrchr(mpd_host, '@');
-    if (at != NULL) {
-        o_mpd_host->host = &at[1];
-        o_mpd_host->password = mpd_host;
-        *at = '\0';
-    } else {
-        o_mpd_host->host = mpd_host;
-        o_mpd_host->password = NULL;
-    }
-}
-
-struct mpd_connection *ashuffle_connect(struct ashuffle_options *options,
+struct mpd_connection *ashuffle_connect(const Options &options,
                                         char *(*getpass_f)()) {
-    assert(options != NULL && "options should always be set");
     struct mpd_connection *mpd;
 
     /* Attempt to get host from command line if available. Otherwise use
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
-    char *mpd_host_raw =
-        options->host
-            ? options->host
+    std::string mpd_host_raw =
+        options.host.has_value()
+            ? *options.host
             : getenv("MPD_HOST") ? getenv("MPD_HOST") : xstrdup("localhost");
-    struct mpd_host mpd_host;
-    parse_mpd_host(mpd_host_raw, &mpd_host);
+    MPDHost mpd_host(mpd_host_raw);
 
     /* Same thing for the port, use the command line defined port, environment
      * defined, or the default port */
     unsigned mpd_port =
-        options->port
-            ? options->port
+        options.port
+            ? options.port
             : (unsigned)(getenv("MPD_PORT") ? atoi(getenv("MPD_PORT")) : 6600);
 
     /* Create a new connection to mpd */
-    mpd = mpd_connection_new(mpd_host.host, mpd_port, TIMEOUT);
+    mpd = mpd_connection_new(mpd_host.host.data(), mpd_port, TIMEOUT);
 
     if (mpd == NULL) {
         die("Could not connect due to lack of memory.");
     } else if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        die("Could not connect to %s:%u.", mpd_host.host, mpd_port);
+        die("Could not connect to %s:%u.", mpd_host.host.data(), mpd_port);
     }
 
     /* Password Workflow:
@@ -487,12 +482,12 @@ struct mpd_connection *ashuffle_connect(struct ashuffle_options *options,
      * 3. If the user successfully entered a password, then check that all
      *    required commands can be executed again. If we still can't execute
      *    all required commands, then fail. */
-    if (mpd_host.password != NULL) {
-        mpd_run_password(mpd, mpd_host.password);
+    if (mpd_host.password.has_value()) {
+        mpd_run_password(mpd, mpd_host.password->data());
         mpd_perror_if_error(mpd);
     }
     bool need_mpd_password = is_mpd_password_needed(mpd);
-    if (mpd_host.password != NULL && need_mpd_password) {
+    if (mpd_host.password.has_value() && need_mpd_password) {
         die("password applied, but required command still not allowed.");
     }
     if (need_mpd_password) {
