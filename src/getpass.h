@@ -2,6 +2,7 @@
 #define __ASHUFFLE_GETPASS_H__
 
 #include <cstdio>
+#include <string>
 #include <string_view>
 
 // GetPass obtains a password from the user. It writes the given prompt to

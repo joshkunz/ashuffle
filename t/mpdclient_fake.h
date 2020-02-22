@@ -1,13 +1,19 @@
-#ifndef __MPDCLIENT_FAKE_H__
-#define __MPDCLIENT_FAKE_H__
+#ifndef __ASHUFFLE_T_MPDCLIENT_FAKE_H__
+#define __ASHUFFLE_T_MPDCLIENT_FAKE_H__
 
 #include <deque>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
-#include <mpd/client.h>
+#include <mpd/error.h>
+#include <mpd/idle.h>
+#include <mpd/pair.h>
+#include <mpd/protocol.h>
+#include <mpd/status.h>
+#include <mpd/tag.h>
 
 struct TagValue {
     enum mpd_tag_type tag;

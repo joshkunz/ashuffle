@@ -3,8 +3,7 @@
 
 #include <deque>
 #include <string>
-
-class ShuffleChainIter;
+#include <vector>
 
 class ShuffleChain {
    public:

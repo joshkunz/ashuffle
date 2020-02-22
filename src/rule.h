@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include <mpd/client.h>
+#include <mpd/tag.h>
 
 // Internal API.
 struct Pattern {

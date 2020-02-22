@@ -1,9 +1,6 @@
-#include <errno.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <string.h>
+#include <string_view>
 
-#include <mpd/client.h>
+#include <mpd/tag.h>
 #include <tap.h>
 
 #include "rule.h"

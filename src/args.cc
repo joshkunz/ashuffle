@@ -2,8 +2,8 @@
 #include <cstdio>
 #include <string_view>
 
-#include "absl/strings/numbers.h"
-#include "absl/strings/str_format.h"
+#include <absl/strings/numbers.h>
+#include <absl/strings/str_format.h>
 
 #include "args.h"
 #include "rule.h"

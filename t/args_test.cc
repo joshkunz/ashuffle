@@ -1,10 +1,11 @@
-#include <assert.h>
-#include <errno.h>
-#include <stdarg.h>
-#include <stdbool.h>
-#include <string.h>
+#include <stdio.h>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <variant>
+#include <vector>
 
-#include <mpd/client.h>
+#include <mpd/tag.h>
 #include <tap.h>
 
 #include "args.h"
@@ -23,8 +24,6 @@ std::optional<ParseError> ParseOnly(Args... strs) {
     return std::nullopt;
 }
 
-#define PARSE_ONLY(...) ParseOnly(__VA_ARGS__)
-
 void test_default() {
     auto result = Options::Parse(std::vector<std::string>());
     ok(std::get_if<ParseError>(&result) == nullptr, "empty parse works");
@@ -32,7 +31,7 @@ void test_default() {
     Options opts = std::get<Options>(result);
     ok(opts.ruleset.empty(), "no rules by default");
     cmp_ok(opts.queue_only, "==", 0, "no 'queue only' by default");
-    ok(opts.file_in == NULL, "no input file by default");
+    ok(opts.file_in == nullptr, "no input file by default");
     cmp_ok(opts.check_uris, "==", true, "check_uris on by default");
     cmp_ok(opts.queue_buffer, "==", 0, "no queue buffer by default");
     ok(opts.host == std::nullopt, "no host by default");
@@ -93,7 +92,7 @@ void test_basic_long() {
 
     cmp_ok(opts.ruleset.size(), ">=", 1, "basic long detected rule");
     cmp_ok(opts.queue_only, "==", 5, "basic long queue only");
-    ok(opts.file_in != NULL, "basic file in present");
+    ok(opts.file_in != nullptr, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic long nocheck");
     cmp_ok(opts.queue_buffer, "==", 10, "basic long queue buffer");
     ok(opts.host == "foo", "basic long host");
@@ -120,7 +119,7 @@ void test_basic_mixed_long_short() {
 
     cmp_ok(opts.ruleset.size(), ">=", 1, "basic mixed detected rule");
     cmp_ok(opts.queue_only, "==", 5, "basic mixed queue only");
-    ok(opts.file_in != NULL, "basic file in present");
+    ok(opts.file_in != nullptr, "basic file in present");
     cmp_ok(opts.check_uris, "==", false, "basic mixed nocheck");
     cmp_ok(opts.queue_buffer, "==", 10, "basic mixed queue buffer");
 }

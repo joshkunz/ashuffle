@@ -1,16 +1,16 @@
+#include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <cassert>
 #include <iostream>
 #include <string>
 #include <variant>
 #include <vector>
 
-#include <mpd/client.h>
+#include <mpd/connection.h>
 
 #include "args.h"
 #include "ashuffle.h"
-#include "getpass.h"
-#include "rule.h"
 #include "shuffle.h"
 
 int main(int argc, const char *argv[]) {

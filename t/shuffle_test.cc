@@ -1,15 +1,13 @@
+#include <stdlib.h>
 #include <algorithm>
-#include <iostream>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
-#include "absl/strings/str_cat.h"
-
+#include <absl/strings/str_cat.h>
 #include <tap.h>
 
 #include "shuffle.h"
-
-#include "t/helpers.h"
 
 void test_basic() {
     ShuffleChain chain;

@@ -1,14 +1,22 @@
+#include "mpdclient_fake.h"
+
 #include <algorithm>
 #include <cassert>
-#include <cstdio>
-#include <cstdlib>
 #include <iostream>
+#include <memory>
+#include <utility>
 
-#include "absl/strings/str_format.h"
-
-#include <mpd/client.h>
-
-#include "mpdclient_fake.h"
+#include <absl/strings/str_format.h>
+#include <mpd/capabilities.h>
+#include <mpd/connection.h>
+#include <mpd/database.h>
+#include <mpd/pair.h>
+#include <mpd/password.h>
+#include <mpd/player.h>
+#include <mpd/queue.h>
+#include <mpd/recv.h>
+#include <mpd/search.h>
+#include <mpd/song.h>
 
 #define UNUSED __attribute__((unused))
 

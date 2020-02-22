@@ -1,12 +1,9 @@
-#ifndef __T_HELPERS_H__
-#define __T_HELPERS_H__
+#ifndef __ASHUFFLE_T_HELPERS_H__
+#define __ASHUFFLE_T_HELPERS_H__
 
 #include <vector>
 
 #include "mpdclient_fake.h"
-
-// Evaluates to the length of static array "a".
-#define STATIC_ARRAY_LEN(a) (sizeof(a) / sizeof((a)[0]))
 
 // Define a tag value on a song. Used with `TEST_SONG`.
 #define TAG(name, value) \

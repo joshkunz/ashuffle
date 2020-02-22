@@ -1,10 +1,21 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <deque>
+#include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <variant>
 #include <vector>
 
-#include <mpd/client.h>
+#include <mpd/error.h>
+#include <mpd/idle.h>
+#include <mpd/pair.h>
+#include <mpd/status.h>
+#include <mpd/tag.h>
 #include <tap.h>
 
 #include "args.h"
@@ -98,7 +109,7 @@ void test_build_songs_file_nocheck() {
     struct mpd_song song_c("song_c");
 
     FILE *f = tmpfile();
-    if (f == NULL) {
+    if (f == nullptr) {
         perror("couldn't open tmpfile");
         abort();
     }
@@ -195,7 +206,7 @@ void test_build_songs_file_check() {
 
     // step 5. Set up our test input file, but writing the URIs of our songs.
     FILE *f = tmpfile();
-    if (f == NULL) {
+    if (f == nullptr) {
         perror("couldn't open tmpfile");
         abort();
     }
@@ -598,9 +609,9 @@ struct ConnectTestCase {
     // Password is the password that will be set for the fake MPD server.
     std::optional<std::string> password = std::nullopt;
     // Env are the values that will be stored in the MPD_* environment
-    // variables. If they are NULL or 0, they will remain unset.
+    // variables. If they are nullptr or 0, they will remain unset.
     HostPort env = {};
-    // Flag are the values that will be given in flags. If they are NULL
+    // Flag are the values that will be given in flags. If they are nullptr
     // or 0, the respective flag will not be set.
     HostPort flag = {};
 };

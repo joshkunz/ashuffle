@@ -1,9 +1,9 @@
 #ifndef __ASHUFFLE_ASHUFFLE_H__
 #define __ASHUFFLE_ASHUFFLE_H__
 
+#include <cstdio>
+#include <string>
 #include <vector>
-
-#include <stdio.h>
 
 #include <mpd/client.h>
 

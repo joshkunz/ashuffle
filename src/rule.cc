@@ -3,7 +3,7 @@
 #include <cctype>
 #include <string>
 
-#include <mpd/client.h>
+#include <mpd/song.h>
 
 #include "rule.h"
 
