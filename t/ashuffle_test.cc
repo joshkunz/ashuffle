@@ -1,7 +1,6 @@
+#include <algorithm>
 #include <cassert>
 #include <cstring>
-
-#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -561,9 +560,9 @@ void test_shuffle_loop_buffer_partial() {
     }
 }
 
-static char *failing_getpass_f() {
+static std::string failing_getpass_f() {
     fail("called failing getpass!");
-    return strdup("");  // unreachable
+    return "";
 }
 
 void test_connect_no_password() {
@@ -736,9 +735,9 @@ void test_connect_env_password() {
 
 static unsigned _GOOD_PASSWORD_COUNT = 0;
 
-char *good_password_f() {
+std::string good_password_f() {
     _GOOD_PASSWORD_COUNT += 1;
-    return strdup("good_password");
+    return "good_password";
 }
 
 void test_connect_env_bad_password() {

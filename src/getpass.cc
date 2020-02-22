@@ -1,51 +1,53 @@
-#include <assert.h>
-#include <stdbool.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <cstdlib>
+#include <string>
 
 #include "getpass.h"
 
-#define DEFAULT_GETLINE_BUFSIZE 100
+namespace {
 
-#define set_flag(field, flag, state) \
-    do {                             \
-        if ((state)) {               \
-            (field) |= (flag);       \
-        } else {                     \
-            (field) &= ~(flag);      \
-        }                            \
-    } while (0)
-
-static void set_echo(FILE *stream, bool echo_state, bool echo_nl_state) {
-    struct termios flags;
-    int res = tcgetattr(fileno(stream), &flags);
-    if (res != 0) {
-        perror("set_echo (tcgetattr)");
-        exit(1);
-    }
-    set_flag(flags.c_lflag, ECHO, echo_state);
-    set_flag(flags.c_lflag, ECHONL, echo_nl_state);
-    res = tcsetattr(fileno(stream), TCSANOW, &flags);
-    if (res != 0) {
-        perror("set_echo (tcsetattr)");
-        exit(1);
+template <typename FieldT, typename FlagT>
+void SetFlag(FieldT &field, FlagT flag, bool state) {
+    if (state) {
+        field |= flag;
+    } else {
+        field &= ~flag;
     }
 }
 
-char *as_getpass(FILE *in_stream, FILE *out_stream, const char *prompt) {
-    if (fwrite(prompt, strlen(prompt), 1, out_stream) != 1) {
+void SetEcho(FILE *stream, bool echo_state, bool echo_nl_state) {
+    struct termios flags;
+    int res = tcgetattr(fileno(stream), &flags);
+    if (res != 0) {
+        perror("SetEcho (tcgetattr)");
+        std::exit(1);
+    }
+    SetFlag(flags.c_lflag, ECHO, echo_state);
+    SetFlag(flags.c_lflag, ECHONL, echo_nl_state);
+    res = tcsetattr(fileno(stream), TCSANOW, &flags);
+    if (res != 0) {
+        perror("SetEcho (tcsetattr)");
+        std::exit(1);
+    }
+}
+
+}  // namespace
+
+std::string GetPass(FILE *in_stream, FILE *out_stream,
+                    std::string_view prompt) {
+    if (fwrite(prompt.data(), prompt.size(), 1, out_stream) != 1) {
         perror("getpass (fwrite)");
-        exit(1);
+        std::exit(1);
     }
     if (fflush(out_stream) != 0) {
         perror("getpass (fflush)");
-        exit(1);
+        std::exit(1);
     }
 
-    set_echo(out_stream, false, true);
+    SetEcho(out_stream, false, true);
 
     char *result = NULL;
     size_t result_size = 0;
@@ -59,7 +61,7 @@ char *as_getpass(FILE *in_stream, FILE *out_stream, const char *prompt) {
         result[result_len - 1] = '\0';
     }
 
-    set_echo(out_stream, true, true);
+    SetEcho(out_stream, true, true);
 
     return result;
 }

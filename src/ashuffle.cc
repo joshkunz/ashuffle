@@ -1,12 +1,8 @@
-#include <assert.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
 #include <algorithm>
 #include <array>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -364,19 +360,20 @@ int shuffle_loop(struct mpd_connection *mpd, ShuffleChain *songs,
     return 0;
 }
 
-static char *default_getpass() {
-    return as_getpass(stdin, stdout, "mpd password: ");
+static std::string DefaultGetPass() {
+    return GetPass(stdin, stdout, "mpd password: ");
 }
 
-static void get_mpd_password(struct mpd_connection *mpd, char *(*getpass_f)()) {
-    char *(*do_getpass)() = getpass_f;
+static void get_mpd_password(struct mpd_connection *mpd,
+                             std::string (*getpass_f)()) {
+    std::string (*do_getpass)() = getpass_f;
     if (do_getpass == NULL) {
-        do_getpass = default_getpass;
+        do_getpass = DefaultGetPass;
     }
     /* keep looping till we get a bad error, or we get a good password. */
     while (true) {
-        char *pass = do_getpass();
-        mpd_run_password(mpd, pass);
+        std::string pass = do_getpass();
+        mpd_run_password(mpd, pass.data());
         const enum mpd_error err = mpd_connection_get_error(mpd);
         if (err == MPD_ERROR_SUCCESS) {
             return;
@@ -440,7 +437,7 @@ struct MPDHost {
 };
 
 struct mpd_connection *ashuffle_connect(const Options &options,
-                                        char *(*getpass_f)()) {
+                                        std::string (*getpass_f)()) {
     struct mpd_connection *mpd;
 
     /* Attempt to get host from command line if available. Otherwise use

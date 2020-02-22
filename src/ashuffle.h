@@ -18,7 +18,7 @@ extern const int WINDOW_SIZE;
 // for a password. If `getpass_f' is NULL, the a default password prompt
 // (based on getpass) will be used.
 struct mpd_connection* ashuffle_connect(const Options& options,
-                                        char* (*getpass_f)());
+                                        std::string (*getpass_f)());
 
 // Build a `shuffle_chain` of songs from URIs in the given file.
 int build_songs_file(struct mpd_connection* mpd,
