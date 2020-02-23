@@ -11,6 +11,8 @@
 #include "rule.h"
 #include "shuffle.h"
 
+namespace ashuffle {
+
 extern const int WINDOW_SIZE;
 
 // `MPD_PORT` environment variables. If a password is needed, no password can
@@ -44,4 +46,7 @@ struct shuffle_test_delegate {
 // NULL during normal operations.
 int shuffle_loop(struct mpd_connection* mpd, ShuffleChain* songs,
                  const Options& options, struct shuffle_test_delegate*);
+
+}  // namespace ashuffle
+
 #endif

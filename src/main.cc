@@ -13,6 +13,8 @@
 #include "ashuffle.h"
 #include "shuffle.h"
 
+using namespace ashuffle;
+
 int main(int argc, const char *argv[]) {
     std::variant<Options, ParseError> parse = Options::ParseFromC(argv, argc);
     if (ParseError *err = std::get_if<ParseError>(&parse); err != nullptr) {

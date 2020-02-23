@@ -26,6 +26,8 @@
 #include "t/helpers.h"
 #include "t/mpdclient_fake.h"
 
+using namespace ashuffle;
+
 void xclearenv() {
     if (clearenv()) {
         perror("xclearenv");

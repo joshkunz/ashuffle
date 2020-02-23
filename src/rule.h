@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
+#include <mpd/song.h>
 #include <mpd/tag.h>
+
+namespace ashuffle {
 
 // Internal API.
 struct Pattern {
@@ -57,5 +60,7 @@ class Rule {
     std::vector<Pattern> patterns_;
     Type type_;
 };
+
+}  // namespace ashuffle
 
 #endif

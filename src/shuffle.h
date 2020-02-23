@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+namespace ashuffle {
+
 class ShuffleChain {
    public:
     // By default, create a new shuffle chain with a window-size of 1.
@@ -38,5 +40,7 @@ class ShuffleChain {
     std::deque<std::string> _window;
     std::deque<std::string> _pool;
 };
+
+}  // namespace ashuffle
 
 #endif

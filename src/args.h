@@ -10,6 +10,8 @@
 
 #include "rule.h"
 
+namespace ashuffle {
+
 struct ParseError {
     enum Type {
         kUnknown,  // Initial error type, unknown error.
@@ -58,5 +60,7 @@ class Options {
 
 // Print the help message on the given output stream.
 void PrintHelp(FILE *output_stream);
+
+}  // namespace ashuffle
 
 #endif

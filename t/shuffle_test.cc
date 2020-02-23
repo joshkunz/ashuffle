@@ -9,6 +9,8 @@
 
 #include "shuffle.h"
 
+using namespace ashuffle;
+
 void test_basic() {
     ShuffleChain chain;
     std::string test_str("test");

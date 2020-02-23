@@ -34,6 +34,8 @@ void SetEcho(FILE *stream, bool echo_state, bool echo_nl_state) {
 
 }  // namespace
 
+namespace ashuffle {
+
 std::string GetPass(FILE *in_stream, FILE *out_stream,
                     std::string_view prompt) {
     if (fwrite(prompt.data(), prompt.size(), 1, out_stream) != 1) {
@@ -63,3 +65,5 @@ std::string GetPass(FILE *in_stream, FILE *out_stream,
 
     return result;
 }
+
+}  // namespace ashuffle

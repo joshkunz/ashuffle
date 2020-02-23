@@ -7,6 +7,8 @@
 
 #include "rule.h"
 
+namespace ashuffle {
+
 Rule::Status Rule::AddPattern(const std::string &field, std::string value) {
     Pattern p;
     p.tag = mpd_tag_name_iparse(field.data());
@@ -20,7 +22,7 @@ Rule::Status Rule::AddPattern(const std::string &field, std::string value) {
     return Status::kOK;
 }
 
-bool Rule::Accepts(const struct mpd_song *song) const {
+bool Rule::Accepts(const struct ::mpd_song *song) const {
     assert(type_ == Rule::Type::kExclude &&
            "only exclusion rules are supported");
     for (const Pattern &p : patterns_) {
@@ -45,3 +47,5 @@ bool Rule::Accepts(const struct mpd_song *song) const {
     }
     return true;
 }
+
+}  // namespace ashuffle

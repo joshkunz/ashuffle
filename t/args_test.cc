@@ -14,6 +14,8 @@
 #include "t/helpers.h"
 #include "t/mpdclient_fake.h"
 
+using namespace ashuffle;
+
 template <typename... Args>
 std::optional<ParseError> ParseOnly(Args... strs) {
     std::vector<std::string> args = {strs...};

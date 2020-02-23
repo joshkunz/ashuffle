@@ -8,6 +8,7 @@
 #include "args.h"
 #include "rule.h"
 
+namespace ashuffle {
 namespace {
 
 constexpr char kHelpMessage[] =
@@ -265,3 +266,5 @@ std::variant<Options, ParseError> Options::Parse(
 }
 
 void PrintHelp(FILE* output) { fputs(kHelpMessage, output); }
+
+}  // namespace ashuffle

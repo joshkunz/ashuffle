@@ -42,6 +42,8 @@ void Die(Args... strs) {
 
 }  // namespace
 
+namespace ashuffle {
+
 /* 25 seconds is the default timeout */
 static const int TIMEOUT = 25000;
 
@@ -502,3 +504,5 @@ struct mpd_connection *ashuffle_connect(const Options &options,
     }
     return mpd;
 }
+
+}  // namespace ashuffle

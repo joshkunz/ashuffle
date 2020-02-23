@@ -8,6 +8,8 @@
 #include "t/helpers.h"
 #include "t/mpdclient_fake.h"
 
+using namespace ashuffle;
+
 static void test_basic() {
     Rule rule;
 

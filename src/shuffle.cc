@@ -5,6 +5,8 @@
 
 #include "shuffle.h"
 
+namespace ashuffle {
+
 void ShuffleChain::Empty() {
     _window.clear();
     _pool.clear();
@@ -39,3 +41,5 @@ std::vector<std::string> ShuffleChain::Items() {
     items.insert(items.end(), _pool.begin(), _pool.end());
     return items;
 }
+
+}  // namespace ashuffle
