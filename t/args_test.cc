@@ -259,6 +259,17 @@ void test_test_option() {
            "test_option: print_all_songs_and_exit is set");
 }
 
+void test_parse_from_c() {
+    const char *c_argv[] = {"ashuffle", "-o", "33"};
+    auto res = Options::ParseFromC(c_argv, 3);
+    Options *opts = std::get_if<Options>(&res);
+    ok(opts != nullptr, "parse_from_c: parses correctly");
+    skip(opts == nullptr, 1, "no options parsed");
+    cmp_ok(opts->queue_only, "==", 33,
+           "parse_from_c: parses queue_only correctly");
+    end_skip;
+}
+
 int main() {
     plan(NO_PLAN);
 
@@ -273,6 +284,7 @@ int main() {
     test_partials();
     test_rule_basic();
     test_test_option();
+    test_parse_from_c();
 
     done_testing();
 }

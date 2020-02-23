@@ -48,7 +48,8 @@ class Options {
     static std::variant<Options, ParseError> ParseFromC(const char **argv,
                                                         int argc) {
         std::vector<std::string> args;
-        for (int i = 0; i < argc; i++) {
+        // Start from '1' to skip the program name itself.
+        for (int i = 1; i < argc; i++) {
             args.push_back(argv[i]);
         }
         return Options::Parse(args);
