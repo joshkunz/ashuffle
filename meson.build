@@ -31,6 +31,7 @@ low_dep_sources = files(
 	'src/getpass.cc',
 	'src/rule.cc',
     'src/shuffle.cc',
+    'src/mpd.cc'
 )
 
 sources = low_dep_sources + high_dep_sources
