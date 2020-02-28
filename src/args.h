@@ -8,6 +8,7 @@
 #include <variant>
 #include <vector>
 
+#include "mpd.h"
 #include "rule.h"
 
 namespace ashuffle {
@@ -28,7 +29,7 @@ struct ParseError {
 
 class Options {
    public:
-    std::vector<Rule> ruleset = {};
+    std::vector<Rule> ruleset;
     unsigned queue_only = 0;
     FILE *file_in = nullptr;
     bool check_uris = true;
@@ -43,18 +44,19 @@ class Options {
     // Parse parses the arguments in the given vector and returns ParseResult
     // based on the success/failure of the parse.
     static std::variant<Options, ParseError> Parse(
-        const std::vector<std::string> &);
+        std::unique_ptr<mpd::TagParser>, const std::vector<std::string> &);
 
     // ParseFromC parses the arguments in the given c-style arguments list,
     // like would be given in `main`.
-    static std::variant<Options, ParseError> ParseFromC(const char **argv,
-                                                        int argc) {
+    static std::variant<Options, ParseError> ParseFromC(
+        std::unique_ptr<mpd::TagParser> tag_parser, const char **argv,
+        int argc) {
         std::vector<std::string> args;
         // Start from '1' to skip the program name itself.
         for (int i = 1; i < argc; i++) {
             args.push_back(argv[i]);
         }
-        return Options::Parse(args);
+        return Options::Parse(std::move(tag_parser), args);
     }
 };
 

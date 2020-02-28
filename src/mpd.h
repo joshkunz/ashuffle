@@ -4,42 +4,39 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
 #include <mpd/idle.h>
-#include <mpd/tag.h>
 #include <mpd/status.h>
+#include <mpd/tag.h>
 
 namespace ashuffle {
 namespace mpd {
 
-constexpr unsigned kDefaultTimeout = 25000;  // 25 seconds.
-
 class TagParser {
-public:
+   public:
     // Parse parses the given tag, and returns the appropriate tag type.
     // If no matching tag is found, then an empty optional is returned.
-    virtual std::optional<enum mpd_tag_type> Parse(const std::string& tag) = 0;
+    virtual std::optional<enum mpd_tag_type> Parse(
+        const std::string_view tag) = 0;
     virtual ~TagParser(){};
 };
 
-// DefaultParser returns the default TagParser.
-std::unique_ptr<TagParser> DefaultParser();
-
 class Song {
-public:
+   public:
     virtual ~Song(){};
 
     // Get the given tag for this song.
     virtual std::optional<std::string> Tag(enum mpd_tag_type tag) const = 0;
 
-    // Returns the URI of this song. 
+    // Returns the URI of this song.
     virtual std::string URI() const = 0;
 };
 
 class Status {
-public:
+   public:
     virtual ~Status(){};
 
     // Return the current queue length. Returns 0 if the queue is empty.
@@ -53,14 +50,14 @@ public:
     // played, or the queue is empty) then an empty option is returned;
     virtual std::optional<int> SongPosition() const = 0;
 
-    // Returns the current play state of the player. 
+    // Returns the current play state of the player.
     virtual enum mpd_state State() const = 0;
 };
 
 // SongReader is a helper for iterating over a list of songs fetched from
 // MPD.
 class SongReader {
-public:
+   public:
     virtual ~SongReader(){};
 
     // Next returns the next song from the iterator, or an empty option if
@@ -79,24 +76,18 @@ struct IdleEventSet {
     int events;
 
     // Add adds the given event to the set.
-    void Add(enum mpd_idle event) {
-        events |= event;
-    }
+    void Add(enum mpd_idle event) { events |= event; }
 
     // Has returns true if the given event is in the set.
-    bool Has(enum mpd_idle event) const {
-        return !!(events & event);
-    }
+    bool Has(enum mpd_idle event) const { return !!(events & event); }
 
     // Enum is a helper, that returns an enum representation of `events`.
-    enum mpd_idle Enum() const {
-        return static_cast<enum mpd_idle>(events);
-    }
+    enum mpd_idle Enum() const { return static_cast<enum mpd_idle>(events); }
 };
 
 // Address represents the dial address of a given MPD instance.
 struct Address {
-    // host is the hostname of the MPD instance. 
+    // host is the hostname of the MPD instance.
     std::string host = "";
     // Port is the TCP port the MPD instance is listening on.
     unsigned port = 0;
@@ -104,7 +95,7 @@ struct Address {
 
 // MPD represents a connection to an MPD instance.
 class MPD {
-public:
+   public:
     virtual ~MPD(){};
 
     // Pauses the player.
@@ -125,7 +116,8 @@ public:
 
     // Searches MPD's DB for a particular song URI, and returns that song.
     // Returns an empty optional if the song could not be found.
-    virtual std::optional<std::unique_ptr<Song>> Search(const std::string &uri) = 0;
+    virtual std::optional<std::unique_ptr<Song>> Search(
+        const std::string& uri) = 0;
 
     // Blocks until one of the enum mpd_idle events in the event set happens.
     // A new event set is returned, containing all events that occured during
@@ -134,19 +126,23 @@ public:
 
     // Add, adds the song wit the given URI to the MPD queue.
     virtual void Add(const std::string& uri) = 0;
+
+    enum PasswordStatus {
+        kAccepted,
+        kRejected,
+    };
+    // ApplyPassword applies the given password to the MPD connection. If
+    // the password was received by MPD successfully, a PasswordStatus is
+    // returned.
+    virtual PasswordStatus ApplyPassword(const std::string& password) = 0;
+
+    // CheckCommandsAllowed checks that the given commands are allowed on
+    // the MPD connection.
+    virtual bool CheckCommandsAllowed(
+        const std::vector<std::string_view>& cmds) = 0;
 };
 
-// Connect to MPD at the given address. On connection, MPD verfies that
-// the given `required commands` can be run. It also uses the given
-// password to log-in if provided. Required commands are checked after
-// login.
-std::variant<std::unique_ptr<MPD>, std::string>
-Connect(const Address& addr,
-        const std::vector<std::string> &required_commands,
-        unsigned timeout_ms = kDefaultTimeout,
-        std::optional<std::string_view> password = std::nullopt);
+}  // namespace mpd
+}  // namespace ashuffle
 
-} // namespace mpd
-} // namespace ashuffle
-
-#endif // __ASHUFFLE_MPD_H__
+#endif  // __ASHUFFLE_MPD_H__

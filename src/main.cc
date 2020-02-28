@@ -11,12 +11,14 @@
 
 #include "args.h"
 #include "ashuffle.h"
+#include "mpd_client.h"
 #include "shuffle.h"
 
 using namespace ashuffle;
 
 int main(int argc, const char *argv[]) {
-    std::variant<Options, ParseError> parse = Options::ParseFromC(argv, argc);
+    std::variant<Options, ParseError> parse =
+        Options::ParseFromC(mpd::client::Parser(), argv, argc);
     if (ParseError *err = std::get_if<ParseError>(&parse); err != nullptr) {
         switch (err->type) {
             case ParseError::Type::kUnknown:

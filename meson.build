@@ -24,6 +24,7 @@ libmpdclient = dependency('libmpdclient')
 
 high_dep_sources = files(
     'src/ashuffle.cc',
+    'src/mpd_client.cc',
 )
 
 low_dep_sources = files(
@@ -31,7 +32,6 @@ low_dep_sources = files(
 	'src/getpass.cc',
 	'src/rule.cc',
     'src/shuffle.cc',
-    'src/mpd.cc'
 )
 
 sources = low_dep_sources + high_dep_sources

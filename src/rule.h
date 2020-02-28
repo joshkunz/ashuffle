@@ -4,8 +4,9 @@
 #include <string>
 #include <vector>
 
-#include <mpd/song.h>
 #include <mpd/tag.h>
+
+#include "mpd.h"
 
 namespace ashuffle {
 
@@ -13,6 +14,8 @@ namespace ashuffle {
 struct Pattern {
     enum mpd_tag_type tag;
     std::string value;
+
+    Pattern(enum mpd_tag_type t, std::string_view v) : tag(t), value(v){};
 };
 
 // Rule represents a set of patterns (song attribute/value pairs) that should
@@ -27,10 +30,8 @@ class Rule {
         kExclude,
     };
 
-    // Construct a new exclusion rule.
+    // Construct a new exclusion rule .
     Rule() : Rule(Type::kExclude){};
-
-    // Construct a new rule with the specific type.
     Rule(Type t) : type_(t){};
 
     // Type returns the type of this rule.
@@ -39,26 +40,18 @@ class Rule {
     // Empty returns true when this rule matches no patterns.
     inline bool Empty() const { return patterns_.empty(); }
 
-    // Status is the type returned from AddPattern. If the pattern was
-    // successfully added, kOK is returned. If we failed to add the pattern,
-    // we return kFail.
-    enum Status {
-        kOK,
-        kFail,
-    };
-
     // Add the given pattern to this rule.
-    Status AddPattern(const std::string &field, std::string value);
+    void AddPattern(enum mpd_tag_type, std::string value);
 
     // Returns true if the given song is "accepted" by the rule. Whether or
     // not a song is accepted depends on the "type" of the rule. E.g., for an
     // exclude rule (type kExclude) if the song matched a rule pattern, the
     // song would *not* be accepted.
-    bool Accepts(const struct mpd_song *song) const;
+    bool Accepts(const mpd::Song &song) const;
 
    private:
-    std::vector<Pattern> patterns_;
     Type type_;
+    std::vector<Pattern> patterns_;
 };
 
 }  // namespace ashuffle

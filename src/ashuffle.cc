@@ -27,6 +27,8 @@
 #include "args.h"
 #include "ashuffle.h"
 #include "getpass.h"
+#include "mpd.h"
+#include "mpd_client.h"
 #include "rule.h"
 #include "shuffle.h"
 
@@ -69,7 +71,7 @@ void mpd_perror_if_error(struct mpd_connection *mpd) {
 
 /* check wheter a song is allowed by the given ruleset */
 bool ruleset_accepts_song(const std::vector<Rule> &ruleset,
-                          struct mpd_song *song) {
+                          const mpd::Song &song) {
     for (const Rule &rule : ruleset) {
         if (!rule.Accepts(song)) {
             return false;
@@ -88,15 +90,13 @@ bool ruleset_accepts_uri(struct mpd_connection *mpd,
         mpd_perror(mpd);
     }
 
-    struct mpd_song *song = mpd_recv_song(mpd);
+    struct mpd_song *raw_song = mpd_recv_song(mpd);
     mpd_perror_if_error(mpd);
-    if (song != NULL) {
-        if (ruleset_accepts_song(ruleset, song)) {
+    if (raw_song != nullptr) {
+        std::unique_ptr<mpd::Song> song = mpd::client::LiftLegacySong(raw_song);
+        if (ruleset_accepts_song(ruleset, *song)) {
             accepted = true;
         }
-
-        /* free the song we got from MPD */
-        mpd_song_free(song);
 
         /* even though we're searching for a single song, libmpdclient
          * still acts like we're reading a song list. We read an aditional
@@ -210,7 +210,7 @@ int build_songs_mpd(struct mpd_connection *mpd,
     }
 
     /* parse out the pairs */
-    struct mpd_song *song = mpd_recv_song(mpd);
+    struct mpd_song *raw_song = mpd_recv_song(mpd);
     const enum mpd_error err = mpd_connection_get_error(mpd);
     if (err == MPD_ERROR_CLOSED) {
         Die("MPD server closed the connection while getting the list of\n"
@@ -220,13 +220,13 @@ int build_songs_mpd(struct mpd_connection *mpd,
     } else if (err != MPD_ERROR_SUCCESS) {
         mpd_perror(mpd);
     }
-    for (; song; song = mpd_recv_song(mpd)) {
+    for (; raw_song != nullptr; raw_song = mpd_recv_song(mpd)) {
+        std::unique_ptr<mpd::Song> song = mpd::client::LiftLegacySong(raw_song);
+
         /* if this song is allowed, add it to the list */
-        if (ruleset_accepts_song(ruleset, song)) {
-            songs->Add(mpd_song_get_uri(song));
+        if (ruleset_accepts_song(ruleset, *song)) {
+            songs->Add(song->URI());
         }
-        /* free the current song */
-        mpd_song_free(song);
     }
     return 0;
 }

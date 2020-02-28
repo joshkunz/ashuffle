@@ -59,8 +59,10 @@ class Parser {
     // a parser error.
     std::variant<Options, ParseError> Finish();
 
-    // Constructs an empty parser.
-    Parser() : state_(kNone){};
+    // Constructs an empty parser. The given tagger is used to resolve
+    // exclusion rule field names.
+    Parser(std::unique_ptr<mpd::TagParser> tag_parser)
+        : state_(kNone), tag_parser_(std::move(tag_parser)){};
 
    private:
     enum State {
@@ -86,8 +88,9 @@ class Parser {
     // empty token.
     std::string prev_;
 
+    std::unique_ptr<mpd::TagParser> tag_parser_;
     Rule pending_rule_;
-    std::string rule_field_;
+    enum mpd_tag_type rule_tag_;
 
     // Returns true if we are in a "Generic" state, where we can transfer
     // to any other option.
@@ -112,7 +115,7 @@ bool Parser::InFinalState() { return state_ == kFinal || state_ == kError; }
 void Parser::FlushRule() {
     assert(!pending_rule_.Empty() &&
            "should not be possible to construct empty rule");
-    opts_.ruleset.push_back(pending_rule_);
+    opts_.ruleset.emplace_back(std::move(pending_rule_));
     pending_rule_ = Rule();
 }
 
@@ -165,7 +168,7 @@ std::variant<Options, ParseError> Parser::Finish() {
     if (state_ == kError) {
         return err_;
     }
-    return opts_;
+    return std::exchange(opts_, Options());
 }
 
 std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
@@ -231,11 +234,17 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
             }
             return kNone;
         case kRule:
-        case kRuleBegin:
-            rule_field_ = arg;
+        case kRuleBegin: {
+            std::optional<enum mpd_tag_type> tag = tag_parser_->Parse(arg);
+            if (!tag) {
+                return ParseError(
+                    absl::StrFormat("invalid song tag name '%s'", arg));
+            }
+            rule_tag_ = *tag;
             return kRuleValue;
+        }
         case kRuleValue:
-            pending_rule_.AddPattern(rule_field_, std::string(arg));
+            pending_rule_.AddPattern(rule_tag_, std::string(arg));
             return kRule;
         case kTest:
             if (arg == "print_all_songs_and_exit") {
@@ -255,8 +264,9 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
 }  // namespace
 
 std::variant<Options, ParseError> Options::Parse(
+    std::unique_ptr<mpd::TagParser> tag_parser,
     const std::vector<std::string>& args) {
-    Parser p;
+    Parser p(std::move(tag_parser));
     for (std::string_view arg : args) {
         if (p.Consume(arg) == Parser::Status::kDone) {
             break;
