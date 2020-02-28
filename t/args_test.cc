@@ -12,22 +12,40 @@
 #include "rule.h"
 
 #include "t/helpers.h"
+#include "t/mpd_fake.h"
 #include "t/mpdclient_fake.h"
 
 using namespace ashuffle;
 
 template <typename... Args>
-std::optional<ParseError> ParseOnly(Args... strs) {
+std::optional<ParseError> ParseOnly(const mpd::TagParser &tagger,
+                                    Args... strs) {
     std::vector<std::string> args = {strs...};
-    std::variant<Options, ParseError> result = Options::Parse(args);
+    std::variant<Options, ParseError> result = Options::Parse(tagger, args);
     if (ParseError *err = std::get_if<ParseError>(&result); err != nullptr) {
         return *err;
     }
     return std::nullopt;
 }
 
+// We need this additional binding, so this overload binds more tightly than
+// the "generic" non-tagger binding.
+template <typename... Args>
+std::optional<ParseError> ParseOnly(const fake::TagParser &tagger,
+                                    Args... strs) {
+    return ParseOnly<Args...>(static_cast<const mpd::TagParser &>(tagger),
+                              strs...);
+}
+
+template <typename... Args>
+std::optional<ParseError> ParseOnly(Args... strs) {
+    fake::TagParser tagger;
+    return ParseOnly<Args...>(tagger, strs...);
+}
+
 void test_default() {
-    auto result = Options::Parse(std::vector<std::string>());
+    fake::TagParser tagger;
+    auto result = Options::Parse(tagger, std::vector<std::string>());
     ok(std::get_if<ParseError>(&result) == nullptr, "empty parse works");
 
     Options opts = std::get<Options>(result);
@@ -43,24 +61,20 @@ void test_default() {
 }
 
 void test_basic_short() {
-    SetTagNameIParse("artist", MPD_TAG_ARTIST);
+    fake::TagParser tagger({
+        {"artist", MPD_TAG_ARTIST},
+    });
 
-    Options opts = std::get<Options>(Options::Parse({
-        "-o",
-        "5",
+    // clang-format off
+    Options opts = std::get<Options>(Options::Parse(tagger, {
+        "-o", "5",
         "-n",
-        "-q",
-        "10",
-        "-e",
-        "artist",
-        "test artist",
-        "artist",
-        "another one",
-        "-f",
-        "/dev/zero",
-        "-p",
-        "1234",
+        "-q", "10",
+        "-e", "artist", "test artist", "artist", "another one",
+        "-f", "/dev/zero",
+        "-p", "1234",
     }));
+    // clang-format on
 
     cmp_ok(opts.ruleset.size(), ">=", 1, "basic short detected rule");
     cmp_ok(opts.queue_only, "==", 5, "basic short queue only");
@@ -71,26 +85,22 @@ void test_basic_short() {
 }
 
 void test_basic_long() {
-    SetTagNameIParse("artist", MPD_TAG_ARTIST);
+    fake::TagParser tagger({
+        {"artist", MPD_TAG_ARTIST},
+    });
 
-    Options opts = std::get<Options>(Options::Parse({
-        "--only",
-        "5",
-        "--no-check",
-        "--file",
-        "/dev/zero",
-        "--exclude",
-        "artist",
-        "test artist",
-        "artist",
-        "another one",
-        "--queue-buffer",
-        "10",
-        "--host",
-        "foo",
-        "--port",
-        "1234",
+    // clang-format off
+    Options opts =
+        std::get<Options>(Options::Parse(tagger, {
+            "--only", "5",
+            "--no-check",
+            "--file", "/dev/zero",
+            "--exclude", "artist", "test artist", "artist", "another one",
+            "--queue-buffer", "10",
+            "--host", "foo",
+            "--port", "1234",
     }));
+    // clang-format on
 
     cmp_ok(opts.ruleset.size(), ">=", 1, "basic long detected rule");
     cmp_ok(opts.queue_only, "==", 5, "basic long queue only");
@@ -102,22 +112,20 @@ void test_basic_long() {
 }
 
 void test_basic_mixed_long_short() {
-    SetTagNameIParse("artist", MPD_TAG_ARTIST);
+    fake::TagParser tagger({
+        {"artist", MPD_TAG_ARTIST},
+    });
 
-    Options opts = std::get<Options>(Options::Parse({
-        "-o",
-        "5",
-        "--file",
-        "/dev/zero",
-        "-n",
-        "--queue-buffer",
-        "10",
-        "--exclude",
-        "artist",
-        "test artist",
-        "artist",
-        "another one",
+    // clang-format off
+    Options opts =
+        std::get<Options>(Options::Parse(tagger, {
+            "-o", "5",
+            "--file", "/dev/zero",
+            "-n",
+            "--queue-buffer", "10",
+            "--exclude", "artist", "test artist", "artist", "another one",
     }));
+    // clang-format on
 
     cmp_ok(opts.ruleset.size(), ">=", 1, "basic mixed detected rule");
     cmp_ok(opts.queue_only, "==", 5, "basic mixed queue only");
@@ -138,10 +146,12 @@ void test_bad_strtou() {
 }
 
 void test_rule_basic() {
-    SetTagNameIParse("artist", MPD_TAG_ARTIST);
+    fake::TagParser tagger({
+        {"artist", MPD_TAG_ARTIST},
+    });
 
-    Options opts =
-        std::get<Options>(Options::Parse({"-e", "artist", "__artist__"}));
+    Options opts = std::get<Options>(
+        Options::Parse(tagger, {"-e", "artist", "__artist__"}));
 
     cmp_ok(opts.ruleset.size(), ">=", 1, "basic rule parsed at least one rule");
 
@@ -151,23 +161,23 @@ void test_rule_basic() {
     // test songs.
     Rule &r = opts.ruleset[0];
 
-    TEST_SONG(matching, TAG(MPD_TAG_ARTIST, "__artist__"));
-    TEST_SONG(not_matching, TAG(MPD_TAG_ARTIST, "not artist"));
+    fake::Song matching({{MPD_TAG_ARTIST, "__artist__"}});
+    fake::Song not_matching({{MPD_TAG_ARTIST, "not artist"}});
 
-    ok(!r.Accepts(&matching), "basic rule arg should exclude match song");
-    ok(r.Accepts(&not_matching),
-       "basic rule arg should not exclude other song");
+    ok(!r.Accepts(matching), "basic rule arg should exclude match song");
+    ok(r.Accepts(not_matching), "basic rule arg should not exclude other song");
 
     end_skip;
 }
 
 void test_file_stdin() {
     Options opts;
+    fake::TagParser tagger;
 
-    opts = std::get<Options>(Options::Parse({"-f", "-"}));
+    opts = std::get<Options>(Options::Parse(tagger, {"-f", "-"}));
     ok(opts.file_in == stdin, "'-f -' parses as stdin");
 
-    opts = std::get<Options>(Options::Parse({"--file", "-"}));
+    opts = std::get<Options>(Options::Parse(tagger, {"--file", "-"}));
     ok(opts.file_in == stdin, "'--file -' parses as stdin");
 }
 
@@ -203,20 +213,26 @@ void test_partials() {
     TEST_PARTIAL("queue buffer long", ParseOnly("--queue-buffer"),
                  "no argument supplied for '--queue-buffer'");
 
+    // Fake tagger with "artist" tag, so we can test partial rule matching
+    // without running into "unknown tag" errors.
+    fake::TagParser tagger({
+        {"artist", MPD_TAG_ARTIST},
+    });
     TEST_PARTIAL("exclude short no arg", ParseOnly("-e"),
                  "no argument supplied for '-e'");
-    TEST_PARTIAL("exclude short only match", ParseOnly("-e", "artist"),
+    TEST_PARTIAL("exclude short only match", ParseOnly(tagger, "-e", "artist"),
                  "no value supplied for match 'artist'");
     TEST_PARTIAL("exclude short only match mutli",
-                 ParseOnly("-e", "artist", "whatever", "artist"),
+                 ParseOnly(tagger, "-e", "artist", "whatever", "artist"),
                  "no value supplied for match 'artist'");
 
     TEST_PARTIAL("exclude long no arg", ParseOnly("--exclude"),
                  "no argument supplied for '--exclude'");
-    TEST_PARTIAL("exclude long only match", ParseOnly("--exclude", "artist"),
+    TEST_PARTIAL("exclude long only match",
+                 ParseOnly(tagger, "--exclude", "artist"),
                  "no value supplied for match 'artist'");
     TEST_PARTIAL("exclude long only match mutli",
-                 ParseOnly("--exclude", "artist", "whatever", "artist"),
+                 ParseOnly(tagger, "--exclude", "artist", "whatever", "artist"),
                  "no value supplied for match 'artist'");
 
     TEST_PARTIAL("host long", ParseOnly("--host"),
@@ -252,18 +268,21 @@ void test_bad_option() {
 }
 
 void test_test_option() {
-    Options opts = std::get<Options>(Options::Parse({
-        "--test_enable_option_do_not_use",
-        "print_all_songs_and_exit",
-    }));
+    fake::TagParser tagger;
+    Options opts = std::get<Options>(
+        Options::Parse(tagger, {
+                                   "--test_enable_option_do_not_use",
+                                   "print_all_songs_and_exit",
+                               }));
 
     cmp_ok(opts.test.print_all_songs_and_exit, "==", true,
            "test_option: print_all_songs_and_exit is set");
 }
 
 void test_parse_from_c() {
+    fake::TagParser tagger;
     const char *c_argv[] = {"ashuffle", "-o", "33"};
-    auto res = Options::ParseFromC(c_argv, 3);
+    auto res = Options::ParseFromC(tagger, c_argv, 3);
     Options *opts = std::get_if<Options>(&res);
     ok(opts != nullptr, "parse_from_c: parses correctly");
     skip(opts == nullptr, 1, "no options parsed");

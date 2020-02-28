@@ -44,19 +44,18 @@ class Options {
     // Parse parses the arguments in the given vector and returns ParseResult
     // based on the success/failure of the parse.
     static std::variant<Options, ParseError> Parse(
-        std::unique_ptr<mpd::TagParser>, const std::vector<std::string> &);
+        const mpd::TagParser &, const std::vector<std::string> &);
 
     // ParseFromC parses the arguments in the given c-style arguments list,
     // like would be given in `main`.
     static std::variant<Options, ParseError> ParseFromC(
-        std::unique_ptr<mpd::TagParser> tag_parser, const char **argv,
-        int argc) {
+        const mpd::TagParser &tag_parser, const char **argv, int argc) {
         std::vector<std::string> args;
         // Start from '1' to skip the program name itself.
         for (int i = 1; i < argc; i++) {
             args.push_back(argv[i]);
         }
-        return Options::Parse(std::move(tag_parser), args);
+        return Options::Parse(tag_parser, args);
     }
 };
 

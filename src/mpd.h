@@ -20,7 +20,7 @@ class TagParser {
     // Parse parses the given tag, and returns the appropriate tag type.
     // If no matching tag is found, then an empty optional is returned.
     virtual std::optional<enum mpd_tag_type> Parse(
-        const std::string_view tag) = 0;
+        const std::string_view tag) const = 0;
     virtual ~TagParser(){};
 };
 

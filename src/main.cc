@@ -18,7 +18,7 @@ using namespace ashuffle;
 
 int main(int argc, const char *argv[]) {
     std::variant<Options, ParseError> parse =
-        Options::ParseFromC(mpd::client::Parser(), argv, argc);
+        Options::ParseFromC(*mpd::client::Parser(), argv, argc);
     if (ParseError *err = std::get_if<ParseError>(&parse); err != nullptr) {
         switch (err->type) {
             case ParseError::Type::kUnknown:

@@ -38,11 +38,12 @@ class TagParserImpl : public TagParser {
    public:
     // Parse parses the given tag, and returns the appropriate tag type.
     // If no matching tag is found, then an empty optional is returned.
-    std::optional<enum mpd_tag_type> Parse(const std::string_view tag);
+    std::optional<enum mpd_tag_type> Parse(
+        const std::string_view tag) const override;
 };
 
 std::optional<enum mpd_tag_type> TagParserImpl::Parse(
-    const std::string_view tag_name) {
+    const std::string_view tag_name) const {
     std::string name_with_null(tag_name);
     enum mpd_tag_type tag = mpd_tag_name_iparse(name_with_null.data());
     if (tag == MPD_TAG_UNKNOWN) {
