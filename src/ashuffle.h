@@ -15,8 +15,6 @@
 
 namespace ashuffle {
 
-extern const int WINDOW_SIZE;
-
 // `MPD_PORT` environment variables. If a password is needed, no password can
 // be found in MPD_HOST, then `getpass_f' will be used to prompt the user
 // for a password. If `getpass_f' is NULL, the a default password prompt
@@ -33,8 +31,8 @@ struct TestDelegate {
 // queue finishes playing. This is the core loop of `ashuffle`. The tests
 // delegate is used during tests to observe loop effects. It should be set to
 // NULL during normal operations.
-void shuffle_loop(mpd::MPD* mpd, ShuffleChain* songs, const Options& options,
-                  TestDelegate d = TestDelegate());
+void Loop(mpd::MPD* mpd, ShuffleChain* songs, const Options& options,
+          TestDelegate d = TestDelegate());
 
 }  // namespace ashuffle
 

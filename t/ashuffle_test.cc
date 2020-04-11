@@ -60,7 +60,7 @@ TestDelegate loop_once_d{
         },
 };
 
-void test_shuffle_loop_init_empty() {
+void test_Loop_init_empty() {
     fake::MPD mpd;
 
     fake::Song song_a("song_a");
@@ -71,16 +71,16 @@ void test_shuffle_loop_init_empty() {
     ShuffleChain chain;
     chain.Add(song_a.URI());
 
-    shuffle_loop(&mpd, &chain, options, init_only_d);
+    Loop(&mpd, &chain, options, init_only_d);
 
     cmp_ok(mpd.queue.size(), "==", 1,
-           "shuffle_loop_init_empty: added one song to queue");
-    ok(mpd.state.playing, "shuffle_loop_init_empty: playing after init");
+           "Loop_init_empty: added one song to queue");
+    ok(mpd.state.playing, "Loop_init_empty: playing after init");
     ok(mpd.state.song_position == 0,
-       "shuffle_loop_init_empty: queue position on first song");
+       "Loop_init_empty: queue position on first song");
 }
 
-void test_shuffle_loop_init_playing() {
+void test_Loop_init_playing() {
     fake::MPD mpd;
     fake::Song song_a("song_a");
     mpd.db.push_back(song_a);
@@ -92,18 +92,18 @@ void test_shuffle_loop_init_playing() {
     mpd.queue.push_back(song_a);
     mpd.PlayAt(0);
 
-    shuffle_loop(&mpd, &chain, Options(), init_only_d);
+    Loop(&mpd, &chain, Options(), init_only_d);
 
     // We shouldn't add anything to the queue if we're already playing,
     // ashuffle should start silently.
     cmp_ok(mpd.queue.size(), "==", 1,
-           "shuffle_loop_init_playing: no songs added to queue");
-    ok(mpd.state.playing, "shuffle_loop_init_playing: playing after init");
+           "Loop_init_playing: no songs added to queue");
+    ok(mpd.state.playing, "Loop_init_playing: playing after init");
     ok(mpd.state.song_position == 0,
-       "shuffle_loop_init_playing: queue position on first song");
+       "Loop_init_playing: queue position on first song");
 }
 
-void test_shuffle_loop_init_stopped() {
+void test_Loop_init_stopped() {
     fake::MPD mpd;
 
     fake::Song song_a("song_a"), song_b("song_b");
@@ -119,17 +119,17 @@ void test_shuffle_loop_init_stopped() {
     mpd.state.song_position = 0;
     mpd.state.playing = false;
 
-    shuffle_loop(&mpd, &chain, Options(), init_only_d);
+    Loop(&mpd, &chain, Options(), init_only_d);
 
     // We should add a new item to the queue, and start playing.
     cmp_ok(mpd.queue.size(), "==", 2,
-           "shuffle_loop_init_stopped: added one song to queue");
-    ok(mpd.state.playing, "shuffle_loop_init_stopped: playing after init");
+           "Loop_init_stopped: added one song to queue");
+    ok(mpd.state.playing, "Loop_init_stopped: playing after init");
     ok(mpd.state.song_position == 1,
-       "shuffle_loop_init_stopped: queue position on second song");
+       "Loop_init_stopped: queue position on second song");
 }
 
-void test_shuffle_loop_basic() {
+void test_Loop_basic() {
     fake::MPD mpd;
 
     fake::Song song_a("song_a"), song_b("song_b");
@@ -149,24 +149,23 @@ void test_shuffle_loop_basic() {
     // Make future Idle calls return IDLE_QUEUE
     mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    shuffle_loop(&mpd, &chain, Options(), loop_once_d);
+    Loop(&mpd, &chain, Options(), loop_once_d);
 
     // We should add a new item to the queue, and start playing.
-    cmp_ok(mpd.queue.size(), "==", 2,
-           "shuffle_loop_basic: added one song to queue");
-    ok(mpd.state.playing, "shuffle_loop_basic: playing after loop");
+    cmp_ok(mpd.queue.size(), "==", 2, "Loop_basic: added one song to queue");
+    ok(mpd.state.playing, "Loop_basic: playing after loop");
     ok(mpd.state.song_position == 1,
-       "shuffle_loop_basic: queue position on second song");
+       "Loop_basic: queue position on second song");
 
     // The currently playing item should be song_a (the only song in the
     // shuffle chain). If the mpd state is invalid, no playing song is returned,
     // and we skip this check.
     if (std::optional<fake::Song> p = mpd.Playing(); p) {
-        ok(p == song_a, "shuffle_loop_basic: queued and played song_a");
+        ok(p == song_a, "Loop_basic: queued and played song_a");
     }
 }
 
-void test_shuffle_loop_empty() {
+void test_Loop_empty() {
     fake::MPD mpd;
 
     fake::Song song_a("song_a");
@@ -178,24 +177,23 @@ void test_shuffle_loop_empty() {
     // Make future IDLE calls return IDLE_QUEUE
     mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    shuffle_loop(&mpd, &chain, Options(), loop_once_d);
+    Loop(&mpd, &chain, Options(), loop_once_d);
 
     // We should add a new item to the queue, and start playing.
-    cmp_ok(mpd.queue.size(), "==", 1,
-           "shuffle_loop_empty: added one song to queue");
-    ok(mpd.state.playing, "shuffle_loop_empty: playing after loop");
+    cmp_ok(mpd.queue.size(), "==", 1, "Loop_empty: added one song to queue");
+    ok(mpd.state.playing, "Loop_empty: playing after loop");
     ok(mpd.state.song_position == 0,
-       "shuffle_loop_empty: queue position on first song");
+       "Loop_empty: queue position on first song");
 
     // The currently playing item should be song_a (the only song in the
     // shuffle chain). If the mpd state is invalid, no playing song is returned,
     // and we skip this check.
     if (std::optional<fake::Song> p = mpd.Playing(); p) {
-        ok(p == song_a, "shuffle_loop_empty: queued and played song_a");
+        ok(p == song_a, "Loop_empty: queued and played song_a");
     }
 }
 
-void test_shuffle_loop_empty_buffer() {
+void test_Loop_empty_buffer() {
     fake::MPD mpd;
 
     fake::Song song_a("song_a");
@@ -210,23 +208,23 @@ void test_shuffle_loop_empty_buffer() {
     // Make future IDLE calls return IDLE_QUEUE
     mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    shuffle_loop(&mpd, &chain, options, loop_once_d);
+    Loop(&mpd, &chain, options, loop_once_d);
 
     // We should add 4 new items to the queue, and start playing on the first
     // one.
     // 4 = queue_buffer + the currently playing song.
     cmp_ok(mpd.queue.size(), "==", 4,
-           "shuffle_loop_empty_buffer: added one song to queue");
-    ok(mpd.state.playing, "shuffle_loop_empty_buffer: playing after loop");
+           "Loop_empty_buffer: added one song to queue");
+    ok(mpd.state.playing, "Loop_empty_buffer: playing after loop");
     ok(mpd.state.song_position == 0,
-       "shuffle_loop_empty_buffer: queue position on first song");
+       "Loop_empty_buffer: queue position on first song");
 
     if (std::optional<fake::Song> p = mpd.Playing(); p) {
-        ok(p == song_a, "shuffle_loop_empty_buffer: queued and played song_a");
+        ok(p == song_a, "Loop_empty_buffer: queued and played song_a");
     }
 }
 
-void test_shuffle_loop_buffer_partial() {
+void test_Loop_buffer_partial() {
     fake::MPD mpd;
 
     fake::Song song_a("song_a"), song_b("song_b");
@@ -249,20 +247,19 @@ void test_shuffle_loop_buffer_partial() {
     // Make future IDLE calls return IDLE_QUEUE
     mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    shuffle_loop(&mpd, &chain, options, loop_once_d);
+    Loop(&mpd, &chain, options, loop_once_d);
 
     // We had 3 songs in the queue, and we were playing the second song, so
     // we only need to add 2 more songs to fill out the queue buffer.
     cmp_ok(mpd.queue.size(), "==", 5,
-           "shuffle_loop_partial_buffer: added one song to queue");
+           "Loop_partial_buffer: added one song to queue");
     // We should still be playing the same song as before.
-    ok(mpd.state.playing, "shuffle_loop_partial_buffer: playing after loop");
+    ok(mpd.state.playing, "Loop_partial_buffer: playing after loop");
     ok(mpd.state.song_position == 1,
-       "shuffle_loop_partial_buffer: queue position on the same song");
+       "Loop_partial_buffer: queue position on the same song");
 
     if (std::optional<fake::Song> p = mpd.Playing(); p) {
-        ok(p == song_b,
-           "shuffle_loop_partial_buffer: playing the same song as before");
+        ok(p == song_b, "Loop_partial_buffer: playing the same song as before");
     }
 }
 
@@ -271,7 +268,7 @@ static std::string failing_getpass_f() {
     abort();
 }
 
-void test_connect_no_password() {
+void test_Connect_no_password() {
     // Make sure the environment doesn't influence the test.
     xclearenv();
 
@@ -302,7 +299,7 @@ struct ConnectTestCase {
     mpd::Address flag = {};
 };
 
-void test_connect_parse_host() {
+void test_Connect_parse_host() {
     std::vector<ConnectTestCase> cases = {
         // by default, connect to localhost:6600
         {
@@ -433,7 +430,7 @@ class FakePasswordProvider {
     };
 };
 
-void test_connect_env_bad_password() {
+void test_Connect_env_bad_password() {
     xclearenv();
 
     fake::MPD mpd;
@@ -457,7 +454,7 @@ void test_connect_env_bad_password() {
             "connect_env_bad_password: fail to connect with bad password");
 }
 
-void test_connect_env_ok_password_bad_perms() {
+void test_Connect_env_ok_password_bad_perms() {
     xclearenv();
 
     fake::MPD mpd;
@@ -489,7 +486,7 @@ void test_connect_env_ok_password_bad_perms() {
 // command, then we should prompt for a user password. Once that password
 // matches, *and* we don't have any more disallowed required commands, then
 // we should be OK.
-void test_connect_bad_perms_ok_prompt() {
+void test_Connect_bad_perms_ok_prompt() {
     xclearenv();
 
     fake::MPD mpd;
@@ -519,7 +516,7 @@ void test_connect_bad_perms_ok_prompt() {
         "connect_bad_perms_ok_prompt: should have one call to password func");
 }
 
-void test_connect_bad_perms_prompt_bad_perms() {
+void test_Connect_bad_perms_prompt_bad_perms() {
     xclearenv();
 
     fake::MPD mpd;
@@ -548,21 +545,21 @@ void test_connect_bad_perms_prompt_bad_perms() {
 int main() {
     plan(NO_PLAN);
 
-    test_shuffle_loop_init_empty();
-    test_shuffle_loop_init_playing();
-    test_shuffle_loop_init_stopped();
+    test_Loop_init_empty();
+    test_Loop_init_playing();
+    test_Loop_init_stopped();
 
-    test_shuffle_loop_basic();
-    test_shuffle_loop_empty();
-    test_shuffle_loop_empty_buffer();
-    test_shuffle_loop_buffer_partial();
+    test_Loop_basic();
+    test_Loop_empty();
+    test_Loop_empty_buffer();
+    test_Loop_buffer_partial();
 
-    test_connect_no_password();
-    test_connect_parse_host();
-    test_connect_env_bad_password();
-    test_connect_env_ok_password_bad_perms();
-    test_connect_bad_perms_ok_prompt();
-    test_connect_bad_perms_prompt_bad_perms();
+    test_Connect_no_password();
+    test_Connect_parse_host();
+    test_Connect_env_bad_password();
+    test_Connect_env_ok_password_bad_perms();
+    test_Connect_bad_perms_ok_prompt();
+    test_Connect_bad_perms_prompt_bad_perms();
 
     done_testing();
 }

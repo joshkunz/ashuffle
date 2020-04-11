@@ -21,6 +21,9 @@ using namespace ashuffle;
 
 namespace {
 
+// The size of the rolling shuffle window.
+const int kWindowSize = 7;
+
 std::unique_ptr<Loader> BuildLoader(mpd::MPD* mpd, const Options& opts) {
     if (opts.file_in != nullptr && opts.check_uris) {
         return std::make_unique<CheckFileLoader>(mpd, opts.ruleset,
@@ -66,7 +69,7 @@ int main(int argc, const char* argv[]) {
     std::unique_ptr<mpd::MPD> mpd =
         Connect(*mpd::client::Dialer(), options, pass_f);
 
-    ShuffleChain songs(WINDOW_SIZE);
+    ShuffleChain songs(kWindowSize);
 
     {
         // We construct the loader in a new scope, since loaders can
@@ -101,7 +104,7 @@ int main(int argc, const char* argv[]) {
         }
         printf("Added %u songs.\n", options.queue_only);
     } else {
-        shuffle_loop(mpd.get(), &songs, options);
+        Loop(mpd.get(), &songs, options);
     }
 
     return 0;

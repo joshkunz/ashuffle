@@ -36,18 +36,14 @@
 
 namespace ashuffle {
 
-/* 25 seconds is the default timeout */
-static const int TIMEOUT = 25000;
-
-/* The size of the rolling shuffle window */
-const int WINDOW_SIZE = 7;
+namespace {
 
 /* These MPD commands are required for ashuffle to run */
 constexpr std::array<std::string_view, 5> kRequiredCommands = {
     "add", "status", "play", "pause", "idle",
 };
 
-void try_first(mpd::MPD *mpd, ShuffleChain *songs) {
+void TryFirst(mpd::MPD *mpd, ShuffleChain *songs) {
     std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
     // No need to do anything if the player is already going.
     if (status->IsPlaying()) {
@@ -60,7 +56,7 @@ void try_first(mpd::MPD *mpd, ShuffleChain *songs) {
     mpd->PlayAt(status->QueueLength());
 }
 
-void try_enqueue(mpd::MPD *mpd, ShuffleChain *songs, const Options &options) {
+void TryEnqueue(mpd::MPD *mpd, ShuffleChain *songs, const Options &options) {
     std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
 
     // We're "past" the last song, if there is no current song position.
@@ -120,39 +116,7 @@ void try_enqueue(mpd::MPD *mpd, ShuffleChain *songs, const Options &options) {
     }
 }
 
-/* Keep adding songs when the queue runs out */
-void shuffle_loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
-                  TestDelegate test_d) {
-    static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
-                  "QUEUE Now different signal.");
-    mpd::IdleEventSet set(MPD_IDLE_DATABASE, MPD_IDLE_QUEUE, MPD_IDLE_PLAYER);
-
-    // If the test delegate's `skip_init` is set to true, then skip the
-    // initializer.
-    if (!test_d.skip_init) {
-        try_first(mpd, songs);
-        try_enqueue(mpd, songs, options);
-    }
-
-    // Loop forever if test delegates are not set.
-    while (test_d.until_f == nullptr || test_d.until_f()) {
-        /* wait till the player state changes */
-        mpd::IdleEventSet events = mpd->Idle(set);
-        /* Only update the database if our original list was built from
-         * MPD. */
-        if (events.Has(MPD_IDLE_DATABASE) && options.file_in == nullptr) {
-            songs->Clear();
-            MPDLoader loader(mpd, options.ruleset);
-            loader.Load(songs);
-            printf("Picking random songs out of a pool of %u.\n", songs->Len());
-        } else if (events.Has(MPD_IDLE_QUEUE) || events.Has(MPD_IDLE_PLAYER)) {
-            try_enqueue(mpd, songs, options);
-        }
-    }
-}
-
-static void prompt_password(mpd::MPD *mpd,
-                            std::function<std::string()> &getpass_f) {
+void PromptPassword(mpd::MPD *mpd, std::function<std::string()> &getpass_f) {
     /* keep looping till we get a bad error, or we get a good password. */
     while (true) {
         using status = mpd::MPD::PasswordStatus;
@@ -178,6 +142,39 @@ struct MPDHost {
         }
     }
 };
+
+}  // namespace
+
+/* Keep adding songs when the queue runs out */
+void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
+          TestDelegate test_d) {
+    static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
+                  "QUEUE Now different signal.");
+    mpd::IdleEventSet set(MPD_IDLE_DATABASE, MPD_IDLE_QUEUE, MPD_IDLE_PLAYER);
+
+    // If the test delegate's `skip_init` is set to true, then skip the
+    // initializer.
+    if (!test_d.skip_init) {
+        TryFirst(mpd, songs);
+        TryEnqueue(mpd, songs, options);
+    }
+
+    // Loop forever if test delegates are not set.
+    while (test_d.until_f == nullptr || test_d.until_f()) {
+        /* wait till the player state changes */
+        mpd::IdleEventSet events = mpd->Idle(set);
+        /* Only update the database if our original list was built from
+         * MPD. */
+        if (events.Has(MPD_IDLE_DATABASE) && options.file_in == nullptr) {
+            songs->Clear();
+            MPDLoader loader(mpd, options.ruleset);
+            loader.Load(songs);
+            printf("Picking random songs out of a pool of %u.\n", songs->Len());
+        } else if (events.Has(MPD_IDLE_QUEUE) || events.Has(MPD_IDLE_PLAYER)) {
+            TryEnqueue(mpd, songs, options);
+        }
+    }
+}
 
 std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer &d, const Options &options,
                                   std::function<std::string()> &getpass_f) {
@@ -231,7 +228,7 @@ std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer &d, const Options &options,
         // If the user did *not* supply a password, and we are missing a
         // required command, then try to prompt the user to provide a password.
         // Once we get/apply a password, try the required commands again...
-        prompt_password(mpd.get(), getpass_f);
+        PromptPassword(mpd.get(), getpass_f);
         auth = mpd->CheckCommands(required);
     }
     // If we still can't connect, inform the user which commands are missing,
