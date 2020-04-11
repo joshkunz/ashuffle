@@ -57,18 +57,6 @@ constexpr std::array<std::string_view, 5> kRequiredCommands = {
     "add", "status", "play", "pause", "idle",
 };
 
-void mpd_perror(struct mpd_connection *mpd) {
-    assert(mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS &&
-           "must be an error present");
-    Die("MPD error: %s", mpd_connection_get_error_message(mpd));
-}
-
-void mpd_perror_if_error(struct mpd_connection *mpd) {
-    if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        mpd_perror(mpd);
-    }
-}
-
 /* check wheter a song is allowed by the given ruleset */
 bool ruleset_accepts_song(const std::vector<Rule> &ruleset,
                           const mpd::Song &song) {

@@ -78,7 +78,7 @@ foreach test_name, test_sources : tests
         test_name + '_test',
         low_dep_sources + test_sources,
         include_directories : src_inc,
-        dependencies : absl_all + [libtap_dep, testhelpers_dep, clientfake_dep],
+        dependencies : absl_all + [libtap_dep, mpdfake_dep],
         c_args : test_c_args,
         override_options : test_options,
     )

@@ -10,7 +10,6 @@
 #include "args.h"
 #include "rule.h"
 
-#include "t/helpers.h"
 #include "t/mpd_fake.h"
 
 #include <tap.h>
@@ -195,8 +194,6 @@ void test_file_stdin() {
 void test_partials() {
 #define TEST_PARTIAL(name, _res, err_match) \
     TEST_PARSE_FAIL("partial " name, (_res), err_match)
-
-    SetTagNameIParse("artist", MPD_TAG_ARTIST);
 
     TEST_PARTIAL("only short", ParseOnly("-o"),
                  "no argument supplied for '-o'");

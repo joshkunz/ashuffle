@@ -26,9 +26,7 @@
 #include "rule.h"
 #include "shuffle.h"
 
-#include "t/helpers.h"
 #include "t/mpd_fake.h"
-#include "t/mpdclient_fake.h"
 
 using namespace ashuffle;
 
