@@ -27,22 +27,12 @@
 
 #include "args.h"
 #include "ashuffle.h"
+#include "load.h"
 #include "mpd.h"
 #include "mpd_client.h"
 #include "rule.h"
 #include "shuffle.h"
-
-namespace {
-
-// Die logs the given message as if it was printed via `absl::StrFormat`,
-// and then terminates the program with with an error status code.
-template <typename... Args>
-void Die(Args... strs) {
-    std::cerr << absl::StrFormat(strs...) << std::endl;
-    std::exit(EXIT_FAILURE);
-}
-
-}  // namespace
+#include "util.h"
 
 namespace ashuffle {
 
@@ -56,105 +46,6 @@ const int WINDOW_SIZE = 7;
 constexpr std::array<std::string_view, 5> kRequiredCommands = {
     "add", "status", "play", "pause", "idle",
 };
-
-/* check wheter a song is allowed by the given ruleset */
-bool ruleset_accepts_song(const std::vector<Rule> &ruleset,
-                          const mpd::Song &song) {
-    for (const Rule &rule : ruleset) {
-        if (!rule.Accepts(song)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool ruleset_accepts_uri(mpd::MPD *mpd, const std::vector<Rule> &ruleset,
-                         const std::string_view uri) {
-    std::optional<std::unique_ptr<mpd::Song>> song = mpd->Search(uri);
-    // The song doesn't exist in MPD's database, can't match ruleset.
-    if (!song) {
-        std::cerr << absl::StrFormat("Song URI '%s' not found", uri)
-                  << std::endl;
-        return false;
-    }
-    return ruleset_accepts_song(ruleset, **song);
-}
-
-/* build the list of songs to shuffle from using
- * the supplied file. */
-void build_songs_file(mpd::MPD *mpd, const std::vector<Rule> &ruleset,
-                      FILE *input, ShuffleChain *songs, bool check) {
-    char *uri = NULL;
-    ssize_t length = 0;
-    size_t ignored = 0;
-    std::vector<std::string> all_uris;
-
-    if (check) {
-        std::unique_ptr<mpd::SongReader> reader = mpd->ListAll();
-        while (!reader->Done()) {
-            all_uris.push_back((*reader->Next())->URI());
-        }
-        std::sort(all_uris.begin(), all_uris.end());
-    }
-
-    length = getline(&uri, &ignored, input);
-    while (!feof(input) && !ferror(input)) {
-        if (length < 1) {
-            Die("invalid URI in input stream");
-        }
-
-        /* if this line has terminating newline attached, set it
-         * to null (effectively removing the newline). */
-        if (uri[length - 1] == '\n') {
-            length -= 1;
-            uri[length] = '\0';
-        }
-
-        if (check) {
-            if (all_uris.empty()) {
-                // No URIs in MPD, so the song can't possibly exist.
-                goto skip_uri;
-            }
-            if (!std::binary_search(all_uris.begin(), all_uris.end(), uri)) {
-                // We have some uris in `all_uris', but the given URI
-                // is not in there. Skip this URI.
-                goto skip_uri;
-            }
-            if (!ruleset.empty() && !ruleset_accepts_uri(mpd, ruleset, uri)) {
-                // User-specified some rules, and they don't match this URI,
-                // so skip this uri.
-                goto skip_uri;
-            }
-        }
-
-        songs->Add(std::string(uri));
-
-    skip_uri:
-
-        /* free the temporary memory */
-        free(uri);
-        uri = NULL;
-
-        /* get the next uri */
-        length = getline(&uri, &ignored, input);
-    }
-    // Free any memory allocated by our final getline.
-    if (uri != NULL) {
-        free(uri);
-    }
-}
-
-/* build the list of songs to shuffle from using MPD */
-void build_songs_mpd(mpd::MPD *mpd, const std::vector<Rule> &ruleset,
-                     ShuffleChain *songs) {
-    std::unique_ptr<mpd::SongReader> reader = mpd->ListAll();
-    while (!reader->Done()) {
-        std::unique_ptr<mpd::Song> song = *reader->Next();
-        if (ruleset_accepts_song(ruleset, *song)) {
-            songs->Add(song->URI());
-        }
-    }
-}
 
 void try_first(mpd::MPD *mpd, ShuffleChain *songs) {
     std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
@@ -251,7 +142,8 @@ void shuffle_loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
          * MPD. */
         if (events.Has(MPD_IDLE_DATABASE) && options.file_in == nullptr) {
             songs->Clear();
-            build_songs_mpd(mpd, options.ruleset, songs);
+            MPDLoader loader(mpd, options.ruleset);
+            loader.Load(songs);
             printf("Picking random songs out of a pool of %u.\n", songs->Len());
         } else if (events.Has(MPD_IDLE_QUEUE) || events.Has(MPD_IDLE_PLAYER)) {
             try_enqueue(mpd, songs, options);
@@ -287,9 +179,8 @@ struct MPDHost {
     }
 };
 
-std::unique_ptr<mpd::MPD> ashuffle_connect(
-    const mpd::Dialer &d, const Options &options,
-    std::function<std::string()> &getpass_f) {
+std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer &d, const Options &options,
+                                  std::function<std::string()> &getpass_f) {
     /* Attempt to get host from command line if available. Otherwise use
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
     std::string mpd_host_raw =

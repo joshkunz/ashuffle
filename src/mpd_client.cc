@@ -19,6 +19,7 @@
 #include <mpd/status.h>
 
 #include "mpd.h"
+#include "util.h"
 
 namespace ashuffle {
 namespace mpd {
@@ -27,14 +28,6 @@ namespace client {
 namespace {
 
 using Authorization = mpd::MPD::Authorization;
-
-// Die logs the given message as if it was printed via `absl::StrFormat`,
-// and then terminates the program with with an error status code.
-template <typename... Args>
-void Die(Args... strs) {
-    std::cerr << absl::StrFormat(strs...) << std::endl;
-    std::exit(EXIT_FAILURE);
-}
 
 class TagParserImpl : public TagParser {
    public:
@@ -187,7 +180,7 @@ class SongReaderImpl : public SongReader {
     SongReaderImpl(SongReaderImpl&&) = default;
     SongReaderImpl& operator=(SongReaderImpl&&) = default;
 
-    // Default destructor shoudl work fine, since the std::optional owns
+    // Default destructor should work fine, since the std::optional owns
     // a unique_ptr to an actual Song. The generated destructor will destruct
     // that type correctly.
     ~SongReaderImpl() override = default;

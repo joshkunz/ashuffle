@@ -13,15 +13,31 @@
 #include "args.h"
 #include "ashuffle.h"
 #include "getpass.h"
+#include "load.h"
 #include "mpd_client.h"
 #include "shuffle.h"
 
 using namespace ashuffle;
 
-int main(int argc, const char *argv[]) {
+namespace {
+
+std::unique_ptr<Loader> BuildLoader(mpd::MPD* mpd, const Options& opts) {
+    if (opts.file_in != nullptr && opts.check_uris) {
+        return std::make_unique<CheckFileLoader>(mpd, opts.ruleset,
+                                                 opts.file_in);
+    } else if (opts.file_in != nullptr) {
+        return std::make_unique<FileLoader>(opts.file_in);
+    }
+
+    return std::make_unique<MPDLoader>(mpd, opts.ruleset);
+}
+
+}  // namespace
+
+int main(int argc, const char* argv[]) {
     std::variant<Options, ParseError> parse =
         Options::ParseFromC(*mpd::client::Parser(), argv, argc);
-    if (ParseError *err = std::get_if<ParseError>(&parse); err != nullptr) {
+    if (ParseError* err = std::get_if<ParseError>(&parse); err != nullptr) {
         switch (err->type) {
             case ParseError::Type::kUnknown:
                 fprintf(stderr,
@@ -48,17 +64,15 @@ int main(int argc, const char *argv[]) {
     };
     /* attempt to connect to MPD */
     std::unique_ptr<mpd::MPD> mpd =
-        ashuffle_connect(*mpd::client::Dialer(), options, pass_f);
+        Connect(*mpd::client::Dialer(), options, pass_f);
 
     ShuffleChain songs(WINDOW_SIZE);
 
-    /* build the list of songs to shuffle through */
-    if (options.file_in != NULL) {
-        build_songs_file(mpd.get(), options.ruleset, options.file_in, &songs,
-                         options.check_uris);
-        fclose(options.file_in);
-    } else {
-        build_songs_mpd(mpd.get(), options.ruleset, &songs);
+    {
+        // We construct the loader in a new scope, since loaders can
+        // consume a lot of memory.
+        std::unique_ptr<Loader> loader = BuildLoader(mpd.get(), options);
+        loader->Load(&songs);
     }
 
     // For integration testing, we sometimes just want to have ashuffle
@@ -68,7 +82,7 @@ int main(int argc, const char *argv[]) {
         for (auto song : all_songs) {
             std::cout << song << std::endl;
         }
-        return 0;
+        exit(EXIT_SUCCESS);
     }
 
     if (songs.Len() == 0) {

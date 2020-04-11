@@ -22,21 +22,16 @@ absl_all = [
 
 libmpdclient = dependency('libmpdclient')
 
-high_dep_sources = files(
+sources = files(
     'src/ashuffle.cc',
-    'src/mpd_client.cc',
-)
-
-low_dep_sources = files(
+    'src/load.cc',
 	'src/args.cc',
 	'src/getpass.cc',
 	'src/rule.cc',
     'src/shuffle.cc',
 )
 
-sources = low_dep_sources + high_dep_sources
-
-executable_sources = sources + files('src/main.cc')
+executable_sources = sources + files('src/mpd_client.cc', 'src/main.cc')
 
 src_inc = include_directories('src')
 root_inc = include_directories('.')
@@ -68,15 +63,16 @@ test_options = [
 
 tests = {
     'args': ['t/args_test.cc'],
-    'ashuffle': ['src/ashuffle.cc', 't/ashuffle_test.cc'],
+    'ashuffle': ['t/ashuffle_test.cc'],
     'rule': ['t/rule_test.cc'],
     'shuffle': ['t/shuffle_test.cc'],
+    'load': ['t/load_test.cc']
 }
 
 foreach test_name, test_sources : tests
     test_exe = executable(
         test_name + '_test',
-        low_dep_sources + test_sources,
+        sources + test_sources,
         include_directories : src_inc,
         dependencies : absl_all + [libtap_dep, mpdfake_dep],
         c_args : test_c_args,
