@@ -1,47 +1,61 @@
+#include "rule.h"
+
 #include <memory>
 #include <string_view>
 
 #include <mpd/tag.h>
 
 #include "mpd.h"
-#include "rule.h"
 
 #include "t/mpd_fake.h"
 
-#include <tap.h>
+#include <gtest/gtest.h>
 
 using namespace ashuffle;
 
-static void test_basic() {
+TEST(Rule, Empty) {
     Rule rule;
+    EXPECT_TRUE(rule.Empty()) << "rule with no matchers should be empty";
 
-    ok(rule.Empty(), "no matchers on empty rule");
     rule.AddPattern(MPD_TAG_ARTIST, "foo fighters");
-    ok(!rule.Empty(), "rule no longer empty after adding one matcher");
+    EXPECT_FALSE(rule.Empty()) << "rule with matcher should not be empty";
+}
+
+TEST(Rule, Accepts) {
+    Rule rule;
+    rule.AddPattern(MPD_TAG_ARTIST, "foo fighters");
 
     fake::Song matching({{MPD_TAG_ARTIST, "foo fighters"}});
     fake::Song non_matching({{MPD_TAG_ARTIST, "some randy"}});
 
-    ok(!rule.Accepts(matching), "should exclude song with matching tag");
-    ok(rule.Accepts(non_matching), "includes song with non-matching tag");
+    // Remember, these are exclusion rules, so if a song matches, it should
+    // *not* be accepted by the rule.
+    EXPECT_FALSE(rule.Accepts(matching));
+    EXPECT_TRUE(rule.Accepts(non_matching));
 }
 
-static void test_submatch() {
+TEST(Rule, PatternIsSubstring) {
     Rule rule;
     rule.AddPattern(MPD_TAG_ARTIST, "foo");
 
     fake::Song matching({{MPD_TAG_ARTIST, "foo fighters"}});
     fake::Song mid_word_matching({{MPD_TAG_ARTIST, "floofoofaf"}});
-    fake::Song mid_word_matching_case({{MPD_TAG_ARTIST, "fLOoFoOfaF"}});
 
-    ok(!rule.Accepts(matching), "should exclude song with submatch");
-    ok(!rule.Accepts(mid_word_matching),
-       "should exclude song with submatch mid-word");
-    ok(!rule.Accepts(mid_word_matching_case),
-       "should exclude song with submatch mid-word (case insensitive)");
+    EXPECT_FALSE(rule.Accepts(matching));
+    EXPECT_FALSE(rule.Accepts(mid_word_matching));
 }
 
-static void test_multi() {
+TEST(Rule, PatternCaseInsensitive) {
+    Rule rule;
+    rule.AddPattern(MPD_TAG_ARTIST, "foo");
+
+    fake::Song weird_case({{MPD_TAG_ARTIST, "fLOoFoOfaF"}});
+
+    EXPECT_FALSE(rule.Accepts(weird_case))
+        << "failed to match substring with different case";
+}
+
+TEST(Rule, MultiplePatterns) {
     Rule rule;
     rule.AddPattern(MPD_TAG_ALBUM, "__album__");
     rule.AddPattern(MPD_TAG_ARTIST, "__artist__");
@@ -50,34 +64,25 @@ static void test_multi() {
         {MPD_TAG_ARTIST, "__artist__"},
         {MPD_TAG_ALBUM, "__album__"},
     });
+
     fake::Song partial_match_artist({
         {MPD_TAG_ARTIST, "__artist__"},
         {MPD_TAG_ALBUM, "no match"},
     });
+
     fake::Song partial_match_album({
         {MPD_TAG_ARTIST, "no match"},
         {MPD_TAG_ALBUM, "__album__"},
     });
+
     fake::Song no_match({
         {MPD_TAG_ARTIST, "no match"},
         {MPD_TAG_ALBUM, "no match"},
     });
 
-    ok(!rule.Accepts(full_match), "should match if all fields match");
-    ok(!rule.Accepts(partial_match_artist),
-       "should match if any field matches (artist)");
-    ok(!rule.Accepts(partial_match_album),
-       "should match if any field matches (album)");
-    ok(rule.Accepts(no_match),
-       "no match if no matching fields, even with multiple possibilities");
-}
-
-int main() {
-    plan(NO_PLAN);
-
-    test_basic();
-    test_submatch();
-    test_multi();
-
-    done_testing();
+    EXPECT_FALSE(rule.Accepts(full_match))
+        << "song accepted even though some fields match a pattern";
+    EXPECT_FALSE(rule.Accepts(partial_match_artist));
+    EXPECT_FALSE(rule.Accepts(partial_match_album));
+    EXPECT_TRUE(rule.Accepts(no_match));
 }

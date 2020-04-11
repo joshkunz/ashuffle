@@ -71,7 +71,6 @@ test_options = [
 libtap_tests = {
     'args': ['t/args_test.cc'],
     'ashuffle': ['t/ashuffle_test.cc'],
-    'rule': ['t/rule_test.cc'],
     'shuffle': ['t/shuffle_test.cc'],
     'load': ['t/load_test.cc']
 }
@@ -88,7 +87,7 @@ foreach test_name, test_sources : libtap_tests
 endforeach
 
 gtest_tests = {
-  'poc': ['t/poc_test.cc'],
+  'rule': ['t/rule_test.cc'],
 }
 
 foreach test_name, test_sources : gtest_tests 
