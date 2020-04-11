@@ -50,10 +50,17 @@ clang_tidy = run_target('ashuffle-clang-tidy',
 # We only generate tests if we are *not running in tidy mode
 if get_option('tests').enabled()
 
-subdir('t')
+googletest = cmake.subproject('googletest/googletest', cmake_options: [
+  '-DCMAKE_CXX_STANDARD=17',
+])
 
-test_c_args = [
+gtest_deps = [
+  dependency('threads'),
+  googletest.dependency('gtest'),
+  googletest.dependency('gtest_main'),
 ]
+
+subdir('t')
 
 test_options = [
     'werror=true',
@@ -61,7 +68,7 @@ test_options = [
     'b_sanitize=undefined',
 ]
 
-tests = {
+libtap_tests = {
     'args': ['t/args_test.cc'],
     'ashuffle': ['t/ashuffle_test.cc'],
     'rule': ['t/rule_test.cc'],
@@ -69,13 +76,27 @@ tests = {
     'load': ['t/load_test.cc']
 }
 
-foreach test_name, test_sources : tests
+foreach test_name, test_sources : libtap_tests 
     test_exe = executable(
         test_name + '_test',
         sources + test_sources,
         include_directories : src_inc,
         dependencies : absl_all + [libtap_dep, mpdfake_dep],
-        c_args : test_c_args,
+        override_options : test_options,
+    )
+    test(test_name, test_exe)
+endforeach
+
+gtest_tests = {
+  'poc': ['t/poc_test.cc'],
+}
+
+foreach test_name, test_sources : gtest_tests 
+    test_exe = executable(
+        test_name + '_test',
+        sources + test_sources,
+        include_directories : src_inc,
+        dependencies : absl_all + gtest_deps + [mpdfake_dep],
         override_options : test_options,
     )
     test(test_name, test_exe)
