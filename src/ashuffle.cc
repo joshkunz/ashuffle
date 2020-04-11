@@ -3,6 +3,7 @@
 #include <array>
 #include <cassert>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -26,7 +27,6 @@
 
 #include "args.h"
 #include "ashuffle.h"
-#include "getpass.h"
 #include "mpd.h"
 #include "mpd_client.h"
 #include "rule.h"
@@ -80,75 +80,32 @@ bool ruleset_accepts_song(const std::vector<Rule> &ruleset,
     return true;
 }
 
-bool ruleset_accepts_uri(struct mpd_connection *mpd,
-                         const std::vector<Rule> &ruleset, char *uri) {
-    bool accepted = false;
-    /* search for the song URI in MPD */
-    mpd_search_db_songs(mpd, true);
-    mpd_search_add_uri_constraint(mpd, MPD_OPERATOR_DEFAULT, uri);
-    if (mpd_search_commit(mpd) != true) {
-        mpd_perror(mpd);
+bool ruleset_accepts_uri(mpd::MPD *mpd, const std::vector<Rule> &ruleset,
+                         const std::string_view uri) {
+    std::optional<std::unique_ptr<mpd::Song>> song = mpd->Search(uri);
+    // The song doesn't exist in MPD's database, can't match ruleset.
+    if (!song) {
+        std::cerr << absl::StrFormat("Song URI '%s' not found", uri)
+                  << std::endl;
+        return false;
     }
-
-    struct mpd_song *raw_song = mpd_recv_song(mpd);
-    mpd_perror_if_error(mpd);
-    if (raw_song != nullptr) {
-        std::unique_ptr<mpd::Song> song = mpd::client::LiftLegacySong(raw_song);
-        if (ruleset_accepts_song(ruleset, *song)) {
-            accepted = true;
-        }
-
-        /* even though we're searching for a single song, libmpdclient
-         * still acts like we're reading a song list. We read an aditional
-         * element to convince MPD this is the end of the song list. */
-        (void)mpd_recv_song(mpd);
-    } else {
-        fprintf(stderr, "Song uri '%s' not found.\n", uri);
-    }
-
-    return accepted;
-}
-
-static std::vector<std::string> mpd_song_uri_list(struct mpd_connection *mpd) {
-    /* ask for a list of songs */
-    if (mpd_send_list_all_meta(mpd, NULL) != true) {
-        mpd_perror(mpd);
-    }
-
-    std::vector<std::string> result;
-
-    /* parse out the pairs */
-    struct mpd_song *song = mpd_recv_song(mpd);
-    const enum mpd_error err = mpd_connection_get_error(mpd);
-    if (err == MPD_ERROR_CLOSED) {
-        Die("MPD server closed the connection while getting the list of\n"
-            "all songs. If MPD error logs say \"Output buffer is full\",\n"
-            "consider setting max_output_buffer_size to a higher value\n"
-            "(e.g. 32768) in your MPD config.");
-    } else if (err != MPD_ERROR_SUCCESS) {
-        mpd_perror(mpd);
-    }
-    for (; song; song = mpd_recv_song(mpd)) {
-        result.push_back(mpd_song_get_uri(song));
-
-        /* free the current song */
-        mpd_song_free(song);
-    }
-    return result;
+    return ruleset_accepts_song(ruleset, **song);
 }
 
 /* build the list of songs to shuffle from using
  * the supplied file. */
-int build_songs_file(struct mpd_connection *mpd,
-                     const std::vector<Rule> &ruleset, FILE *input,
-                     ShuffleChain *songs, bool check) {
+void build_songs_file(mpd::MPD *mpd, const std::vector<Rule> &ruleset,
+                      FILE *input, ShuffleChain *songs, bool check) {
     char *uri = NULL;
     ssize_t length = 0;
     size_t ignored = 0;
     std::vector<std::string> all_uris;
 
     if (check) {
-        all_uris = mpd_song_uri_list(mpd);
+        std::unique_ptr<mpd::SongReader> reader = mpd->ListAll();
+        while (!reader->Done()) {
+            all_uris.push_back((*reader->Next())->URI());
+        }
         std::sort(all_uris.begin(), all_uris.end());
     }
 
@@ -197,86 +154,45 @@ int build_songs_file(struct mpd_connection *mpd,
     if (uri != NULL) {
         free(uri);
     }
-
-    return 0;
 }
 
 /* build the list of songs to shuffle from using MPD */
-int build_songs_mpd(struct mpd_connection *mpd,
-                    const std::vector<Rule> &ruleset, ShuffleChain *songs) {
-    /* ask for a list of songs */
-    if (mpd_send_list_all_meta(mpd, NULL) != true) {
-        mpd_perror(mpd);
-    }
-
-    /* parse out the pairs */
-    struct mpd_song *raw_song = mpd_recv_song(mpd);
-    const enum mpd_error err = mpd_connection_get_error(mpd);
-    if (err == MPD_ERROR_CLOSED) {
-        Die("MPD server closed the connection while getting the list of\n"
-            "all songs. If MPD error logs say \"Output buffer is full\",\n"
-            "consider setting max_output_buffer_size to a higher value\n"
-            "(e.g. 32768) in your MPD config.");
-    } else if (err != MPD_ERROR_SUCCESS) {
-        mpd_perror(mpd);
-    }
-    for (; raw_song != nullptr; raw_song = mpd_recv_song(mpd)) {
-        std::unique_ptr<mpd::Song> song = mpd::client::LiftLegacySong(raw_song);
-
-        /* if this song is allowed, add it to the list */
+void build_songs_mpd(mpd::MPD *mpd, const std::vector<Rule> &ruleset,
+                     ShuffleChain *songs) {
+    std::unique_ptr<mpd::SongReader> reader = mpd->ListAll();
+    while (!reader->Done()) {
+        std::unique_ptr<mpd::Song> song = *reader->Next();
         if (ruleset_accepts_song(ruleset, *song)) {
             songs->Add(song->URI());
         }
     }
-    return 0;
 }
 
-/* Append a random song from the given list of
- * songs to the queue */
-void shuffle_single(struct mpd_connection *mpd, ShuffleChain *songs) {
-    if (mpd_run_add(mpd, songs->Pick().c_str()) != true) {
-        mpd_perror(mpd);
+void try_first(mpd::MPD *mpd, ShuffleChain *songs) {
+    std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
+    // No need to do anything if the player is already going.
+    if (status->IsPlaying()) {
+        return;
     }
+
+    // If we're not playing, then add a song, and start playing it.
+    mpd->Add(songs->Pick());
+    // Passing the former queue length, because PlayAt is zero-indexed.
+    mpd->PlayAt(status->QueueLength());
 }
 
-int try_first(struct mpd_connection *mpd, ShuffleChain *songs) {
-    struct mpd_status *status;
-    status = mpd_run_status(mpd);
-    if (status == NULL) {
-        puts(mpd_connection_get_error_message(mpd));
-        return -1;
-    }
+void try_enqueue(mpd::MPD *mpd, ShuffleChain *songs, const Options &options) {
+    std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
 
-    if (mpd_status_get_state(status) != MPD_STATE_PLAY) {
-        shuffle_single(mpd, songs);
-        if (!mpd_run_play_pos(mpd, mpd_status_get_queue_length(status))) {
-            mpd_perror(mpd);
-        }
-    }
-
-    mpd_status_free(status);
-    return 0;
-}
-
-int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
-                const Options &options) {
-    struct mpd_status *status = mpd_run_status(mpd);
-
-    /* Check for error while fetching the status */
-    if (status == NULL) {
-        /* print the error message from the server */
-        puts(mpd_connection_get_error_message(mpd));
-        return -1;
-    }
-
-    bool past_last = mpd_status_get_song_pos(status) == -1;
-    bool queue_empty = mpd_status_get_queue_length(status) == 0;
+    // We're "past" the last song, if there is no current song position.
+    bool past_last = !status->SongPosition().has_value();
+    bool queue_empty = status->QueueLength() == 0;
 
     unsigned queue_songs_remaining = 0;
     if (!past_last) {
         /* +1 on song_pos because it is zero-indexed */
-        queue_songs_remaining = (mpd_status_get_queue_length(status) -
-                                 (mpd_status_get_song_pos(status) + 1));
+        queue_songs_remaining =
+            (status->QueueLength() - (*status->SongPosition() + 1));
     }
 
     bool should_add = false;
@@ -284,8 +200,7 @@ int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
         /* Always add if we've progressed past the last song. Even if
          * --queue_buffer, we should have already enqueued a song by now. */
         should_add = true;
-    } else if (options.queue_buffer != 0 &&
-               queue_songs_remaining < options.queue_buffer) {
+    } else if (queue_songs_remaining < options.queue_buffer) {
         /* If a queue buffer is set, check to see how any songs are left. If
          * we're past the end of our queue buffer, allow enquing a song. */
         should_add = true;
@@ -305,10 +220,10 @@ int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
                 to_enqueue += 1;
             }
             for (unsigned i = queue_songs_remaining; i < to_enqueue; i++) {
-                shuffle_single(mpd, songs);
+                mpd->Add(songs->Pick());
             }
         } else {
-            shuffle_single(mpd, songs);
+            mpd->Add(songs->Pick());
         }
     }
 
@@ -318,123 +233,55 @@ int try_enqueue(struct mpd_connection *mpd, ShuffleChain *songs,
         /* Since the 'status' was before we added our song, and the queue
          * is zero-indexed, the length will be the position of the song we
          * just added. Play that song */
-        if (!mpd_run_play_pos(mpd, mpd_status_get_queue_length(status))) {
-            mpd_perror(mpd);
-        }
+        mpd->PlayAt(status->QueueLength());
         /* Immediately pause playback if mpd single mode is on */
-        if (mpd_status_get_single(status)) {
-            if (mpd_run_pause(mpd, true)) {
-                mpd_perror(mpd);
-            }
+        if (status->Single()) {
+            mpd->Pause();
         }
     }
-
-    /* free the status we retrieved */
-    mpd_status_free(status);
-    return 0;
 }
 
 /* Keep adding songs when the queue runs out */
-int shuffle_loop(struct mpd_connection *mpd, ShuffleChain *songs,
-                 const Options &options, struct shuffle_test_delegate *test_d) {
+void shuffle_loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
+                  TestDelegate test_d) {
     static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
                   "QUEUE Now different signal.");
-    enum mpd_idle idle_mask =
-        (enum mpd_idle)(MPD_IDLE_DATABASE | MPD_IDLE_QUEUE | MPD_IDLE_PLAYER);
+    mpd::IdleEventSet set(MPD_IDLE_DATABASE, MPD_IDLE_QUEUE, MPD_IDLE_PLAYER);
 
     // If the test delegate's `skip_init` is set to true, then skip the
     // initializer.
-    if (!test_d || !test_d->skip_init) {
-        if (try_first(mpd, songs) != 0) {
-            return -1;
-        }
-        if (try_enqueue(mpd, songs, options) != 0) {
-            return -1;
-        }
+    if (!test_d.skip_init) {
+        try_first(mpd, songs);
+        try_enqueue(mpd, songs, options);
     }
 
     // Loop forever if test delegates are not set.
-    while (test_d == NULL || test_d->until_f()) {
+    while (test_d.until_f == nullptr || test_d.until_f()) {
         /* wait till the player state changes */
-        enum mpd_idle event = mpd_run_idle_mask(mpd, idle_mask);
-        mpd_perror_if_error(mpd);
-        bool idle_db = !!(event & MPD_IDLE_DATABASE);
-        bool idle_queue = !!(event & MPD_IDLE_QUEUE);
-        bool idle_player = !!(event & MPD_IDLE_PLAYER);
+        mpd::IdleEventSet events = mpd->Idle(set);
         /* Only update the database if our original list was built from
          * MPD. */
-        if (idle_db && options.file_in == NULL) {
-            songs->Empty();
+        if (events.Has(MPD_IDLE_DATABASE) && options.file_in == nullptr) {
+            songs->Clear();
             build_songs_mpd(mpd, options.ruleset, songs);
             printf("Picking random songs out of a pool of %u.\n", songs->Len());
-        } else if (idle_queue || idle_player) {
-            if (try_enqueue(mpd, songs, options) != 0) {
-                return -1;
-            }
+        } else if (events.Has(MPD_IDLE_QUEUE) || events.Has(MPD_IDLE_PLAYER)) {
+            try_enqueue(mpd, songs, options);
         }
     }
-    return 0;
 }
 
-static std::string DefaultGetPass() {
-    return GetPass(stdin, stdout, "mpd password: ");
-}
-
-static void get_mpd_password(struct mpd_connection *mpd,
-                             std::string (*getpass_f)()) {
-    std::string (*do_getpass)() = getpass_f;
-    if (do_getpass == NULL) {
-        do_getpass = DefaultGetPass;
-    }
+static void prompt_password(mpd::MPD *mpd,
+                            std::function<std::string()> &getpass_f) {
     /* keep looping till we get a bad error, or we get a good password. */
     while (true) {
-        std::string pass = do_getpass();
-        mpd_run_password(mpd, pass.data());
-        const enum mpd_error err = mpd_connection_get_error(mpd);
-        if (err == MPD_ERROR_SUCCESS) {
+        using status = mpd::MPD::PasswordStatus;
+        std::string pass = getpass_f();
+        if (mpd->ApplyPassword(pass) == status::kAccepted) {
             return;
-        } else if (err == MPD_ERROR_SERVER) {
-            enum mpd_server_error server_err =
-                mpd_connection_get_server_error(mpd);
-            if (server_err != MPD_SERVER_ERROR_PASSWORD) {
-                mpd_perror(mpd);
-            }
-            mpd_connection_clear_error(mpd);
-            fprintf(stderr, "incorrect password.\n");
-        } else {
-            mpd_perror(mpd);
         }
+        fputs("incorrect password.\n", stderr);
     }
-}
-
-/* If a password is required, "password" is used if not null, otherwise
- * a password is obtained from stdin. */
-bool is_mpd_password_needed(struct mpd_connection *mpd) {
-    // Fetch a list of the commands we're not allowed to run. In most
-    // installs, this should be empty.
-    if (!mpd_send_disallowed_commands(mpd)) {
-        mpd_perror(mpd);
-    }
-    std::vector<std::string> disallowed_commands;
-    struct mpd_pair *command = mpd_recv_command_pair(mpd);
-    while (command != NULL) {
-        disallowed_commands.push_back(command->value);
-        mpd_return_pair(mpd, command);
-        command = mpd_recv_command_pair(mpd);
-    }
-    mpd_perror_if_error(mpd);
-
-    bool password_needed = false;
-    for (std::string_view cmd : kRequiredCommands) {
-        if (std::find(disallowed_commands.begin(), disallowed_commands.end(),
-                      cmd) != disallowed_commands.end()) {
-            fprintf(stderr, "required MPD command \"%s\" not allowed by MPD.\n",
-                    cmd.data());
-            password_needed = true;
-            break;
-        }
-    }
-    return password_needed;
 }
 
 struct MPDHost {
@@ -452,10 +299,9 @@ struct MPDHost {
     }
 };
 
-struct mpd_connection *ashuffle_connect(const Options &options,
-                                        std::string (*getpass_f)()) {
-    struct mpd_connection *mpd;
-
+std::unique_ptr<mpd::MPD> ashuffle_connect(
+    const mpd::Dialer &d, const Options &options,
+    std::function<std::string()> &getpass_f) {
     /* Attempt to get host from command line if available. Otherwise use
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
     std::string mpd_host_raw =
@@ -471,14 +317,18 @@ struct mpd_connection *ashuffle_connect(const Options &options,
             ? options.port
             : (unsigned)(getenv("MPD_PORT") ? atoi(getenv("MPD_PORT")) : 6600);
 
-    /* Create a new connection to mpd */
-    mpd = mpd_connection_new(mpd_host.host.data(), mpd_port, TIMEOUT);
+    mpd::Address addr = {
+        .host = mpd_host.host,
+        .port = mpd_port,
+    };
 
-    if (mpd == NULL) {
-        Die("Could not connect due to lack of memory.");
-    } else if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        Die("Could not connect to %s:%u.", mpd_host.host.data(), mpd_port);
+    mpd::Dialer::result r = d.Dial(addr);
+
+    if (std::string *err = std::get_if<std::string>(&r); err != nullptr) {
+        Die("Failed to connect to mpd: %s", *err);
     }
+    std::unique_ptr<mpd::MPD> mpd =
+        std::move(std::get<std::unique_ptr<mpd::MPD>>(r));
 
     /* Password Workflow:
      * 1. If the user supplied a password, then apply it. No matter what.
@@ -488,18 +338,30 @@ struct mpd_connection *ashuffle_connect(const Options &options,
      * 3. If the user successfully entered a password, then check that all
      *    required commands can be executed again. If we still can't execute
      *    all required commands, then fail. */
-    if (mpd_host.password.has_value()) {
-        mpd_run_password(mpd, mpd_host.password->data());
-        mpd_perror_if_error(mpd);
+    if (mpd_host.password) {
+        // We don't actually care if the password was accepted here. We still
+        // need to check the available commands either way.
+        (void)mpd->ApplyPassword(*mpd_host.password);
     }
-    bool need_mpd_password = is_mpd_password_needed(mpd);
-    if (mpd_host.password.has_value() && need_mpd_password) {
-        Die("password applied, but required command still not allowed.");
+
+    // Need a vector for the types to match up.
+    const std::vector<std::string_view> required(kRequiredCommands.begin(),
+                                                 kRequiredCommands.end());
+    mpd::MPD::Authorization auth = mpd->CheckCommands(required);
+    if (!mpd_host.password && !auth.authorized) {
+        // If the user did *not* supply a password, and we are missing a
+        // required command, then try to prompt the user to provide a password.
+        // Once we get/apply a password, try the required commands again...
+        prompt_password(mpd.get(), getpass_f);
+        auth = mpd->CheckCommands(required);
     }
-    if (need_mpd_password) {
-        get_mpd_password(mpd, getpass_f);
-    }
-    if (is_mpd_password_needed(mpd)) {
+    // If we still can't connect, inform the user which commands are missing,
+    // and exit.
+    if (!auth.authorized) {
+        std::cerr << "Missing MPD Commands:" << std::endl;
+        for (std::string &cmd : auth.missing) {
+            std::cerr << "  " << cmd << std::endl;
+        }
         Die("password applied, but required command still not allowed.");
     }
     return mpd;

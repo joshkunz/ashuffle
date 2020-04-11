@@ -6,14 +6,14 @@
 #include <vector>
 
 #include <mpd/tag.h>
-#include <tap.h>
 
 #include "args.h"
 #include "rule.h"
 
 #include "t/helpers.h"
 #include "t/mpd_fake.h"
-#include "t/mpdclient_fake.h"
+
+#include <tap.h>
 
 using namespace ashuffle;
 

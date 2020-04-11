@@ -2,12 +2,13 @@
 #include <string_view>
 
 #include <mpd/tag.h>
-#include <tap.h>
 
 #include "mpd.h"
 #include "rule.h"
 
 #include "t/mpd_fake.h"
+
+#include <tap.h>
 
 using namespace ashuffle;
 

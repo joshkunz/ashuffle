@@ -7,7 +7,7 @@
 
 namespace ashuffle {
 
-void ShuffleChain::Empty() {
+void ShuffleChain::Clear() {
     _window.clear();
     _pool.clear();
 }

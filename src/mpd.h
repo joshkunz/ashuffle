@@ -51,7 +51,7 @@ class Status {
     virtual std::optional<int> SongPosition() const = 0;
 
     // Returns the current play state of the player.
-    virtual enum mpd_state State() const = 0;
+    virtual bool IsPlaying() const = 0;
 };
 
 // SongReader is a helper for iterating over a list of songs fetched from
@@ -73,7 +73,15 @@ class SongReader {
 // signal to MPD what conditions trigger the end of an "idle" command.
 struct IdleEventSet {
     // Events is an integer representation of the bit-set.
-    int events;
+    int events = 0;
+
+    template <typename... Events>
+    IdleEventSet(Events... set_events) {
+        std::initializer_list<int> es = {set_events...};
+        for (int event : es) {
+            Add(static_cast<enum mpd_idle>(event));
+        }
+    }
 
     // Add adds the given event to the set.
     void Add(enum mpd_idle event) { events |= event; }
@@ -86,12 +94,6 @@ struct IdleEventSet {
 };
 
 // Address represents the dial address of a given MPD instance.
-struct Address {
-    // host is the hostname of the MPD instance.
-    std::string host = "";
-    // Port is the TCP port the MPD instance is listening on.
-    unsigned port = 0;
-};
 
 // MPD represents a connection to an MPD instance.
 class MPD {
@@ -108,7 +110,7 @@ class MPD {
     virtual void PlayAt(unsigned position) = 0;
 
     // Gets the current player/MPD status.
-    virtual std::unique_ptr<Status> GetStatus() = 0;
+    virtual std::unique_ptr<Status> CurrentStatus() = 0;
 
     // Returns a song reader that can be used to list all songs stored in MPD's
     // database.
@@ -117,7 +119,7 @@ class MPD {
     // Searches MPD's DB for a particular song URI, and returns that song.
     // Returns an empty optional if the song could not be found.
     virtual std::optional<std::unique_ptr<Song>> Search(
-        const std::string& uri) = 0;
+        std::string_view uri) = 0;
 
     // Blocks until one of the enum mpd_idle events in the event set happens.
     // A new event set is returned, containing all events that occured during
@@ -136,10 +138,42 @@ class MPD {
     // returned.
     virtual PasswordStatus ApplyPassword(const std::string& password) = 0;
 
+    struct Authorization {
+        // Set to true if this connection is authorized to execute all
+        // requested commands.
+        bool authorized = false;
+        // If authorized is false, this will be filled with the missing
+        // commands.
+        std::vector<std::string> missing = {};
+    };
+
     // CheckCommandsAllowed checks that the given commands are allowed on
     // the MPD connection.
-    virtual bool CheckCommandsAllowed(
+    virtual Authorization CheckCommands(
         const std::vector<std::string_view>& cmds) = 0;
+};
+
+struct Address {
+    // host is the hostname of the MPD instance.
+    std::string host = "";
+    // Port is the TCP port the MPD instance is listening on.
+    unsigned port = 0;
+};
+
+class Dialer {
+   public:
+    virtual ~Dialer(){};
+
+    constexpr static unsigned kDefaultTimeout = 25000;  // 25 seconds.
+
+    typedef std::variant<std::unique_ptr<MPD>, std::string> result;
+
+    // Dial connects to the MPD instance at the given Address, optionally,
+    // with the given timeout. On success a variant with a unique_ptr to
+    // an MPD instance is returned. On failure, a string is returned with
+    // a human-readable description of the error.
+    virtual result Dial(const Address&,
+                        unsigned timeout_ms = kDefaultTimeout) const = 0;
 };
 
 }  // namespace mpd

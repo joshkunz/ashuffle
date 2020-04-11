@@ -15,8 +15,8 @@ class ShuffleChain {
     // Create a new ShuffleChain with the given window length.
     ShuffleChain(unsigned window) : _max_window(window){};
 
-    // Empty this shuffle chain, removing anypreviously added songs.
-    void Empty();
+    // Clear this shuffle chain, removing anypreviously added songs.
+    void Clear();
 
     // Add a string to the pool of songs that can be picked out of this
     // chain.

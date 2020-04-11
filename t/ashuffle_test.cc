@@ -4,6 +4,8 @@
 #include <cassert>
 #include <cstring>
 #include <deque>
+#include <functional>
+#include <iostream>
 #include <memory>
 #include <optional>
 #include <string>
@@ -20,10 +22,12 @@
 
 #include "args.h"
 #include "ashuffle.h"
+#include "mpd.h"
 #include "rule.h"
 #include "shuffle.h"
 
 #include "t/helpers.h"
+#include "t/mpd_fake.h"
 #include "t/mpdclient_fake.h"
 
 using namespace ashuffle;
@@ -43,44 +47,35 @@ void xsetenv(const char *key, const char *value) {
 }
 
 void test_build_songs_mpd_basic() {
-    struct mpd_connection c;
+    fake::MPD mpd;
+    mpd.db.emplace_back("song_a");
+    mpd.db.emplace_back("song_b");
 
     ShuffleChain chain;
     std::vector<Rule> ruleset;
 
-    struct mpd_song song_a("song_a");
-    struct mpd_song song_b("song_b");
-    c.song_iter.push_back(song_a);
-    c.song_iter.push_back(song_b);
-
-    int result = build_songs_mpd(&c, ruleset, &chain);
-    cmp_ok(result, "==", 0, "build_songs_mpd basic returns ok");
+    build_songs_mpd(&mpd, ruleset, &chain);
     cmp_ok(chain.Len(), "==", 2,
            "build_songs_mpd_basic: 2 songs added to shuffle chain");
 }
 
 void test_build_songs_mpd_filter() {
-    struct mpd_connection c;
+    fake::MPD mpd;
 
     ShuffleChain chain;
     std::vector<Rule> ruleset;
 
-    Rule artist_match;
-    SetTagNameIParse("artist", MPD_TAG_ARTIST);
+    Rule rule;
     // Exclude all songs with the artist "__not_artist__".
-    artist_match.AddPattern("artist", "__not_artist__");
-    ruleset.push_back(artist_match);
+    rule.AddPattern(MPD_TAG_ARTIST, "__not_artist__");
+    ruleset.push_back(rule);
 
-    TEST_SONG(song_a, TAG(MPD_TAG_ARTIST, "__artist__"));
-    TEST_SONG(song_b, TAG(MPD_TAG_ARTIST, "__not_artist__"));
-    TEST_SONG(song_c, TAG(MPD_TAG_ARTIST, "__artist__"));
+    mpd.db.push_back(fake::Song("song_a", {{MPD_TAG_ARTIST, "__artist__"}}));
+    mpd.db.push_back(
+        fake::Song("song_b", {{MPD_TAG_ARTIST, "__not_artist__"}}));
+    mpd.db.push_back(fake::Song("song_c", {{MPD_TAG_ARTIST, "__artist__"}}));
 
-    c.song_iter.push_back(song_a);
-    c.song_iter.push_back(song_b);
-    c.song_iter.push_back(song_c);
-
-    int result = build_songs_mpd(&c, ruleset, &chain);
-    cmp_ok(result, "==", 0, "build_songs_mpd filter returns ok");
+    build_songs_mpd(&mpd, ruleset, &chain);
     cmp_ok(chain.Len(), "==", 2,
            "build_songs_mpd_filter: 2 songs added to shuffle chain");
 }
@@ -98,17 +93,10 @@ void xfwriteln(FILE *f, std::string msg) {
 }
 
 void test_build_songs_file_nocheck() {
-    struct mpd_connection c;
-
-    c.SetError(MPD_ERROR_ARGUMENT,
-               "ashuffle should not dial MPD when check is false");
-
     const unsigned window_size = 3;
     ShuffleChain chain(window_size);
 
-    struct mpd_song song_a("song_a");
-    struct mpd_song song_b("song_b");
-    struct mpd_song song_c("song_c");
+    fake::Song song_a("song_a"), song_b("song_b"), song_c("song_c");
 
     FILE *f = tmpfile();
     if (f == nullptr) {
@@ -116,16 +104,15 @@ void test_build_songs_file_nocheck() {
         abort();
     }
 
-    xfwriteln(f, song_a.uri);
-    xfwriteln(f, song_b.uri);
-    xfwriteln(f, song_c.uri);
+    xfwriteln(f, song_a.URI());
+    xfwriteln(f, song_b.URI());
+    xfwriteln(f, song_c.URI());
 
     // rewind, so build_songs_file can see the URIs we've written.
     rewind(f);
 
     std::vector<Rule> empty_ruleset;
-    int result = build_songs_file(&c, empty_ruleset, f, &chain, false);
-    cmp_ok(result, "==", 0, "build_songs_file nocheck returns ok");
+    build_songs_file(nullptr, empty_ruleset, f, &chain, false);
     cmp_ok(chain.Len(), "==", 3,
            "build_songs_file_nocheck: 3 songs added to shuffle chain");
 
@@ -133,11 +120,8 @@ void test_build_songs_file_nocheck() {
     // shuffle chain, and make sure they match the three URIs we wrote. This
     // should be stable because we set a window size equal to the number of
     // song URIs, and sort the URIs we receive from shuffle_pick.
-    std::vector<std::string> want = {song_a.uri, song_b.uri, song_c.uri};
-    std::vector<std::string> got;
-    got.push_back(chain.Pick());
-    got.push_back(chain.Pick());
-    got.push_back(chain.Pick());
+    std::vector<std::string> want = {song_a.URI(), song_b.URI(), song_c.URI()};
+    std::vector<std::string> got = {chain.Pick(), chain.Pick(), chain.Pick()};
 
     std::sort(want.begin(), want.end());
     std::sort(got.begin(), got.end());
@@ -153,15 +137,14 @@ void test_build_songs_file_nocheck() {
 
 void test_build_songs_file_check() {
     // step 1. Initialize the MPD connection.
-    struct mpd_connection c;
+    fake::MPD mpd;
 
     // step 2. Build the ruleset, and add an exclusions for __not_artist__
     std::vector<Rule> ruleset;
 
     Rule artist_match;
-    SetTagNameIParse("artist", MPD_TAG_ARTIST);
     // Exclude all songs with the artist "__not_artist__".
-    artist_match.AddPattern("artist", "__not_artist__");
+    artist_match.AddPattern(MPD_TAG_ARTIST, "__not_artist__");
     ruleset.push_back(artist_match);
 
     // step 3. Prepare the shuffle_chain.
@@ -170,41 +153,23 @@ void test_build_songs_file_check() {
 
     // step 4. Prepare our songs/song list. The song_list will be used for
     // subsequent calls to `mpd_recv_song`.
-    TEST_SONG(song_a, TAG(MPD_TAG_ARTIST, "__artist__"));
-    TEST_SONG(song_b, TAG(MPD_TAG_ARTIST, "__not_artist__"));
-    TEST_SONG(song_c, TAG(MPD_TAG_ARTIST, "__artist__"));
+    fake::Song song_a("song_a", {{MPD_TAG_ARTIST, "__artist__"}});
+    fake::Song song_b("song_b", {{MPD_TAG_ARTIST, "__not_artist__"}});
+    fake::Song song_c("song_c", {{MPD_TAG_ARTIST, "__artist__"}});
     // This song will not be present in the MPD library, so it doesn't need
     // any tags.
-    struct mpd_song song_d("song_d");
+    fake::Song song_d("song_d");
 
     // When matching songs, ashuffle will first query for a list of songs,
     // and then match against that static list. Only if a song is in the library
     // will it be matched against the ruleset (since matching requires
     // expensive MPD queries to resolve the URI).
-    c.song_iter.push_back(song_a);
-    c.song_iter.push_back(song_b);
-    c.song_iter.push_back(song_c);
+    mpd.db.push_back(song_a);
+    mpd.db.push_back(song_b);
+    mpd.db.push_back(song_c);
     // Don't push song_d, so we can validate that only songs in the MPD
     // library are allowed.
-    // c.song_iter.push_back(song_d)
-
-    // Empty to terminate the list of songs from the `listall' query.
-    c.song_iter.push_back(std::nullopt);
-
-    // For the songs that are actually in the database, we will check
-    // against the ruleset. When matching each song URI against the
-    // rules, ashuffle executes mpd_recv_song twice. Once to receive
-    // the actual song object from libmpdclient, and once to "finish"
-    // the iteration. So, for each URI we want to test, we also need to
-    // insert an empty entry after it.
-    c.song_iter.push_back(song_a);
-    c.song_iter.push_back(std::nullopt);
-    c.song_iter.push_back(song_b);
-    c.song_iter.push_back(std::nullopt);
-    c.song_iter.push_back(song_c);
-    c.song_iter.push_back(std::nullopt);
-    // No song_d here, since we should never query for it, it should be
-    // filtered out earlier.
+    // mpd.db.push_back(song_d)
 
     // step 5. Set up our test input file, but writing the URIs of our songs.
     FILE *f = tmpfile();
@@ -213,29 +178,26 @@ void test_build_songs_file_check() {
         abort();
     }
 
-    xfwriteln(f, song_a.uri);
-    xfwriteln(f, song_b.uri);
-    xfwriteln(f, song_c.uri);
+    xfwriteln(f, song_a.URI());
+    xfwriteln(f, song_b.URI());
+    xfwriteln(f, song_c.URI());
     // But we do want to write song_d here, so that ashuffle has to check it.
-    xfwriteln(f, song_d.uri);
+    xfwriteln(f, song_d.URI());
 
     // rewind, so build_songs_file can see the URIs we've written.
     rewind(f);
 
     // step 6. Run! (and validate)
 
-    int result = build_songs_file(&c, ruleset, f, &chain, true);
-    cmp_ok(result, "==", 0, "build_songs_file check returns ok");
+    build_songs_file(&mpd, ruleset, f, &chain, true);
     cmp_ok(chain.Len(), "==", 2,
            "build_songs_file_check: 2 songs added to shuffle chain");
 
     // This check works like the nocheck case, but instead of expecting us
     // to pick all 3 songs that were written into the input file, we only want
     // to pick song_a and song_c which are not excluded by the ruleset
-    std::vector<std::string> want = {song_a.uri, song_c.uri};
-    std::vector<std::string> got;
-    got.push_back(chain.Pick());
-    got.push_back(chain.Pick());
+    std::vector<std::string> want = {song_a.URI(), song_c.URI()};
+    std::vector<std::string> got = {chain.Pick(), chain.Pick()};
 
     std::sort(want.begin(), want.end());
     std::sort(got.begin(), got.end());
@@ -249,373 +211,263 @@ void test_build_songs_file_check() {
     fclose(f);
 }
 
-void test_shuffle_single() {
-    struct mpd_connection c;
+TestDelegate init_only_d = {
+    .skip_init = false,
+    .until_f = [] { return false; },
+};
 
-    struct mpd_song song_a("song_a");
-    struct mpd_song song_b("song_b");
-
-    c.db.push_back(song_a);
-    c.db.push_back(song_b);
-
-    ShuffleChain chain;
-    chain.Add(song_a.uri);
-
-    ok(c.queue.empty(), "shuffle_single: queue empty before song added");
-    shuffle_single(&c, &chain);
-
-    cmp_ok(c.queue.size(), "==", 1,
-           "shuffle_single: queue length 1 after song added");
-
-    ok(c.queue[0].uri == song_a.uri,
-       "shuffle_single: ensure that song_a was added");
-}
-
-// This function returns true, false, true, false... etc for each call. It
-// can be used with shuffle_loop to make the internal loop run exactly once.
-static bool once_f() {
-    static unsigned count;
-    return (count++ % 2) == 0;
-}
-
-// When used with shuffle_loop, this function will only allow the
-// initialization code to run.
-static bool only_init_f() { return false; }
+TestDelegate loop_once_d{
+    .skip_init = true,
+    .until_f =
+        [] {
+            static unsigned count;
+            // Returns true, false, true, false. This is so we can re-use the
+            // same delegate in multiple tests.
+            return (count++ % 2) == 0;
+        },
+};
 
 void test_shuffle_loop_init_empty() {
-    struct mpd_connection c;
+    fake::MPD mpd;
 
-    struct mpd_song song_a("song_a");
+    fake::Song song_a("song_a");
+    mpd.db.push_back(song_a);
 
     Options options;
 
     ShuffleChain chain;
-    chain.Add(song_a.uri);
+    chain.Add(song_a.URI());
 
-    c.db.push_back(song_a);
+    shuffle_loop(&mpd, &chain, options, init_only_d);
 
-    struct shuffle_test_delegate delegate = {
-        .skip_init = false,
-        .until_f = only_init_f,
-    };
-
-    int result = shuffle_loop(&c, &chain, options, &delegate);
-
-    cmp_ok(result, "==", 0, "shuffle_loop_init_empty: shuffle_loop returns 0");
-    cmp_ok(c.queue.size(), "==", 1,
+    cmp_ok(mpd.queue.size(), "==", 1,
            "shuffle_loop_init_empty: added one song to queue");
-    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_loop_init_empty: playing after init");
-    cmp_ok(c.state.queue_pos, "==", 0,
-           "shuffle_loop_init_empty: queue position on first song");
+    ok(mpd.state.playing, "shuffle_loop_init_empty: playing after init");
+    ok(mpd.state.song_position == 0,
+       "shuffle_loop_init_empty: queue position on first song");
 }
 
 void test_shuffle_loop_init_playing() {
-    struct mpd_connection c;
-
-    struct mpd_song song_a("song_a");
-
-    Options options;
+    fake::MPD mpd;
+    fake::Song song_a("song_a");
+    mpd.db.push_back(song_a);
 
     ShuffleChain chain;
-    chain.Add(song_a.uri);
+    chain.Add(song_a.URI());
 
-    c.db.push_back(song_a);
     // Pretend like we already have a song in our queue, and we're playing.
-    c.queue.push_back(song_a);
+    mpd.queue.push_back(song_a);
+    mpd.PlayAt(0);
 
-    c.state.play_state = MPD_STATE_PLAY;
-    c.state.queue_pos = 0;
-
-    struct shuffle_test_delegate delegate = {
-        .skip_init = false,
-        .until_f = only_init_f,
-    };
-
-    int result = shuffle_loop(&c, &chain, options, &delegate);
+    shuffle_loop(&mpd, &chain, Options(), init_only_d);
 
     // We shouldn't add anything to the queue if we're already playing,
     // ashuffle should start silently.
-    cmp_ok(result, "==", 0,
-           "shuffle_loop_init_playing: shuffle_loop returns 0");
-    cmp_ok(c.queue.size(), "==", 1,
+    cmp_ok(mpd.queue.size(), "==", 1,
            "shuffle_loop_init_playing: no songs added to queue");
-    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_loop_init_playing: playing after init");
-    cmp_ok(c.state.queue_pos, "==", 0,
-           "shuffle_loop_init_playing: queue position on first song");
+    ok(mpd.state.playing, "shuffle_loop_init_playing: playing after init");
+    ok(mpd.state.song_position == 0,
+       "shuffle_loop_init_playing: queue position on first song");
 }
 
 void test_shuffle_loop_init_stopped() {
-    struct mpd_connection c;
+    fake::MPD mpd;
 
-    struct mpd_song song_a("song_a");
-    struct mpd_song song_b("song_b");
-
-    Options options;
+    fake::Song song_a("song_a"), song_b("song_b");
+    mpd.db.push_back(song_a);
+    mpd.db.push_back(song_b);
 
     ShuffleChain chain;
-    chain.Add(song_a.uri);
-
-    c.db.push_back(song_a);
-    c.db.push_back(song_b);
+    chain.Add(song_a.URI());
 
     // Pretend like we already have a song in our queue, that was playing,
     // but now we've stopped.
-    c.queue.push_back(song_b);
-    c.state.queue_pos = 0;
-    c.state.play_state = MPD_STATE_STOP;
+    mpd.queue.push_back(song_b);
+    mpd.state.song_position = 0;
+    mpd.state.playing = false;
 
-    struct shuffle_test_delegate delegate = {
-        .skip_init = false,
-        .until_f = only_init_f,
-    };
-
-    int result = shuffle_loop(&c, &chain, options, &delegate);
+    shuffle_loop(&mpd, &chain, Options(), init_only_d);
 
     // We should add a new item to the queue, and start playing.
-    cmp_ok(result, "==", 0,
-           "shuffle_loop_init_stopped: shuffle_loop returns 0");
-    cmp_ok(c.queue.size(), "==", 2,
+    cmp_ok(mpd.queue.size(), "==", 2,
            "shuffle_loop_init_stopped: added one song to queue");
-    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_loop_init_stopped: playing after init");
-    cmp_ok(c.state.queue_pos, "==", 1,
-           "shuffle_loop_init_stopped: queue position on second song");
+    ok(mpd.state.playing, "shuffle_loop_init_stopped: playing after init");
+    ok(mpd.state.song_position == 1,
+       "shuffle_loop_init_stopped: queue position on second song");
 }
 
 void test_shuffle_loop_basic() {
-    struct mpd_connection c;
+    fake::MPD mpd;
 
-    struct mpd_song song_a("song_a");
-    struct mpd_song song_b("song_b");
-
-    Options options;
+    fake::Song song_a("song_a"), song_b("song_b");
+    mpd.db.push_back(song_a);
+    mpd.db.push_back(song_b);
 
     ShuffleChain chain;
-    chain.Add(song_a.uri);
-
-    c.db.push_back(song_a);
-    c.db.push_back(song_b);
+    chain.Add(song_a.URI());
 
     // Pretend like we already have a song in our queue, that was playing,
     // but now we've stopped.
-    c.queue.push_back(song_b);
-    // If we've gone past the end of the queue, libmpdclient signals this
-    // by setting the queue position to -1 (likely because it is unset in the
-    // mpd status response).
-    c.state.queue_pos = -1;
-    c.state.play_state = MPD_STATE_STOP;
+    mpd.queue.push_back(song_b);
+    mpd.state.playing = false;
+    // signal "past the end of the queue" using an empty song_position.
+    mpd.state.song_position = std::nullopt;
 
-    // Make future IDLE calls return IDLE_QUEUE
-    SetIdle(MPD_IDLE_QUEUE);
+    // Make future Idle calls return IDLE_QUEUE
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    struct shuffle_test_delegate delegate = {
-        .skip_init = true,
-        .until_f = once_f,
-    };
-
-    int result = shuffle_loop(&c, &chain, options, &delegate);
+    shuffle_loop(&mpd, &chain, Options(), loop_once_d);
 
     // We should add a new item to the queue, and start playing.
-    cmp_ok(result, "==", 0, "shuffle_loop_basic: shuffle_loop returns 0");
-    cmp_ok(c.queue.size(), "==", 2,
+    cmp_ok(mpd.queue.size(), "==", 2,
            "shuffle_loop_basic: added one song to queue");
-    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_loop_basic: playing after loop");
-    cmp_ok(c.state.queue_pos, "==", 1,
-           "shuffle_loop_basic: queue position on second song");
+    ok(mpd.state.playing, "shuffle_loop_basic: playing after loop");
+    ok(mpd.state.song_position == 1,
+       "shuffle_loop_basic: queue position on second song");
 
     // The currently playing item should be song_a (the only song in the
     // shuffle chain). If the mpd state is invalid, no playing song is returned,
     // and we skip this check.
-    if (c.Playing()) {
-        ok(c.Playing()->uri == song_a.uri,
-           "shuffle_loop_basic: queued and played song_a");
+    if (std::optional<fake::Song> p = mpd.Playing(); p) {
+        ok(p == song_a, "shuffle_loop_basic: queued and played song_a");
     }
 }
 
 void test_shuffle_loop_empty() {
-    struct mpd_connection c;
+    fake::MPD mpd;
 
-    struct mpd_song song_a("song_a");
-
-    Options options;
+    fake::Song song_a("song_a");
+    mpd.db.push_back(song_a);
 
     ShuffleChain chain;
-    chain.Add(song_a.uri);
-
-    c.db.push_back(song_a);
-
-    // Pretend like the queue was just emptied.
-    c.state.queue_pos = 0;
+    chain.Add(song_a.URI());
 
     // Make future IDLE calls return IDLE_QUEUE
-    SetIdle(MPD_IDLE_QUEUE);
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    struct shuffle_test_delegate delegate = {
-        .skip_init = true,
-        .until_f = once_f,
-    };
-
-    int result = shuffle_loop(&c, &chain, options, &delegate);
+    shuffle_loop(&mpd, &chain, Options(), loop_once_d);
 
     // We should add a new item to the queue, and start playing.
-    cmp_ok(result, "==", 0, "shuffle_loop_empty: shuffle_loop returns 0");
-    cmp_ok(c.queue.size(), "==", 1,
+    cmp_ok(mpd.queue.size(), "==", 1,
            "shuffle_loop_empty: added one song to queue");
-    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_loop_empty: playing after loop");
-    cmp_ok(c.state.queue_pos, "==", 0,
-           "shuffle_loop_empty: queue position on first song");
+    ok(mpd.state.playing, "shuffle_loop_empty: playing after loop");
+    ok(mpd.state.song_position == 0,
+       "shuffle_loop_empty: queue position on first song");
 
     // The currently playing item should be song_a (the only song in the
     // shuffle chain). If the mpd state is invalid, no playing song is returned,
     // and we skip this check.
-    if (c.Playing()) {
-        ok(c.Playing()->uri == song_a.uri,
-           "shuffle_loop_empty: queued and played song_a");
+    if (std::optional<fake::Song> p = mpd.Playing(); p) {
+        ok(p == song_a, "shuffle_loop_empty: queued and played song_a");
     }
 }
 
 void test_shuffle_loop_empty_buffer() {
-    struct mpd_connection c;
+    fake::MPD mpd;
 
-    struct mpd_song song_a("song_a");
+    fake::Song song_a("song_a");
+    mpd.db.push_back(song_a);
+
+    ShuffleChain chain;
+    chain.Add(song_a.URI());
 
     Options options;
     options.queue_buffer = 3;
 
-    ShuffleChain chain;
-    chain.Add(song_a.uri);
-
-    c.db.push_back(song_a);
-
-    // Pretend like the queue was just emptied.
-    c.state.queue_pos = -1;
-
     // Make future IDLE calls return IDLE_QUEUE
-    SetIdle(MPD_IDLE_QUEUE);
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    struct shuffle_test_delegate delegate = {
-        .skip_init = true,
-        .until_f = once_f,
-    };
-
-    int result = shuffle_loop(&c, &chain, options, &delegate);
+    shuffle_loop(&mpd, &chain, options, loop_once_d);
 
     // We should add 4 new items to the queue, and start playing on the first
     // one.
-    cmp_ok(result, "==", 0,
-           "shuffle_loop_empty_buffer: shuffle_loop returns 0");
-    // queue_buffer + the currently playing song.
-    cmp_ok(c.queue.size(), "==", 4,
+    // 4 = queue_buffer + the currently playing song.
+    cmp_ok(mpd.queue.size(), "==", 4,
            "shuffle_loop_empty_buffer: added one song to queue");
-    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_loop_empty_buffer: playing after loop");
-    cmp_ok(c.state.queue_pos, "==", 0,
-           "shuffle_loop_empty_buffer: queue position on first song");
+    ok(mpd.state.playing, "shuffle_loop_empty_buffer: playing after loop");
+    ok(mpd.state.song_position == 0,
+       "shuffle_loop_empty_buffer: queue position on first song");
 
-    if (c.Playing()) {
-        ok(c.Playing()->uri == song_a.uri,
-           "shuffle_loop_empty_buffer: queued and played song_a");
+    if (std::optional<fake::Song> p = mpd.Playing(); p) {
+        ok(p == song_a, "shuffle_loop_empty_buffer: queued and played song_a");
     }
 }
 
 void test_shuffle_loop_buffer_partial() {
-    struct mpd_connection c;
+    fake::MPD mpd;
 
-    struct mpd_song song_a("song_a");
-    struct mpd_song song_b("song_b");
-
-    Options options;
-    options.queue_buffer = 3;
+    fake::Song song_a("song_a"), song_b("song_b");
+    mpd.db.push_back(song_a);
 
     ShuffleChain chain;
     chain.Add(song_a.uri);
 
-    c.db.push_back(song_a);
+    Options options;
+    options.queue_buffer = 3;
 
     // Pretend like the queue already has a few songs in it, and we're in
     // the middle of playing it. We normally don't need to do anything,
     // but we may need to update the queue buffer.
-    c.queue.push_back(song_b);
-    c.queue.push_back(song_b);
-    c.queue.push_back(song_b);
-    c.state.queue_pos = 1;
-    c.state.play_state = MPD_STATE_PLAY;
+    mpd.queue.push_back(song_b);
+    mpd.queue.push_back(song_b);
+    mpd.queue.push_back(song_b);
+    mpd.PlayAt(1);
 
     // Make future IDLE calls return IDLE_QUEUE
-    SetIdle(MPD_IDLE_QUEUE);
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    struct shuffle_test_delegate delegate = {
-        .skip_init = true,
-        .until_f = once_f,
-    };
+    shuffle_loop(&mpd, &chain, options, loop_once_d);
 
-    int result = shuffle_loop(&c, &chain, options, &delegate);
-
-    cmp_ok(result, "==", 0,
-           "shuffle_loop_partial_buffer: shuffle_loop returns 0");
     // We had 3 songs in the queue, and we were playing the second song, so
     // we only need to add 2 more songs to fill out the queue buffer.
-    cmp_ok(c.queue.size(), "==", 5,
+    cmp_ok(mpd.queue.size(), "==", 5,
            "shuffle_loop_partial_buffer: added one song to queue");
     // We should still be playing the same song as before.
-    cmp_ok(c.state.play_state, "==", MPD_STATE_PLAY,
-           "shuffle_loop_partial_buffer: playing after loop");
-    cmp_ok(c.state.queue_pos, "==", 1,
-           "shuffle_loop_partial_buffer: queue position on the same song");
+    ok(mpd.state.playing, "shuffle_loop_partial_buffer: playing after loop");
+    ok(mpd.state.song_position == 1,
+       "shuffle_loop_partial_buffer: queue position on the same song");
 
-    if (c.Playing()) {
-        ok(c.Playing()->uri == song_b.uri,
+    if (std::optional<fake::Song> p = mpd.Playing(); p) {
+        ok(p == song_b,
            "shuffle_loop_partial_buffer: playing the same song as before");
     }
 }
 
 static std::string failing_getpass_f() {
     fail("called failing getpass!");
-    return "";
+    abort();
 }
 
 void test_connect_no_password() {
     // Make sure the environment doesn't influence the test.
     xclearenv();
-    // Default host/port;
-    SetServer("localhost", 6600, 0);
 
-    Options opts;
+    fake::MPD mpd;
+    fake::Dialer dialer(mpd);
+    // by default we should try and connect to localhost on the default port.
+    dialer.check = mpd::Address{"localhost", 6600};
 
-    struct mpd_connection c;
+    std::function<std::string()> pass_f = failing_getpass_f;
+    std::unique_ptr<mpd::MPD> result =
+        ashuffle_connect(dialer, Options(), pass_f);
 
-    struct mpd_pair not_needed = {"", "__uneeded__"};
-    c.pair_iter.push_back(not_needed);
-
-    SetConnection(c);
-
-    struct mpd_connection *result = ashuffle_connect(opts, failing_getpass_f);
-
-    ok(result == &c, "connect_no_password: connection matches set connection");
-    cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
-           "connect_no_password: connection successful");
+    ok(*dynamic_cast<fake::MPD *>(result.get()) == mpd,
+       "connect_no_password: same mpd instance");
 }
-
-struct HostPort {
-    std::optional<std::string> host = std::nullopt;
-    unsigned port = 0;
-};
 
 struct ConnectTestCase {
     // Want is used to set the actual server host/port.
-    HostPort want;
-    // Password is the password that will be set for the fake MPD server.
+    mpd::Address want;
+    // Password is the password that will be set for the fake MPD server. If
+    // this value is set, the dialed MPD fake will have zero permissions
+    // initially.
     std::optional<std::string> password = std::nullopt;
     // Env are the values that will be stored in the MPD_* environment
-    // variables. If they are nullptr or 0, they will remain unset.
-    HostPort env = {};
-    // Flag are the values that will be given in flags. If they are nullptr
+    // variables. If they are empty or 0, they will remain unset.
+    mpd::Address env = {};
+    // Flag are the values that will be given in flags. If they are empty
     // or 0, the respective flag will not be set.
-    HostPort flag = {};
+    mpd::Address flag = {};
 };
 
 void test_connect_parse_host() {
@@ -676,10 +528,9 @@ void test_connect_parse_host() {
         const auto &test = cases[i];
 
         xclearenv();
-        SetServer(*test.want.host, test.want.port, 0);
 
-        if (test.env.host) {
-            xsetenv("MPD_HOST", test.env.host->data());
+        if (!test.env.host.empty()) {
+            xsetenv("MPD_HOST", test.env.host.data());
         }
 
         if (test.env.port) {
@@ -689,11 +540,11 @@ void test_connect_parse_host() {
         }
 
         std::vector<std::string> flags;
-        if (cases[i].flag.host) {
+        if (!test.flag.host.empty()) {
             flags.push_back("--host");
-            flags.push_back(*test.flag.host);
+            flags.push_back(test.flag.host);
         }
-        if (cases[i].flag.port) {
+        if (test.flag.port) {
             flags.push_back("--port");
             flags.push_back(std::to_string(test.flag.port));
         }
@@ -701,7 +552,7 @@ void test_connect_parse_host() {
         Options opts;
 
         if (flags.size() > 0) {
-            auto parse = Options::Parse(flags);
+            auto parse = Options::Parse(fake::TagParser(), flags);
             if (auto err = std::get_if<ParseError>(&parse); err != nullptr) {
                 fail("connect_parse_host[%u]: failed to parse flags", i);
                 diag("  parse result: %s", err->msg.data());
@@ -709,96 +560,96 @@ void test_connect_parse_host() {
             opts = std::get<Options>(parse);
         }
 
-        struct mpd_connection c;
+        fake::MPD mpd;
         if (test.password) {
-            c.password = *test.password;
+            // Create two users, one with no allowed commands, and one with
+            // the good set of allowed commands.
+            mpd.users = {
+                {"zero-privileges", {}},
+                {*test.password, {"add", "status", "play", "pause", "idle"}},
+            };
+            // Then mark the default user, as the user with no privileges.
+            // the default user in the fake allows all commands, so we need
+            // to change it.
+            mpd.active_user = "zero-privileges";
         }
-        SetConnection(c);
 
-        struct mpd_connection *result =
-            ashuffle_connect(opts, failing_getpass_f);
-        ok(result == &c,
-           "connect_parse_host[%u]: connection matches set connection", i);
-        cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
-               "connect_parse_host[%u]: connection successful", i);
+        fake::Dialer dialer(mpd);
+        dialer.check = test.want;
+
+        std::function<std::string()> pass_f = failing_getpass_f;
+        std::unique_ptr<mpd::MPD> result =
+            ashuffle_connect(dialer, opts, pass_f);
+
+        ok(mpd == *dynamic_cast<fake::MPD *>(result.get()),
+           "connect_parse_host[%u]: matches mpd connection", i);
     }
 }
 
-void test_connect_env_password() {
-    xclearenv();
-    // Default host/port;
-    SetServer("localhost", 6600, 0);
+// FakePasswordProvider is a password function that always returns the
+// given password, and counts the number of times that the password function
+// is called.
+class FakePasswordProvider {
+   public:
+    FakePasswordProvider(std::string p) : password(p){};
 
-    // set our password in the environment
-    xsetenv("MPD_HOST", "test_password@localhost");
+    std::string password = {};
+    int call_count = 0;
 
-    Options opts;
-
-    struct mpd_connection c;
-    c.password = "test_password";
-
-    SetConnection(c);
-
-    struct mpd_connection *result = ashuffle_connect(opts, failing_getpass_f);
-
-    ok(result == &c, "connect_env_password: connection matches set connection");
-    cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
-           "connect_env_password: connection successful");
-}
-
-static unsigned _GOOD_PASSWORD_COUNT = 0;
-
-std::string good_password_f() {
-    _GOOD_PASSWORD_COUNT += 1;
-    return "good_password";
-}
+    std::string operator()() {
+        call_count++;
+        return password;
+    };
+};
 
 void test_connect_env_bad_password() {
     xclearenv();
-    // Default host/port;
-    SetServer("localhost", 6600, 0);
 
-    // set our password in the environment
+    fake::MPD mpd;
+    mpd.users = {
+        {"zero-privileges", {}},
+        {"good_password", {"add", "status", "play", "pause", "idle"}},
+    };
+    mpd.active_user = "zero-privileges";
+
+    fake::Dialer dialer(mpd);
+    dialer.check = mpd::Address{"localhost", 6600};
+
+    // Set a bad password via the environment.
     xsetenv("MPD_HOST", "bad_password@localhost");
 
-    Options opts;
-
-    struct mpd_connection c;
-
-    c.password = "good_password";
-
-    SetConnection(c);
+    std::function<std::string()> pass_f = FakePasswordProvider("good_password");
 
     // using good_password_f, just in-case ashuffle_connect decides to prompt
     // for a password. It should fail without ever calling good_password_f.
-    dies_ok({ (void)ashuffle_connect(opts, good_password_f); },
+    dies_ok({ (void)ashuffle_connect(dialer, Options(), pass_f); },
             "connect_env_bad_password: fail to connect with bad password");
 }
 
 void test_connect_env_ok_password_bad_perms() {
     xclearenv();
-    // Default host/port;
-    SetServer("localhost", 6600, 0);
+
+    fake::MPD mpd;
+    mpd.users = {
+        {"zero-privileges", {}},
+        // The "test_password" has an extended set of privileges, but should
+        // still be missing some required commands.
+        {"test_password", {"add"}},
+    };
+    mpd.active_user = "zero-privileges";
+
+    fake::Dialer dialer(mpd);
+    dialer.check = mpd::Address{"localhost", 6600};
 
     // set our password in the environment
     xsetenv("MPD_HOST", "good_password@localhost");
 
-    Options opts;
-
-    struct mpd_connection c;
-
-    c.password = "good_password";
-
-    // We have a good password, *but*, we're missing
-    struct mpd_pair status_pair = {"", "status"};
-    c.pair_iter.push_back(status_pair);
-
-    SetConnection(c);
+    std::function<std::string()> pass_f = FakePasswordProvider("good_password");
 
     // We should terminate after seeing the bad permissions. If we end up
     // re-prompting (and getting a good password), we should succeed, and fail
     // the test.
-    dies_ok({ (void)ashuffle_connect(opts, good_password_f); },
+    dies_ok({ (void)ashuffle_connect(dialer, Options(), pass_f); },
             "connect_env_ok_password_bad_perms: fail to connect with bad "
             "permissions");
 }
@@ -809,56 +660,59 @@ void test_connect_env_ok_password_bad_perms() {
 // we should be OK.
 void test_connect_bad_perms_ok_prompt() {
     xclearenv();
-    SetServer("localhost", 6600, 0);
 
-    Options opts;
+    fake::MPD mpd;
+    mpd.users = {
+        {"zero-privileges", {}},
+        {"good_password", {"add", "status", "play", "pause", "idle"}},
+    };
+    mpd.active_user = "zero-privileges";
 
-    struct mpd_connection c;
+    fake::Dialer dialer(mpd);
+    dialer.check = mpd::Address{"localhost", 6600};
 
-    c.password = "good_password";
+    std::function<std::string()> pass_f = FakePasswordProvider("good_password");
+    FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
-    struct mpd_pair add_pair = {"", "add"};
-    c.pair_iter.push_back(add_pair);
+    cmp_ok(
+        pp->call_count, "==", 0,
+        "connect_bad_perms_ok_prompt: no call to password func to start with");
 
-    SetConnection(c);
+    std::unique_ptr<mpd::MPD> result =
+        ashuffle_connect(dialer, Options(), pass_f);
 
-    unsigned good_password_before = _GOOD_PASSWORD_COUNT;
+    ok(*dynamic_cast<fake::MPD *>(result.get()) == mpd,
+       "connect_bad_perms_ok_prompt: mpd matches fake MPD");
 
-    struct mpd_connection *result = ashuffle_connect(opts, good_password_f);
-
-    unsigned good_password_after = _GOOD_PASSWORD_COUNT;
-
-    ok(result == &c,
-       "connect_bad_perms_ok_prompt: connection matches set connection");
-    cmp_ok(c.error.error, "==", MPD_ERROR_SUCCESS,
-           "connect_bad_perms_ok_prompt: connection successful");
-    cmp_ok(good_password_before, "==", good_password_after - 1,
-           "connect_bad_perms_ok_prompt: password prompt should have been "
-           "called once");
+    cmp_ok(
+        pp->call_count, "==", 1,
+        "connect_bad_perms_ok_prompt: should have one call to password func");
 }
 
 void test_connect_bad_perms_prompt_bad_perms() {
     xclearenv();
-    SetServer("localhost", 6600, 0);
 
-    Options opts;
+    fake::MPD mpd;
+    mpd.users = {
+        {"zero-privileges", {}},
+        // Missing privileges for both passwords. "env_password" is given in
+        // the env, but it's missing privleges. Then we prompt, to get
+        // prompt_password, and that *also* fails, so the connect fails overall.
+        {"env_password", {"play"}},
+        {"prompt_password", {"add"}},
+    };
+    mpd.active_user = "zero-privileges";
 
-    struct mpd_connection c;
+    fake::Dialer dialer(mpd);
+    dialer.check = mpd::Address{"localhost", 6600};
 
-    c.password = "good_password";
+    xsetenv("MPD_HOST", "env_password@localhost");
 
-    struct mpd_pair play_pair = {"", "play"};
-    // Add the disabled command twice, so after the prompt, we still recognise
-    // the pasword as invalid.
-    c.pair_iter.push_back(play_pair);
-    // An empty entry stops processing, for the first check.
-    c.pair_iter.push_back(std::nullopt);
-    c.pair_iter.push_back(play_pair);
+    std::function<std::string()> pass_f =
+        FakePasswordProvider("prompt_password");
 
-    SetConnection(c);
-
-    dies_ok({ (void)ashuffle_connect(opts, good_password_f); },
-            "connect_bad_perms_ok_prompt: fails to connect");
+    dies_ok({ (void)ashuffle_connect(dialer, Options(), pass_f); },
+            "connect_bad_perms_prompt_bad_perms: fails to connect");
 }
 
 int main() {
@@ -868,7 +722,6 @@ int main() {
     test_build_songs_mpd_filter();
     test_build_songs_file_nocheck();
     test_build_songs_file_check();
-    test_shuffle_single();
 
     test_shuffle_loop_init_empty();
     test_shuffle_loop_init_playing();
@@ -881,7 +734,6 @@ int main() {
 
     test_connect_no_password();
     test_connect_parse_host();
-    test_connect_env_password();
     test_connect_env_bad_password();
     test_connect_env_ok_password_bad_perms();
     test_connect_bad_perms_ok_prompt();
