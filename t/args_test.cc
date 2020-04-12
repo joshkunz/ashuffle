@@ -2,6 +2,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -12,54 +13,34 @@
 
 #include "t/mpd_fake.h"
 
-#include <tap.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 using namespace ashuffle;
 
-template <typename... Args>
-std::optional<ParseError> ParseOnly(const mpd::TagParser &tagger,
-                                    Args... strs) {
-    std::vector<std::string> args = {strs...};
-    std::variant<Options, ParseError> result = Options::Parse(tagger, args);
-    if (ParseError *err = std::get_if<ParseError>(&result); err != nullptr) {
-        return *err;
-    }
-    return std::nullopt;
-}
+using ::testing::HasSubstr;
+using ::testing::Matcher;
+using ::testing::MatchesRegex;
+using ::testing::Values;
 
-// We need this additional binding, so this overload binds more tightly than
-// the "generic" non-tagger binding.
-template <typename... Args>
-std::optional<ParseError> ParseOnly(const fake::TagParser &tagger,
-                                    Args... strs) {
-    return ParseOnly<Args...>(static_cast<const mpd::TagParser &>(tagger),
-                              strs...);
-}
-
-template <typename... Args>
-std::optional<ParseError> ParseOnly(Args... strs) {
-    fake::TagParser tagger;
-    return ParseOnly<Args...>(tagger, strs...);
-}
-
-void test_default() {
+TEST(ParseTest, Empty) {
     fake::TagParser tagger;
     auto result = Options::Parse(tagger, std::vector<std::string>());
-    ok(std::get_if<ParseError>(&result) == nullptr, "empty parse works");
+    ASSERT_EQ(std::get_if<ParseError>(&result), nullptr);
 
     Options opts = std::get<Options>(result);
-    ok(opts.ruleset.empty(), "no rules by default");
-    cmp_ok(opts.queue_only, "==", 0, "no 'queue only' by default");
-    ok(opts.file_in == nullptr, "no input file by default");
-    cmp_ok(opts.check_uris, "==", true, "check_uris on by default");
-    cmp_ok(opts.queue_buffer, "==", 0, "no queue buffer by default");
-    ok(opts.host == std::nullopt, "no host by default");
-    cmp_ok(opts.port, "==", 0, "no port by default");
-    cmp_ok(opts.test.print_all_songs_and_exit, "==", false,
-           "no print_all_songs_and_exit by default");
+
+    EXPECT_TRUE(opts.ruleset.empty()) << "there should be no rules by default";
+    EXPECT_EQ(opts.queue_only, 0U);
+    EXPECT_EQ(opts.file_in, nullptr);
+    EXPECT_TRUE(opts.check_uris);
+    EXPECT_EQ(opts.queue_buffer, 0U);
+    EXPECT_EQ(opts.host, std::nullopt);
+    EXPECT_EQ(opts.port, 0U);
+    EXPECT_FALSE(opts.test.print_all_songs_and_exit);
 }
 
-void test_basic_short() {
+TEST(ParseTest, Short) {
     fake::TagParser tagger({
         {"artist", MPD_TAG_ARTIST},
     });
@@ -75,15 +56,15 @@ void test_basic_short() {
     }));
     // clang-format on
 
-    cmp_ok(opts.ruleset.size(), ">=", 1, "basic short detected rule");
-    cmp_ok(opts.queue_only, "==", 5, "basic short queue only");
-    ok(opts.file_in != nullptr, "basic file in present");
-    cmp_ok(opts.check_uris, "==", false, "basic short nocheck");
-    cmp_ok(opts.queue_buffer, "==", 10, "basic short queue buffer");
-    cmp_ok(opts.port, "==", 1234);
+    EXPECT_EQ(opts.ruleset.size(), 2U);
+    EXPECT_EQ(opts.queue_only, 5U);
+    EXPECT_NE(opts.file_in, nullptr);
+    EXPECT_FALSE(opts.check_uris);
+    EXPECT_EQ(opts.queue_buffer, 10U);
+    EXPECT_EQ(opts.port, 1234U);
 }
 
-void test_basic_long() {
+TEST(ParseTest, Long) {
     fake::TagParser tagger({
         {"artist", MPD_TAG_ARTIST},
     });
@@ -101,16 +82,16 @@ void test_basic_long() {
     }));
     // clang-format on
 
-    cmp_ok(opts.ruleset.size(), ">=", 1, "basic long detected rule");
-    cmp_ok(opts.queue_only, "==", 5, "basic long queue only");
-    ok(opts.file_in != nullptr, "basic file in present");
-    cmp_ok(opts.check_uris, "==", false, "basic long nocheck");
-    cmp_ok(opts.queue_buffer, "==", 10, "basic long queue buffer");
-    ok(opts.host == "foo", "basic long host");
-    cmp_ok(opts.port, "==", 1234, "basic long port");
+    EXPECT_EQ(opts.ruleset.size(), 2U);
+    EXPECT_EQ(opts.queue_only, 5U);
+    EXPECT_NE(opts.file_in, nullptr);
+    EXPECT_FALSE(opts.check_uris);
+    EXPECT_EQ(opts.queue_buffer, 10U);
+    EXPECT_EQ(opts.host, "foo");
+    EXPECT_EQ(opts.port, 1234U);
 }
 
-void test_basic_mixed_long_short() {
+TEST(ParseTest, MixedLongShort) {
     fake::TagParser tagger({
         {"artist", MPD_TAG_ARTIST},
     });
@@ -126,25 +107,14 @@ void test_basic_mixed_long_short() {
     }));
     // clang-format on
 
-    cmp_ok(opts.ruleset.size(), ">=", 1, "basic mixed detected rule");
-    cmp_ok(opts.queue_only, "==", 5, "basic mixed queue only");
-    ok(opts.file_in != nullptr, "basic file in present");
-    cmp_ok(opts.check_uris, "==", false, "basic mixed nocheck");
-    cmp_ok(opts.queue_buffer, "==", 10, "basic mixed queue buffer");
+    EXPECT_EQ(opts.ruleset.size(), 2U);
+    EXPECT_EQ(opts.queue_only, 5U);
+    EXPECT_NE(opts.file_in, nullptr);
+    EXPECT_FALSE(opts.check_uris);
+    EXPECT_EQ(opts.queue_buffer, 10U);
 }
 
-void test_bad_strtou() {
-    std::optional<ParseError> res;
-    res = ParseOnly("--only", "0x5.0");
-    ok(res.has_value(), "bad strtou fails parse");
-    like(res->msg.data(), "couldn't convert .* '0x5\\.0'");
-
-    res = ParseOnly("--queue-buffer", "20U");
-    ok(res.has_value(), "bad strtou fails parse");
-    like(res->msg.data(), "couldn't convert .* '20U'");
-}
-
-void test_rule_basic() {
+TEST(ParseTest, Rule) {
     fake::TagParser tagger({
         {"artist", MPD_TAG_ARTIST},
     });
@@ -152,119 +122,97 @@ void test_rule_basic() {
     Options opts = std::get<Options>(
         Options::Parse(tagger, {"-e", "artist", "__artist__"}));
 
-    cmp_ok(opts.ruleset.size(), ">=", 1, "basic rule parsed at least one rule");
-
-    skip(opts.ruleset.size() < 1, 2, "skipping rule tests, no rule parsed");
+    ASSERT_FALSE(opts.ruleset.empty());
 
     // Now we pull out the first rule, and then check it against our
-    // test songs.
+    // test songs. This is to assert that we parsed the rule correctly.
     Rule &r = opts.ruleset[0];
 
     fake::Song matching({{MPD_TAG_ARTIST, "__artist__"}});
     fake::Song not_matching({{MPD_TAG_ARTIST, "not artist"}});
 
-    ok(!r.Accepts(matching), "basic rule arg should exclude match song");
-    ok(r.Accepts(not_matching), "basic rule arg should not exclude other song");
-
-    end_skip;
+    EXPECT_FALSE(r.Accepts(matching))
+        << "basic rule arg should exclude match song";
+    EXPECT_TRUE(r.Accepts(not_matching))
+        << "basic rule arg should not exclude non-matching song";
 }
 
-void test_file_stdin() {
+TEST(ParseTest, FileInStdin) {
     Options opts;
     fake::TagParser tagger;
 
     opts = std::get<Options>(Options::Parse(tagger, {"-f", "-"}));
-    ok(opts.file_in == stdin, "'-f -' parses as stdin");
+    EXPECT_EQ(opts.file_in, stdin);
 
     opts = std::get<Options>(Options::Parse(tagger, {"--file", "-"}));
-    ok(opts.file_in == stdin, "'--file -' parses as stdin");
+    EXPECT_EQ(opts.file_in, stdin);
 }
 
-#define TEST_PARSE_FAIL(prefix, _res, err_match)                               \
-    do {                                                                       \
-        std::optional<ParseError> res = (_res);                                \
-        ok(res.has_value(), prefix " parse should fail");                      \
-        skip(!res.has_value(), 2, prefix " parsed OK, skipping error checks"); \
-        ok(res->type == ParseError::Type::kGeneric,                            \
-           prefix " error is generic");                                        \
-        like(res->msg.data(), err_match, prefix " error message matches");     \
-        end_skip;                                                              \
-    } while (0)
+using ParseFailureParam =
+    std::tuple<std::vector<std::string>, Matcher<std::string>>;
 
-void test_partials() {
-#define TEST_PARTIAL(name, _res, err_match) \
-    TEST_PARSE_FAIL("partial " name, (_res), err_match)
+class ParseFailureTest : public testing::TestWithParam<ParseFailureParam> {
+   public:
+    std::optional<ParseError> result_;
 
-    TEST_PARTIAL("only short", ParseOnly("-o"),
-                 "no argument supplied for '-o'");
-    TEST_PARTIAL("only long", ParseOnly("--only"),
-                 "no argument supplied for '--only'");
+    std::vector<std::string> Args() { return std::get<0>(GetParam()); }
 
-    TEST_PARTIAL("file short", ParseOnly("-f"),
-                 "no argument supplied for '-f'");
-    TEST_PARTIAL("file long", ParseOnly("--file"),
-                 "no argument supplied for '--file'");
+    Matcher<std::string> ErrorMatcher() { return std::get<1>(GetParam()); }
 
-    TEST_PARTIAL("queue buffer short", ParseOnly("-q"),
-                 "no argument supplied for '-q'");
-    TEST_PARTIAL("queue buffer long", ParseOnly("--queue-buffer"),
-                 "no argument supplied for '--queue-buffer'");
+    void SetUp() override {
+        fake::TagParser tagger({
+            {"artist", MPD_TAG_ARTIST},
+        });
 
-    // Fake tagger with "artist" tag, so we can test partial rule matching
-    // without running into "unknown tag" errors.
-    fake::TagParser tagger({
-        {"artist", MPD_TAG_ARTIST},
-    });
-    TEST_PARTIAL("exclude short no arg", ParseOnly("-e"),
-                 "no argument supplied for '-e'");
-    TEST_PARTIAL("exclude short only match", ParseOnly(tagger, "-e", "artist"),
-                 "no value supplied for match 'artist'");
-    TEST_PARTIAL("exclude short only match mutli",
-                 ParseOnly(tagger, "-e", "artist", "whatever", "artist"),
-                 "no value supplied for match 'artist'");
+        std::variant<Options, ParseError> result =
+            Options::Parse(tagger, Args());
+        if (ParseError *err = std::get_if<ParseError>(&result);
+            err != nullptr) {
+            result_ = *err;
+        }
+    };
+};
 
-    TEST_PARTIAL("exclude long no arg", ParseOnly("--exclude"),
-                 "no argument supplied for '--exclude'");
-    TEST_PARTIAL("exclude long only match",
-                 ParseOnly(tagger, "--exclude", "artist"),
-                 "no value supplied for match 'artist'");
-    TEST_PARTIAL("exclude long only match mutli",
-                 ParseOnly(tagger, "--exclude", "artist", "whatever", "artist"),
-                 "no value supplied for match 'artist'");
-
-    TEST_PARTIAL("host long", ParseOnly("--host"),
-                 "no argument supplied for '--host'");
-    TEST_PARTIAL("port long", ParseOnly("--port"),
-                 "no argument supplied for '--port'");
-    TEST_PARTIAL("port short ", ParseOnly("-p"),
-                 "no argument supplied for '-p'");
-
-    TEST_PARTIAL("test option no arg",
-                 ParseOnly("--test_enable_option_do_not_use"),
-                 "no argument supplied for '--test_enable_option_do_not_use'");
+TEST_P(ParseFailureTest, ParseFail) {
+    ASSERT_TRUE(result_.has_value());
+    EXPECT_EQ(result_->type, ParseError::Type::kGeneric);
+    EXPECT_THAT(result_->msg, ErrorMatcher());
 }
 
-void test_help() {
-    ok(ParseOnly("-h")->type == ParseError::Type::kHelp, "'-h' parses as help");
-    ok(ParseOnly("--help")->type == ParseError::Type::kHelp,
-       "'--help' parses as help");
-    ok(ParseOnly("-?")->type == ParseError::Type::kHelp, "'-?' parses as help");
-}
+std::vector<ParseFailureParam> partial_cases = {
+    {{"-o"}, HasSubstr("no argument supplied for '-o'")},
+    {{"--only"}, HasSubstr("no argument supplied for '--only'")},
+    {{"-f"}, HasSubstr("no argument supplied for '-f'")},
+    {{"--file"}, HasSubstr("no argument supplied for '--file'")},
+    {{"-q"}, HasSubstr("no argument supplied for '-q'")},
+    {{"--queue-buffer"},
+     HasSubstr("no argument supplied for '--queue-buffer'")},
+    {{"-e"}, HasSubstr("no argument supplied for '-e'")},
+    {{"-e", "artist"}, HasSubstr("no value supplied for match 'artist'")},
+    {{"-e", "artist", "whatever", "artist"},
+     HasSubstr("no value supplied for match 'artist'")},
+    {{"--exclude"}, HasSubstr("no argument supplied for '--exclude'")},
+    {{"--exclude", "artist"},
+     HasSubstr("no value supplied for match 'artist'")},
+    {{"--exclude", "artist", "whatever", "artist"},
+     HasSubstr("no value supplied for match 'artist'")},
+    {{"--host"}, HasSubstr("no argument supplied for '--host'")},
+    {{"-p"}, HasSubstr("no argument supplied for '-p'")},
+    {{"--port"}, HasSubstr("no argument supplied for '--port'")},
+    {{"--test_enable_option_do_not_use"},
+     HasSubstr("no argument supplied for '--test_enable_option_do_not_use'")},
+};
 
-void test_bad_option() {
-    TEST_PARSE_FAIL("bad option 'blah'", ParseOnly("blah"),
-                    "bad option 'blah'");
-    TEST_PARSE_FAIL("--bad_arg in middle",
-                    ParseOnly("-n", "--bad_arg", "-o", "5"),
-                    "bad option '--bad_arg'");
-    TEST_PARSE_FAIL("bad option '-b' at end", ParseOnly("-n", "-o", "5", "-b"),
-                    "bad option '-b'");
-    TEST_PARSE_FAIL("--test_enable_option with bad option",
-                    ParseOnly("--test_enable_option_do_not_use", "invalid"),
-                    "bad test option 'invalid'");
-}
+INSTANTIATE_TEST_SUITE_P(Partials, ParseFailureTest, ValuesIn(partial_cases));
 
-void test_test_option() {
+std::vector<ParseFailureParam> strtou_cases = {
+    {{"--only", "0x5.0"}, MatchesRegex("couldn't convert .* '0x5\\.0'")},
+    {{"--queue-buffer", "20U"}, MatchesRegex("couldn't convert .* '20U'")},
+};
+
+INSTANTIATE_TEST_SUITE_P(BadStrtou, ParseFailureTest, ValuesIn(strtou_cases));
+
+TEST(ParseTest, TestOption) {
     fake::TagParser tagger;
     Options opts = std::get<Options>(
         Options::Parse(tagger, {
@@ -272,37 +220,14 @@ void test_test_option() {
                                    "print_all_songs_and_exit",
                                }));
 
-    cmp_ok(opts.test.print_all_songs_and_exit, "==", true,
-           "test_option: print_all_songs_and_exit is set");
+    EXPECT_TRUE(opts.test.print_all_songs_and_exit);
 }
 
-void test_parse_from_c() {
+TEST(ParseTest, ParseFromC) {
     fake::TagParser tagger;
     const char *c_argv[] = {"ashuffle", "-o", "33"};
     auto res = Options::ParseFromC(tagger, c_argv, 3);
     Options *opts = std::get_if<Options>(&res);
-    ok(opts != nullptr, "parse_from_c: parses correctly");
-    skip(opts == nullptr, 1, "no options parsed");
-    cmp_ok(opts->queue_only, "==", 33,
-           "parse_from_c: parses queue_only correctly");
-    end_skip;
-}
-
-int main() {
-    plan(NO_PLAN);
-
-    test_bad_option();
-    test_bad_strtou();
-    test_basic_long();
-    test_basic_mixed_long_short();
-    test_basic_short();
-    test_default();
-    test_file_stdin();
-    test_help();
-    test_partials();
-    test_rule_basic();
-    test_test_option();
-    test_parse_from_c();
-
-    done_testing();
+    ASSERT_NE(opts, nullptr) << "Options failed to parse from C";
+    EXPECT_EQ(opts->queue_only, 33U);
 }
