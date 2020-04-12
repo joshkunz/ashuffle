@@ -62,7 +62,8 @@ gtest_deps = [
   googletest.dependency('gmock_main'),
 ]
 
-subdir('t')
+mpdfake_inc = include_directories('t')
+mpdfake_dep = declare_dependency(include_directories : mpdfake_inc)
 
 test_options = [
     'werror=true',
