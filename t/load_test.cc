@@ -1,5 +1,9 @@
-#include "load.h"
+#include <istream>
+#include <memory>
+#include <sstream>
+
 #include "args.h"
+#include "load.h"
 #include "mpd.h"
 #include "rule.h"
 #include "shuffle.h"
@@ -52,38 +56,21 @@ TEST(MPDLoaderTest, WithFilter) {
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
 
-FILE *TestFile(std::vector<std::string> lines) {
-    FILE *f = tmpfile();
-    if (f == nullptr) {
-        perror("couldn't open tmpfile");
-        abort();
-    }
-    for (auto l : lines) {
-        l.push_back('\n');
-        if (!fwrite(l.data(), l.size(), 1, f)) {
-            perror("couldn't write to file");
-            abort();
-        }
-    }
-
-    // rewind, so the user can see the lines that were written.
-    rewind(f);
-
-    // The file will be cleaned by the user when it calls fclose.
-    return f;
+std::unique_ptr<std::istream> TestStream(std::vector<std::string> lines) {
+    return std::make_unique<std::istringstream>(absl::StrJoin(lines, "\n"));
 }
 
 TEST(FileLoaderTest, Basic) {
     ShuffleChain chain;
     fake::Song song_a("song_a"), song_b("song_b"), song_c("song_c");
 
-    FILE *f = TestFile({
+    std::unique_ptr<std::istream> s = TestStream({
         song_a.URI(),
         song_b.URI(),
         song_c.URI(),
     });
 
-    FileLoader loader(f);
+    FileLoader loader(s.get());
     loader.Load(&chain);
 
     std::vector<std::string> want = {song_a.URI(), song_b.URI(), song_c.URI()};
@@ -123,7 +110,7 @@ TEST(CheckFileLoaderTest, Basic) {
     // mpd.db.push_back(song_d)
 
     // step 5. Set up our test input file, but writing the URIs of our songs.
-    FILE *f = TestFile({
+    std::unique_ptr<std::istream> s = TestStream({
         song_a.URI(),
         song_b.URI(),
         song_c.URI(),
@@ -133,7 +120,7 @@ TEST(CheckFileLoaderTest, Basic) {
     });
 
     // step 6. Run! (and validate)
-    CheckFileLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, f);
+    CheckFileLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, s.get());
     loader.Load(&chain);
 
     std::vector<std::string> want = {song_a.URI(), song_c.URI()};

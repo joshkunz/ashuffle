@@ -56,11 +56,11 @@ int main(int argc, const char* argv[]) {
             default:
                 assert(false && "unreachable");
         }
-        PrintHelp(stderr);
+        std::cerr << DisplayHelp;
         exit(EXIT_FAILURE);
     }
 
-    Options options = std::get<Options>(parse);
+    Options options = std::move(std::get<Options>(parse));
 
     std::function<std::string()> pass_f = [] {
         return GetPass(stdin, stdout, "mpd password: ");

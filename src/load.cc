@@ -32,50 +32,34 @@ void MPDLoader::Load(ShuffleChain *songs) {
     }
 }
 
-FileLoader::~FileLoader() { fclose(file_); }
-
 bool FileLoader::Verify(std::string_view) {
     // The base file loader verifies all songs. It's the "no-check" version.
     return true;
 }
 
 void FileLoader::Load(ShuffleChain *songs) {
-    char *uri = NULL;
-    ssize_t length = 0;
-    size_t ignored = 0;
-
-    length = getline(&uri, &ignored, file_);
-    while (!feof(file_) && !ferror(file_)) {
-        if (length < 1) {
+    for (std::string uri; std::getline(*file_, uri);) {
+        if (uri.empty()) {
             Die("invalid URI in input stream");
         }
 
         // If this line has terminating newline attached, set it to null
         // (effectively removing the newline).
-        if (uri[length - 1] == '\n') {
-            length -= 1;
-            uri[length] = '\0';
+        if (uri[uri.size() - 1] == '\n') {
+            uri.pop_back();
         }
 
-        if (Verify(uri)) {
-            songs->Add(std::string(uri));
+        if (!Verify(uri)) {
+            continue;
         }
 
-        free(uri);
-        uri = NULL;
-
-        // Get the next URI line.
-        length = getline(&uri, &ignored, file_);
-    }
-
-    // Free any memory allocated by our final getline.
-    if (uri != NULL) {
-        free(uri);
+        songs->Add(uri);
     }
 }
 
 CheckFileLoader::CheckFileLoader(mpd::MPD *mpd,
-                                 const std::vector<Rule> &ruleset, FILE *file)
+                                 const std::vector<Rule> &ruleset,
+                                 std::istream *file)
     : FileLoader(file), mpd_(mpd), rules_(ruleset) {
     std::unique_ptr<mpd::SongReader> reader = mpd->ListAll();
     while (!reader->Done()) {

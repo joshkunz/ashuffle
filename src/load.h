@@ -1,7 +1,7 @@
 #ifndef __ASHUFFLE_LOAD_H__
 #define __ASHUFFLE_LOAD_H__
 
-#include <stdio.h>
+#include <istream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -36,8 +36,8 @@ class MPDLoader : public Loader {
 
 class FileLoader : public Loader {
    public:
-    ~FileLoader() override;
-    FileLoader(FILE* file) : file_(file){};
+    ~FileLoader() override = default;
+    FileLoader(std::istream* file) : file_(file){};
 
     void Load(ShuffleChain* into) override;
 
@@ -45,14 +45,14 @@ class FileLoader : public Loader {
     virtual bool Verify(std::string_view);
 
    private:
-    FILE* file_;
+    std::istream* file_;
 };
 
 class CheckFileLoader : public FileLoader {
    public:
     ~CheckFileLoader() override = default;
     CheckFileLoader(mpd::MPD* mpd, const std::vector<Rule>& ruleset,
-                    FILE* file);
+                    std::istream* file);
 
    protected:
     bool Verify(std::string_view) override;
