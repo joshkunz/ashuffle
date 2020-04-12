@@ -70,29 +70,15 @@ test_options = [
     'b_sanitize=undefined',
 ]
 
-libtap_tests = {
-    'ashuffle': ['t/ashuffle_test.cc'],
-}
-
-foreach test_name, test_sources : libtap_tests 
-    test_exe = executable(
-        test_name + '_test',
-        sources + test_sources,
-        include_directories : src_inc,
-        dependencies : absl_all + [libtap_dep, mpdfake_dep],
-        override_options : test_options,
-    )
-    test(test_name, test_exe)
-endforeach
-
-gtest_tests = {
+tests = {
     'rule': ['t/rule_test.cc'],
     'shuffle': ['t/shuffle_test.cc'],
     'load': ['t/load_test.cc'],
     'args': ['t/args_test.cc'],
+    'ashuffle': ['t/ashuffle_test.cc'],
 }
 
-foreach test_name, test_sources : gtest_tests 
+foreach test_name, test_sources : tests
     test_exe = executable(
         test_name + '_test',
         sources + test_sources,

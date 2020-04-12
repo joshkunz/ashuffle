@@ -18,7 +18,6 @@
 #include <mpd/pair.h>
 #include <mpd/status.h>
 #include <mpd/tag.h>
-#include <tap.h>
 
 #include "args.h"
 #include "ashuffle.h"
@@ -28,27 +27,45 @@
 
 #include "t/mpd_fake.h"
 
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include <absl/strings/str_join.h>
+
 using namespace ashuffle;
 
-void xclearenv() {
-    if (clearenv()) {
-        perror("xclearenv");
-        abort();
-    }
-}
+using ::testing::ElementsAre;
+using ::testing::Eq;
+using ::testing::ExitedWithCode;
+using ::testing::HasSubstr;
+using ::testing::Optional;
+using ::testing::Pointee;
+using ::testing::ValuesIn;
+using ::testing::WhenDynamicCastTo;
 
-void xsetenv(const char *key, const char *value) {
-    if (setenv(key, value, 1) != 0) {
+void xsetenv(std::string k, std::string v) {
+    if (setenv(k.data(), v.data(), 1) != 0) {
         perror("xsetenv");
         abort();
     }
 }
 
+void xclearenv() {
+    // These are the only two flags we care about, we don't want to worry about
+    // messing up the rest of the environment.
+    unsetenv("MPD_HOST");
+    unsetenv("MPD_PORT");
+}
+
+// This test delegate only allows the "init" part of the loop to run. No
+// continous logic runs.
 TestDelegate init_only_d = {
     .skip_init = false,
     .until_f = [] { return false; },
 };
 
+// This delegate *only* runs the core loop logic, and it only runs the
+// logic once.
 TestDelegate loop_once_d{
     .skip_init = true,
     .until_f =
@@ -60,85 +77,73 @@ TestDelegate loop_once_d{
         },
 };
 
-void test_Loop_init_empty() {
+class LoopTest : public testing::Test {
+   public:
     fake::MPD mpd;
-
-    fake::Song song_a("song_a");
-    mpd.db.push_back(song_a);
-
-    Options options;
-
     ShuffleChain chain;
-    chain.Add(song_a.URI());
+    Options opts;
 
-    Loop(&mpd, &chain, options, init_only_d);
+    fake::Song song_a, song_b;
 
-    cmp_ok(mpd.queue.size(), "==", 1,
-           "Loop_init_empty: added one song to queue");
-    ok(mpd.state.playing, "Loop_init_empty: playing after init");
-    ok(mpd.state.song_position == 0,
-       "Loop_init_empty: queue position on first song");
+    // Set up MPD instance with two songs in the database, and a shuffle
+    // chain with only "song_a".
+    void SetUp() override {
+        song_a = fake::Song("song_a");
+        song_b = fake::Song("song_b");
+
+        mpd.db.push_back(song_a);
+        mpd.db.push_back(song_b);
+
+        // Make future Idle calls return IDLE_QUEUE.
+        mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
+
+        // Add song_a to our chain.
+        chain.Add(song_a.URI());
+    }
+};
+
+TEST_F(LoopTest, InitEmptyQueue) {
+    Loop(&mpd, &chain, opts, init_only_d);
+
+    // We should have enqueued one song into the empty queue (song_a, the only
+    // song in the chain), and started playing it.
+    EXPECT_THAT(mpd.queue, ElementsAre(song_a));
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_EQ(mpd.state.song_position, 0);
 }
 
-void test_Loop_init_playing() {
-    fake::MPD mpd;
-    fake::Song song_a("song_a");
-    mpd.db.push_back(song_a);
-
-    ShuffleChain chain;
-    chain.Add(song_a.URI());
-
+TEST_F(LoopTest, InitWhilePlaying) {
     // Pretend like we already have a song in our queue, and we're playing.
     mpd.queue.push_back(song_a);
     mpd.PlayAt(0);
 
-    Loop(&mpd, &chain, Options(), init_only_d);
+    Loop(&mpd, &chain, opts, init_only_d);
 
     // We shouldn't add anything to the queue if we're already playing,
     // ashuffle should start silently.
-    cmp_ok(mpd.queue.size(), "==", 1,
-           "Loop_init_playing: no songs added to queue");
-    ok(mpd.state.playing, "Loop_init_playing: playing after init");
-    ok(mpd.state.song_position == 0,
-       "Loop_init_playing: queue position on first song");
+    EXPECT_THAT(mpd.queue, ElementsAre(song_a));
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_EQ(mpd.state.song_position, 0);
 }
 
-void test_Loop_init_stopped() {
-    fake::MPD mpd;
-
-    fake::Song song_a("song_a"), song_b("song_b");
-    mpd.db.push_back(song_a);
-    mpd.db.push_back(song_b);
-
-    ShuffleChain chain;
-    chain.Add(song_a.URI());
-
+TEST_F(LoopTest, InitWhileStopped) {
     // Pretend like we already have a song in our queue, that was playing,
     // but now we've stopped.
     mpd.queue.push_back(song_b);
     mpd.state.song_position = 0;
     mpd.state.playing = false;
 
-    Loop(&mpd, &chain, Options(), init_only_d);
+    Loop(&mpd, &chain, opts, init_only_d);
 
-    // We should add a new item to the queue, and start playing.
-    cmp_ok(mpd.queue.size(), "==", 2,
-           "Loop_init_stopped: added one song to queue");
-    ok(mpd.state.playing, "Loop_init_stopped: playing after init");
-    ok(mpd.state.song_position == 1,
-       "Loop_init_stopped: queue position on second song");
+    // ashuffle should have picked a song, added it to the queue, then started
+    // playing it. The previous song in the queue should still be there.
+    // Note: song_a is the only song in the chain, so we know we'll pick it.
+    EXPECT_THAT(mpd.queue, ElementsAre(song_b, song_a));
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_THAT(mpd.state.song_position, 1);
 }
 
-void test_Loop_basic() {
-    fake::MPD mpd;
-
-    fake::Song song_a("song_a"), song_b("song_b");
-    mpd.db.push_back(song_a);
-    mpd.db.push_back(song_b);
-
-    ShuffleChain chain;
-    chain.Add(song_a.URI());
-
+TEST_F(LoopTest, Requeue) {
     // Pretend like we already have a song in our queue, that was playing,
     // but now we've stopped.
     mpd.queue.push_back(song_b);
@@ -146,142 +151,70 @@ void test_Loop_basic() {
     // signal "past the end of the queue" using an empty song_position.
     mpd.state.song_position = std::nullopt;
 
-    // Make future Idle calls return IDLE_QUEUE
-    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
-
-    Loop(&mpd, &chain, Options(), loop_once_d);
+    Loop(&mpd, &chain, opts, loop_once_d);
 
     // We should add a new item to the queue, and start playing.
-    cmp_ok(mpd.queue.size(), "==", 2, "Loop_basic: added one song to queue");
-    ok(mpd.state.playing, "Loop_basic: playing after loop");
-    ok(mpd.state.song_position == 1,
-       "Loop_basic: queue position on second song");
+    EXPECT_THAT(mpd.queue, ElementsAre(song_b, song_a));
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_EQ(mpd.state.song_position, 1);
 
-    // The currently playing item should be song_a (the only song in the
-    // shuffle chain). If the mpd state is invalid, no playing song is returned,
-    // and we skip this check.
-    if (std::optional<fake::Song> p = mpd.Playing(); p) {
-        ok(p == song_a, "Loop_basic: queued and played song_a");
-    }
+    EXPECT_THAT(mpd.Playing(), Optional(song_a));
 }
 
-void test_Loop_empty() {
-    fake::MPD mpd;
+TEST_F(LoopTest, RequeueEmpty) {
+    // Leaving the MPD queue empty.
 
-    fake::Song song_a("song_a");
-    mpd.db.push_back(song_a);
-
-    ShuffleChain chain;
-    chain.Add(song_a.URI());
-
-    // Make future IDLE calls return IDLE_QUEUE
-    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
-
-    Loop(&mpd, &chain, Options(), loop_once_d);
+    Loop(&mpd, &chain, opts, loop_once_d);
 
     // We should add a new item to the queue, and start playing.
-    cmp_ok(mpd.queue.size(), "==", 1, "Loop_empty: added one song to queue");
-    ok(mpd.state.playing, "Loop_empty: playing after loop");
-    ok(mpd.state.song_position == 0,
-       "Loop_empty: queue position on first song");
-
-    // The currently playing item should be song_a (the only song in the
-    // shuffle chain). If the mpd state is invalid, no playing song is returned,
-    // and we skip this check.
-    if (std::optional<fake::Song> p = mpd.Playing(); p) {
-        ok(p == song_a, "Loop_empty: queued and played song_a");
-    }
+    EXPECT_THAT(mpd.queue, ElementsAre(song_a));
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_EQ(mpd.state.song_position, 0);
+    EXPECT_THAT(mpd.Playing(), Optional(song_a));
 }
 
-void test_Loop_empty_buffer() {
-    fake::MPD mpd;
+TEST_F(LoopTest, RequeueEmptyWithQueueBuffer) {
+    opts.queue_buffer = 3;
 
-    fake::Song song_a("song_a");
-    mpd.db.push_back(song_a);
+    Loop(&mpd, &chain, opts, loop_once_d);
 
-    ShuffleChain chain;
-    chain.Add(song_a.URI());
-
-    Options options;
-    options.queue_buffer = 3;
-
-    // Make future IDLE calls return IDLE_QUEUE
-    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
-
-    Loop(&mpd, &chain, options, loop_once_d);
-
-    // We should add 4 new items to the queue, and start playing on the first
+    // We should add *4* new items to the queue, and start playing on the first
     // one.
     // 4 = queue_buffer + the currently playing song.
-    cmp_ok(mpd.queue.size(), "==", 4,
-           "Loop_empty_buffer: added one song to queue");
-    ok(mpd.state.playing, "Loop_empty_buffer: playing after loop");
-    ok(mpd.state.song_position == 0,
-       "Loop_empty_buffer: queue position on first song");
 
-    if (std::optional<fake::Song> p = mpd.Playing(); p) {
-        ok(p == song_a, "Loop_empty_buffer: queued and played song_a");
-    }
+    // All elements are song_a, because that's the only song in the chain.
+    EXPECT_THAT(mpd.queue, ElementsAre(song_a, song_a, song_a, song_a));
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_EQ(mpd.state.song_position, 0);
+    EXPECT_THAT(mpd.Playing(), Optional(song_a));
 }
 
-void test_Loop_buffer_partial() {
-    fake::MPD mpd;
+TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilled) {
+    opts.queue_buffer = 3;
 
-    fake::Song song_a("song_a"), song_b("song_b");
-    mpd.db.push_back(song_a);
-
-    ShuffleChain chain;
-    chain.Add(song_a.uri);
-
-    Options options;
-    options.queue_buffer = 3;
+    // Make future IDLE calls return IDLE_QUEUE for this test.
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
     // Pretend like the queue already has a few songs in it, and we're in
     // the middle of playing it. We normally don't need to do anything,
-    // but we may need to update the queue buffer.
+    // but we may need to update the queue buffer. We could get into this
+    // situation if the user manually enqueued several songs, and then
+    // jumped to one near the end.
     mpd.queue.push_back(song_b);
     mpd.queue.push_back(song_b);
     mpd.queue.push_back(song_b);
+    // Zero indexed, this is the second song.
     mpd.PlayAt(1);
 
-    // Make future IDLE calls return IDLE_QUEUE
-    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
-
-    Loop(&mpd, &chain, options, loop_once_d);
+    Loop(&mpd, &chain, opts, loop_once_d);
 
     // We had 3 songs in the queue, and we were playing the second song, so
     // we only need to add 2 more songs to fill out the queue buffer.
-    cmp_ok(mpd.queue.size(), "==", 5,
-           "Loop_partial_buffer: added one song to queue");
+    EXPECT_THAT(mpd.queue, ElementsAre(song_b, song_b, song_b, song_a, song_a));
     // We should still be playing the same song as before.
-    ok(mpd.state.playing, "Loop_partial_buffer: playing after loop");
-    ok(mpd.state.song_position == 1,
-       "Loop_partial_buffer: queue position on the same song");
-
-    if (std::optional<fake::Song> p = mpd.Playing(); p) {
-        ok(p == song_b, "Loop_partial_buffer: playing the same song as before");
-    }
-}
-
-static std::string failing_getpass_f() {
-    fail("called failing getpass!");
-    abort();
-}
-
-void test_Connect_no_password() {
-    // Make sure the environment doesn't influence the test.
-    xclearenv();
-
-    fake::MPD mpd;
-    fake::Dialer dialer(mpd);
-    // by default we should try and connect to localhost on the default port.
-    dialer.check = mpd::Address{"localhost", 6600};
-
-    std::function<std::string()> pass_f = failing_getpass_f;
-    std::unique_ptr<mpd::MPD> result = Connect(dialer, Options(), pass_f);
-
-    ok(*dynamic_cast<fake::MPD *>(result.get()) == mpd,
-       "connect_no_password: same mpd instance");
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_EQ(mpd.state.song_position, 1);
+    EXPECT_THAT(mpd.Playing(), Optional(song_b));
 }
 
 struct ConnectTestCase {
@@ -291,134 +224,50 @@ struct ConnectTestCase {
     // this value is set, the dialed MPD fake will have zero permissions
     // initially.
     std::optional<std::string> password = std::nullopt;
-    // Env are the values that will be stored in the MPD_* environment
-    // variables. If they are empty or 0, they will remain unset.
-    mpd::Address env = {};
-    // Flag are the values that will be given in flags. If they are empty
-    // or 0, the respective flag will not be set.
-    mpd::Address flag = {};
+    // Input are the values to store in flags/environment variables
+    // for the given test.
+    mpd::Address input = {};
 };
 
-void test_Connect_parse_host() {
-    std::vector<ConnectTestCase> cases = {
-        // by default, connect to localhost:6600
-        {
-            .want = {"localhost", 6600},
-        },
-        // If only MPD_HOST is set with a password, and no MPD_PORT
-        {
-            .want = {"localhost", 6600},
-            .password = "foo",
-            .env = {.host = "foo@localhost"},
-        },
-        // MPD_HOST with a domain-like string, and MPD_PORT is set.
-        {
-            .want = {"something.random.com", 123},
-            .env = {"something.random.com", 123},
-        },
-        // MPD_HOST is a unix socket, MPD_PORT unset.
-        {
-            // port is Needed for test, unused by libmpdclient
-            .want = {"/test/mpd.socket", 6600},
-            .env = {"/test/mpd.socket", 0},
-        },
-        // MPD_HOST is a unix socket, with a password.
-        {
-            // port is Needed for test, unused by libmpdclient
-            .want = {"/another/mpd.socket", 6600},
-            .password = "with_pass",
-            .env = {.host = "with_pass@/another/mpd.socket"},
-        },
-        // --host example.com, port unset. environ unset.
-        {
-            .want = {"example.com", 6600},
-            .flag = {.host = "example.com"},
-        },
-        // --host some.host.com --port 5512, environ unset
-        {
-            .want = {"some.host.com", 5512},
-            .flag = {"some.host.com", 5512},
-        },
-        // flag host, with password. environ unset.
-        {
-            .want = {"yet.another.host", 7781},
-            .password = "secret_password",
-            .flag = {"secret_password@yet.another.host", 7781},
-        },
-        // Flags should override MPD_HOST and MPD_PORT environment variables.
-        {
-            .want = {"real.host", 1234},
-            .env = {"default.host", 6600},
-            .flag = {"real.host", 1234},
-        },
-    };
+class ConnectParamTest : public testing::TestWithParam<ConnectTestCase> {
+   public:
+    fake::MPD mpd;
 
-    for (unsigned i = 0; i < cases.size(); i++) {
-        const auto &test = cases[i];
+    std::string Host() { return GetParam().input.host; }
 
+    unsigned Port() { return GetParam().input.port; }
+
+    mpd::Address Want() { return GetParam().want; }
+
+    void SetUp() override {
         xclearenv();
 
-        if (!test.env.host.empty()) {
-            xsetenv("MPD_HOST", test.env.host.data());
-        }
-
-        if (test.env.port) {
-            // xsetenv copies the value string, so it's safe to use a
-            // temporary here.
-            xsetenv("MPD_PORT", std::to_string(test.env.port).data());
-        }
-
-        std::vector<std::string> flags;
-        if (!test.flag.host.empty()) {
-            flags.push_back("--host");
-            flags.push_back(test.flag.host);
-        }
-        if (test.flag.port) {
-            flags.push_back("--port");
-            flags.push_back(std::to_string(test.flag.port));
-        }
-
-        Options opts;
-
-        if (flags.size() > 0) {
-            auto parse = Options::Parse(fake::TagParser(), flags);
-            if (auto err = std::get_if<ParseError>(&parse); err != nullptr) {
-                fail("connect_parse_host[%u]: failed to parse flags", i);
-                diag("  parse result: %s", err->msg.data());
-            }
-            opts = std::get<Options>(parse);
-        }
-
-        fake::MPD mpd;
-        if (test.password) {
+        if (auto &password = GetParam().password; password) {
             // Create two users, one with no allowed commands, and one with
             // the good set of allowed commands.
             mpd.users = {
                 {"zero-privileges", {}},
-                {*test.password, {"add", "status", "play", "pause", "idle"}},
+                {*password, {"add", "status", "play", "pause", "idle"}},
             };
             // Then mark the default user, as the user with no privileges.
             // the default user in the fake allows all commands, so we need
             // to change it.
             mpd.active_user = "zero-privileges";
         }
-
-        fake::Dialer dialer(mpd);
-        dialer.check = test.want;
-
-        std::function<std::string()> pass_f = failing_getpass_f;
-        std::unique_ptr<mpd::MPD> result = Connect(dialer, opts, pass_f);
-
-        ok(mpd == *dynamic_cast<fake::MPD *>(result.get()),
-           "connect_parse_host[%u]: matches mpd connection", i);
     }
-}
+
+    void TearDown() override {
+        // in-case we set any environment variables in our test, clear them.
+        xclearenv();
+    }
+};
 
 // FakePasswordProvider is a password function that always returns the
 // given password, and counts the number of times that the password function
 // is called.
 class FakePasswordProvider {
    public:
+    FakePasswordProvider() : password(""){};
     FakePasswordProvider(std::string p) : password(p){};
 
     std::string password = {};
@@ -430,7 +279,142 @@ class FakePasswordProvider {
     };
 };
 
-void test_Connect_env_bad_password() {
+TEST_P(ConnectParamTest, ViaEnv) {
+    if (!Host().empty()) {
+        xsetenv("MPD_HOST", Host());
+    }
+
+    if (Port()) {
+        xsetenv("MPD_PORT", std::to_string(Port()));
+    }
+
+    fake::Dialer dialer(mpd);
+    dialer.check = Want();
+
+    std::function<std::string()> pass_f = FakePasswordProvider();
+    FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
+
+    std::unique_ptr<mpd::MPD> result = Connect(dialer, Options(), pass_f);
+
+    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
+    EXPECT_EQ(pp->call_count, 0);
+}
+
+TEST_P(ConnectParamTest, ViaFlag) {
+    std::vector<std::string> flags;
+    if (!Host().empty()) {
+        flags.push_back("--host");
+        flags.push_back(Host());
+    }
+    if (Port()) {
+        flags.push_back("--port");
+        flags.push_back(std::to_string(Port()));
+    }
+
+    Options opts = std::get<Options>(Options::Parse(fake::TagParser(), flags));
+
+    fake::Dialer dialer(mpd);
+    dialer.check = Want();
+
+    std::function<std::string()> pass_f = FakePasswordProvider();
+    FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
+
+    std::unique_ptr<mpd::MPD> result = Connect(dialer, opts, pass_f);
+
+    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
+    EXPECT_EQ(pp->call_count, 0);
+}
+
+std::vector<ConnectTestCase> connect_cases = {
+    // by default, connect to localhost:6600
+    {
+        .want = {"localhost", 6600},
+    },
+    {
+        .want = {"localhost", 6600},
+        .password = "foo",
+        .input = {.host = "foo@localhost"},
+    },
+    {
+        .want = {"something.random.com", 123},
+        .input = {"something.random.com", 123},
+    },
+    {
+        // port is Needed for test, unused by libmpdclient
+        .want = {"/test/mpd.socket", 6600},
+        .input = {"/test/mpd.socket", 0},
+    },
+    // MPD_HOST is a unix socket, with a password.
+    {
+        // port is Needed for test, unused by libmpdclient
+        .want = {"/another/mpd.socket", 6600},
+        .password = "with_pass",
+        .input = {.host = "with_pass@/another/mpd.socket"},
+    },
+    {
+        .want = {"example.com", 6600},
+        .input = {.host = "example.com"},
+    },
+    {
+        .want = {"some.host.com", 5512},
+        .input = {"some.host.com", 5512},
+    },
+    {
+        .want = {"yet.another.host", 7781},
+        .password = "secret_password",
+        .input = {"secret_password@yet.another.host", 7781},
+    },
+};
+
+INSTANTIATE_TEST_SUITE_P(Connect, ConnectParamTest, ValuesIn(connect_cases));
+
+TEST(ConnectTest, NoPassword) {
+    // Make sure the environment doesn't influence the test.
+    xclearenv();
+
+    fake::MPD mpd;
+    fake::Dialer dialer(mpd);
+    // by default we should try and connect to localhost on the default port.
+    dialer.check = mpd::Address{"localhost", 6600};
+
+    std::function<std::string()> pass_f = FakePasswordProvider();
+    FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
+
+    std::unique_ptr<mpd::MPD> result = Connect(dialer, Options(), pass_f);
+
+    EXPECT_EQ(pp->call_count, 0) << "getpass func should not have been called.";
+    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
+}
+
+TEST(ConnectTest, FlagOverridesEnv) {
+    xclearenv();
+
+    xsetenv("MPD_HOST", "default.host");
+    xsetenv("MPD_PORT", std::to_string(6600));
+
+    // Flags should override MPD_HOST and MPD_PORT environment variables.
+    Options opts =
+        std::get<Options>(Options::Parse(fake::TagParser(), {
+                                                                "--host",
+                                                                "real.host",
+                                                                "--port",
+                                                                "1234",
+                                                            }));
+
+    fake::MPD mpd;
+    fake::Dialer dialer(mpd);
+    dialer.check = mpd::Address{"real.host", 1234};
+
+    std::function<std::string()> pass_f = FakePasswordProvider();
+    FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
+
+    std::unique_ptr<mpd::MPD> result = Connect(dialer, opts, pass_f);
+
+    EXPECT_EQ(pp->call_count, 0) << "getpass func should not be called";
+    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
+}
+
+TEST(ConnectDeathTest, BadEnvPassword) {
     xclearenv();
 
     fake::MPD mpd;
@@ -446,15 +430,13 @@ void test_Connect_env_bad_password() {
     // Set a bad password via the environment.
     xsetenv("MPD_HOST", "bad_password@localhost");
 
-    std::function<std::string()> pass_f = FakePasswordProvider("good_password");
+    std::function<std::string()> pass_f = FakePasswordProvider();
 
-    // using good_password_f, just in-case Connect decides to prompt
-    // for a password. It should fail without ever calling good_password_f.
-    dies_ok({ (void)Connect(dialer, Options(), pass_f); },
-            "connect_env_bad_password: fail to connect with bad password");
+    EXPECT_EXIT((void)Connect(dialer, Options(), pass_f), ExitedWithCode(1),
+                HasSubstr("required command still not allowed"));
 }
 
-void test_Connect_env_ok_password_bad_perms() {
+TEST(ConnectDeathTest, EnvPasswordValidWithNoPermissions) {
     xclearenv();
 
     fake::MPD mpd;
@@ -463,30 +445,30 @@ void test_Connect_env_ok_password_bad_perms() {
         // The "test_password" has an extended set of privileges, but should
         // still be missing some required commands.
         {"test_password", {"add"}},
+        // Has all permissions. The test should fail if this is used.
+        {"good_password", {"add", "status", "play", "pause", "idle"}},
     };
     mpd.active_user = "zero-privileges";
 
     fake::Dialer dialer(mpd);
     dialer.check = mpd::Address{"localhost", 6600};
 
-    // set our password in the environment
-    xsetenv("MPD_HOST", "good_password@localhost");
+    xsetenv("MPD_HOST", "test_password@localhost");
 
     std::function<std::string()> pass_f = FakePasswordProvider("good_password");
 
     // We should terminate after seeing the bad permissions. If we end up
     // re-prompting (and getting a good password), we should succeed, and fail
     // the test.
-    dies_ok({ (void)Connect(dialer, Options(), pass_f); },
-            "connect_env_ok_password_bad_perms: fail to connect with bad "
-            "permissions");
+    EXPECT_EXIT((void)Connect(dialer, Options(), pass_f), ExitedWithCode(1),
+                HasSubstr("required command still not allowed"));
 }
 
 // If no password is supplied in the environment, but we have a restricted
 // command, then we should prompt for a user password. Once that password
 // matches, *and* we don't have any more disallowed required commands, then
 // we should be OK.
-void test_Connect_bad_perms_ok_prompt() {
+TEST(ConnectTest, BadPermsOKPrompt) {
     xclearenv();
 
     fake::MPD mpd;
@@ -502,21 +484,16 @@ void test_Connect_bad_perms_ok_prompt() {
     std::function<std::string()> pass_f = FakePasswordProvider("good_password");
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
-    cmp_ok(
-        pp->call_count, "==", 0,
-        "connect_bad_perms_ok_prompt: no call to password func to start with");
+    EXPECT_EQ(pp->call_count, 0);
 
     std::unique_ptr<mpd::MPD> result = Connect(dialer, Options(), pass_f);
 
-    ok(*dynamic_cast<fake::MPD *>(result.get()) == mpd,
-       "connect_bad_perms_ok_prompt: mpd matches fake MPD");
+    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
 
-    cmp_ok(
-        pp->call_count, "==", 1,
-        "connect_bad_perms_ok_prompt: should have one call to password func");
+    EXPECT_EQ(pp->call_count, 1) << "getpass should have been called";
 }
 
-void test_Connect_bad_perms_prompt_bad_perms() {
+TEST(ConnectDeathTest, BadPermsBadPrompt) {
     xclearenv();
 
     fake::MPD mpd;
@@ -538,28 +515,6 @@ void test_Connect_bad_perms_prompt_bad_perms() {
     std::function<std::string()> pass_f =
         FakePasswordProvider("prompt_password");
 
-    dies_ok({ (void)Connect(dialer, Options(), pass_f); },
-            "connect_bad_perms_prompt_bad_perms: fails to connect");
-}
-
-int main() {
-    plan(NO_PLAN);
-
-    test_Loop_init_empty();
-    test_Loop_init_playing();
-    test_Loop_init_stopped();
-
-    test_Loop_basic();
-    test_Loop_empty();
-    test_Loop_empty_buffer();
-    test_Loop_buffer_partial();
-
-    test_Connect_no_password();
-    test_Connect_parse_host();
-    test_Connect_env_bad_password();
-    test_Connect_env_ok_password_bad_perms();
-    test_Connect_bad_perms_ok_prompt();
-    test_Connect_bad_perms_prompt_bad_perms();
-
-    done_testing();
+    EXPECT_EXIT((void)Connect(dialer, Options(), pass_f), ExitedWithCode(1),
+                HasSubstr("required command still not allowed"));
 }
