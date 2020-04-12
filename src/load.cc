@@ -32,6 +32,8 @@ void MPDLoader::Load(ShuffleChain *songs) {
     }
 }
 
+FileLoader::~FileLoader() { fclose(file_); }
+
 bool FileLoader::Verify(std::string_view) {
     // The base file loader verifies all songs. It's the "no-check" version.
     return true;

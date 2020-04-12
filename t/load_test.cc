@@ -6,11 +6,15 @@
 
 #include "t/mpd_fake.h"
 
-#include <tap.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 using namespace ashuffle;
 
-void test_MPDLoader_basic() {
+using ::testing::ContainerEq;
+using ::testing::WhenSorted;
+
+TEST(MPDLoaderTest, Basic) {
     fake::MPD mpd;
     mpd.db.emplace_back("song_a");
     mpd.db.emplace_back("song_b");
@@ -21,11 +25,11 @@ void test_MPDLoader_basic() {
     MPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset);
     loader.Load(&chain);
 
-    cmp_ok(chain.Len(), "==", 2,
-           "MPDLoader_basic: 2 songs added to shuffle chain");
+    std::vector<std::string> want = {"song_a", "song_b"};
+    EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
 
-void test_MPDLoader_filter() {
+TEST(MPDLoaderTest, WithFilter) {
     fake::MPD mpd;
 
     mpd.db.push_back(fake::Song("song_a", {{MPD_TAG_ARTIST, "__artist__"}}));
@@ -43,66 +47,51 @@ void test_MPDLoader_filter() {
 
     MPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset);
     loader.Load(&chain);
-    cmp_ok(chain.Len(), "==", 2,
-           "MPDLoader_filter: 2 songs added to shuffle chain");
+
+    std::vector<std::string> want = {"song_a", "song_c"};
+    EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
 
-void xfwrite(FILE *f, const std::string &msg) {
-    if (!fwrite(msg.data(), msg.size(), 1, f)) {
-        perror("couldn't write to file");
-        abort();
-    }
-}
-
-void xfwriteln(FILE *f, std::string msg) {
-    msg.push_back('\n');
-    xfwrite(f, msg);
-}
-
-void test_FileLoader() {
-    const unsigned window_size = 3;
-    ShuffleChain chain(window_size);
-
-    fake::Song song_a("song_a"), song_b("song_b"), song_c("song_c");
-
+FILE *TestFile(std::vector<std::string> lines) {
     FILE *f = tmpfile();
     if (f == nullptr) {
         perror("couldn't open tmpfile");
         abort();
     }
+    for (auto l : lines) {
+        l.push_back('\n');
+        if (!fwrite(l.data(), l.size(), 1, f)) {
+            perror("couldn't write to file");
+            abort();
+        }
+    }
 
-    xfwriteln(f, song_a.URI());
-    xfwriteln(f, song_b.URI());
-    xfwriteln(f, song_c.URI());
-
-    // rewind, so FileLoader can see the URIs we've written.
+    // rewind, so the user can see the lines that were written.
     rewind(f);
+
+    // The file will be cleaned by the user when it calls fclose.
+    return f;
+}
+
+TEST(FileLoaderTest, Basic) {
+    ShuffleChain chain;
+    fake::Song song_a("song_a"), song_b("song_b"), song_c("song_c");
+
+    FILE *f = TestFile({
+        song_a.URI(),
+        song_b.URI(),
+        song_c.URI(),
+    });
 
     FileLoader loader(f);
     loader.Load(&chain);
 
-    cmp_ok(chain.Len(), "==", 3, "FileLoader: 3 songs added to shuffle chain");
-
-    // To make sure we parsed the file correctly, pick three songs out of the
-    // shuffle chain, and make sure they match the three URIs we wrote. This
-    // should be stable because we set a window size equal to the number of
-    // song URIs, and sort the URIs we receive from shuffle_pick.
     std::vector<std::string> want = {song_a.URI(), song_b.URI(), song_c.URI()};
-    std::vector<std::string> got = {chain.Pick(), chain.Pick(), chain.Pick()};
 
-    std::sort(want.begin(), want.end());
-    std::sort(got.begin(), got.end());
-
-    assert(want.size() == window_size &&
-           "number of wanted URIs should match the window size");
-
-    ok(want == got, "FileLoader, want == got");
-
-    // tmpfile is automatically cleaned up by the FileLoader, since it calls
-    // fclose() on the file for us.
+    EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
 
-void test_CheckFileLoader() {
+TEST(CheckFileLoaderTest, Basic) {
     // step 1. Initialize the MPD connection.
     fake::MPD mpd;
 
@@ -115,8 +104,7 @@ void test_CheckFileLoader() {
     ruleset.push_back(artist_match);
 
     // step 3. Prepare the shuffle_chain.
-    const unsigned window_size = 2;
-    ShuffleChain chain(window_size);
+    ShuffleChain chain;
 
     // step 4. Prepare our songs/song list. The song_list will be used for
     // subsequent calls to `mpd_recv_song`.
@@ -127,10 +115,6 @@ void test_CheckFileLoader() {
     // any tags.
     fake::Song song_d("song_d");
 
-    // When matching songs, ashuffle will first query for a list of songs,
-    // and then match against that static list. Only if a song is in the library
-    // will it be matched against the ruleset (since matching requires
-    // expensive MPD queries to resolve the URI).
     mpd.db.push_back(song_a);
     mpd.db.push_back(song_b);
     mpd.db.push_back(song_c);
@@ -139,53 +123,19 @@ void test_CheckFileLoader() {
     // mpd.db.push_back(song_d)
 
     // step 5. Set up our test input file, but writing the URIs of our songs.
-    FILE *f = tmpfile();
-    if (f == nullptr) {
-        perror("couldn't open tmpfile");
-        abort();
-    }
-
-    xfwriteln(f, song_a.URI());
-    xfwriteln(f, song_b.URI());
-    xfwriteln(f, song_c.URI());
-    // But we do want to write song_d here, so that ashuffle has to check it.
-    xfwriteln(f, song_d.URI());
-
-    // rewind, so build_songs_file can see the URIs we've written.
-    rewind(f);
+    FILE *f = TestFile({
+        song_a.URI(),
+        song_b.URI(),
+        song_c.URI(),
+        // But we do want to write song_d here, so that ashuffle has to check
+        // it.
+        song_d.URI(),
+    });
 
     // step 6. Run! (and validate)
     CheckFileLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, f);
     loader.Load(&chain);
 
-    cmp_ok(chain.Len(), "==", 2,
-           "build_songs_file_check: 2 songs added to shuffle chain");
-
-    // This check works like the nocheck case, but instead of expecting us
-    // to pick all 3 songs that were written into the input file, we only want
-    // to pick song_a and song_c which are not excluded by the ruleset
     std::vector<std::string> want = {song_a.URI(), song_c.URI()};
-    std::vector<std::string> got = {chain.Pick(), chain.Pick()};
-
-    std::sort(want.begin(), want.end());
-    std::sort(got.begin(), got.end());
-
-    assert(want.size() == window_size &&
-           "number of wanted URIs should match the window size");
-
-    ok(want == got, "build_songs_file_nocheck, want == got");
-
-    // cleanup.
-    fclose(f);
-}
-
-int main() {
-    plan(NO_PLAN);
-
-    test_MPDLoader_basic();
-    test_MPDLoader_filter();
-    test_FileLoader();
-    test_CheckFileLoader();
-
-    done_testing();
+    EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }

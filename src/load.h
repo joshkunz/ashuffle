@@ -36,7 +36,7 @@ class MPDLoader : public Loader {
 
 class FileLoader : public Loader {
    public:
-    ~FileLoader() override = default;
+    ~FileLoader() override;
     FileLoader(FILE* file) : file_(file){};
 
     void Load(ShuffleChain* into) override;
