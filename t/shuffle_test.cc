@@ -1,3 +1,5 @@
+#include "shuffle.h"
+
 #include <stdlib.h>
 #include <algorithm>
 #include <string>
@@ -5,81 +7,86 @@
 #include <vector>
 
 #include <absl/strings/str_cat.h>
-#include <tap.h>
-
-#include "shuffle.h"
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 using namespace ashuffle;
 
-void test_basic() {
+using ::testing::ContainerEq;
+using ::testing::Each;
+using ::testing::Range;
+using ::testing::Values;
+using ::testing::WhenSorted;
+
+TEST(ShuffleChainTest, AddPick) {
     ShuffleChain chain;
     std::string test_str("test");
-    chain.Add(test_str);
-    ok(chain.Pick() == test_str, "pick returns only string");
 
-    /* Bit of explanation here: If we have a 1-item chain, it should
-     * be OK to run `pick` twice (having it return the same string both
-     * times). */
-    lives_ok({ (void)chain.Pick(); }, "double-pick 1-item chain");
-    ok(chain.Pick() == test_str, "double-pick on 1-item chain matches");
+    chain.Add(test_str);
+
+    EXPECT_EQ(chain.Pick(), test_str);
+    EXPECT_EQ(chain.Pick(), test_str)
+        << "could not double-pick from the same 1-item chain.";
 }
 
-void test_multi() {
-    constexpr unsigned test_rounds = 5000;
+MATCHER_P(IsInCollection, c, "") { return c.find(arg) != c.end(); }
+
+TEST(ShuffleChainTest, PickN) {
+    constexpr int test_rounds = 5000;
     const std::unordered_set<std::string> test_items{"item 1", "item 2",
                                                      "item 3"};
 
     ShuffleChain chain;
 
-    for (auto s : test_items) {
+    for (auto& s : test_items) {
         chain.Add(s);
     }
 
-    for (unsigned i = 0; i < 5000; i++) {
-        std::string item = chain.Pick();
-        if (test_items.find(item) == test_items.end()) {
-            fail("pick %u rounds", test_rounds);
-            diag("  fail on round: %u", i);
-            diag("  input: \"%s\"", item.data());
-            return;
-        }
+    std::vector<std::string> picked;
+    for (int i = 0; i < test_rounds; i++) {
+        picked.emplace_back(chain.Pick());
     }
-    pass("pick %u rounds", test_rounds);
+
+    EXPECT_THAT(picked, Each(IsInCollection(test_items)))
+        << "ShuffleChain picked item not in chain!";
 }
 
-void test_window_of_size(const unsigned window_size) {
-    ShuffleChain chain(window_size);
+class WindowTest : public testing::TestWithParam<int> {
+   public:
+    ShuffleChain chain_;
 
-    for (unsigned i = 0; i < window_size; i++) {
-        chain.Add(absl::StrCat("item ", i));
-    }
+    // This method is purely for documentation.
+    int WindowSize() { return GetParam(); };
 
+    void SetUp() override {
+        chain_ = ShuffleChain(WindowSize());
+        for (int i = 0; i < WindowSize(); i++) {
+            chain_.Add(absl::StrCat("item ", i));
+        }
+    };
+};
+
+TEST_P(WindowTest, Repeats) {
     // The first window_size items should all be unique, so when we check the
     // length of "picked", it should match window_size.
     std::unordered_set<std::string> picked;
-    for (unsigned i = 0; i < window_size; i++) {
-        picked.insert(chain.Pick());
+    for (int i = 0; i < WindowSize(); i++) {
+        picked.insert(chain_.Pick());
     }
 
-    ok(picked.size() == window_size,
-       "pick window_size (%u) items, all are unique", window_size);
+    EXPECT_EQ(picked.size(), static_cast<unsigned>(WindowSize()))
+        << absl::StrCat("first ", WindowSize(), " items should be unique");
 
     // Since we only put in window_size songs, we should now be forced to get
     // a repeat by picking one more song.
-    picked.insert(chain.Pick());
-    ok(picked.size() == window_size,
-       "pick window_size (%u) + 1 items, there is one repeat", window_size);
+    picked.insert(chain_.Pick());
+
+    EXPECT_EQ(picked.size(), static_cast<unsigned>(WindowSize()))
+        << "should have gotten a repeat by picking one more song";
 }
 
-void test_windowing() {
-    // test all the small windows.
-    for (unsigned i = 1; i <= 25; i++) {
-        test_window_of_size(i);
-    }
-    // Test a couple big, round windows.
-    test_window_of_size(50);
-    test_window_of_size(100);
-}
+INSTANTIATE_TEST_SUITE_P(SmallWindows, WindowTest, Range(1, 25 + 1));
+INSTANTIATE_TEST_SUITE_P(BigWindows, WindowTest, Values(50, 99, 100, 1000));
 
 // In this test we seed rand (srand) with a known value so we have
 // deterministic randomness from `rand`. These values are known to be
@@ -88,7 +95,7 @@ void test_windowing() {
 // Note: This test may break if we change how we store items in the list, or
 //  how we index the song list when picking randomly. It's hard to test
 //  that something is random :/.
-void test_random() {
+TEST(ShuffleChainTest, IsRandom) {
     srand(4);
 
     ShuffleChain chain(2);
@@ -97,13 +104,14 @@ void test_random() {
     chain.Add("test b");
     chain.Add("test c");
 
-    ok(chain.Pick() == "test b", "pick 1 is random");
-    ok(chain.Pick() == "test c", "pick 2 is random");
-    ok(chain.Pick() == "test a", "pick 3 is random");
-    ok(chain.Pick() == "test b", "pick 4 is random");
+    std::vector<std::string> want{"test b", "test c", "test a", "test b"};
+    std::vector<std::string> got = {chain.Pick(), chain.Pick(), chain.Pick(),
+                                    chain.Pick()};
+
+    EXPECT_THAT(got, ContainerEq(want));
 }
 
-void test_items() {
+TEST(ShuffleChainTest, Items) {
     ShuffleChain chain(2);
 
     const std::vector<std::string> test_uris{"test a", "test b", "test c"};
@@ -114,24 +122,11 @@ void test_items() {
 
     // This is a gross hack to ensure that we've initialized the window pool.
     // We want to make sure shuffle_chain also picks up songs in the window.
+    // If the internel implementation of the chain changes, then this will
+    // be OK, it just won't do anything.
     (void)chain.Pick();
 
     std::vector<std::string> got = chain.Items();
-    cmp_ok(got.size(), "==", 3, "items: shuffle chain should have 3 items");
-    std::sort(got.begin(), got.end());
 
-    ok(test_uris == got,
-       "items: shuffle chain should only contain inserted items");
-}
-
-int main() {
-    plan(NO_PLAN);
-
-    test_basic();
-    test_multi();
-    test_windowing();
-    test_random();
-    test_items();
-
-    done_testing();
+    EXPECT_THAT(got, WhenSorted(ContainerEq(test_uris)));
 }

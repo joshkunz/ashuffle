@@ -50,14 +50,16 @@ clang_tidy = run_target('ashuffle-clang-tidy',
 # We only generate tests if we are *not running in tidy mode
 if get_option('tests').enabled()
 
-googletest = cmake.subproject('googletest/googletest', cmake_options: [
+googletest = cmake.subproject('googletest', cmake_options: [
+  '-DBUILD_GMOCK=ON',
   '-DCMAKE_CXX_STANDARD=17',
 ])
 
 gtest_deps = [
   dependency('threads'),
   googletest.dependency('gtest'),
-  googletest.dependency('gtest_main'),
+  googletest.dependency('gmock'),
+  googletest.dependency('gmock_main'),
 ]
 
 subdir('t')
@@ -71,7 +73,6 @@ test_options = [
 libtap_tests = {
     'args': ['t/args_test.cc'],
     'ashuffle': ['t/ashuffle_test.cc'],
-    'shuffle': ['t/shuffle_test.cc'],
     'load': ['t/load_test.cc']
 }
 
@@ -87,7 +88,8 @@ foreach test_name, test_sources : libtap_tests
 endforeach
 
 gtest_tests = {
-  'rule': ['t/rule_test.cc'],
+    'rule': ['t/rule_test.cc'],
+    'shuffle': ['t/shuffle_test.cc'],
 }
 
 foreach test_name, test_sources : gtest_tests 
