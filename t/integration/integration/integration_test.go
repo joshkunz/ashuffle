@@ -421,6 +421,10 @@ func TestFastStartup(t *testing.T) {
 			name: "from file",
 			args: []string{"-f", dbF.Path(), "-o", "1"},
 		},
+		{
+			name: "from file, with filter",
+			args: []string{"-f", dbF.Path(), "-o", "1", "-e", "artist", "AA"},
+		},
 	}
 
 	for _, test := range tests {
