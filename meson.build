@@ -67,8 +67,6 @@ mpdfake_dep = declare_dependency(include_directories : mpdfake_inc)
 
 test_options = [
     'werror=true',
-    'b_sanitize=address',
-    'b_sanitize=undefined',
 ]
 
 tests = {
