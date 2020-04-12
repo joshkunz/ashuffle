@@ -78,7 +78,7 @@ TEST(FileLoaderTest, Basic) {
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
 
-TEST(CheckFileLoaderTest, Basic) {
+TEST(FileMPDLoaderTest, Basic) {
     // step 1. Initialize the MPD connection.
     fake::MPD mpd;
 
@@ -120,7 +120,7 @@ TEST(CheckFileLoaderTest, Basic) {
     });
 
     // step 6. Run! (and validate)
-    CheckFileLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, s.get());
+    FileMPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, s.get());
     loader.Load(&chain);
 
     std::vector<std::string> want = {song_a.URI(), song_c.URI()};

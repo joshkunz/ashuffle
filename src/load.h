@@ -29,9 +29,26 @@ class MPDLoader : public Loader {
 
     void Load(ShuffleChain* into) override;
 
+   protected:
+    virtual bool Verify(const mpd::Song&);
+
    private:
     mpd::MPD* mpd_;
     const std::vector<Rule>& rules_;
+};
+
+class FileMPDLoader : public MPDLoader {
+   public:
+    ~FileMPDLoader() override = default;
+    FileMPDLoader(mpd::MPD* mpd, const std::vector<Rule>& ruleset,
+                  std::istream* file);
+
+   protected:
+    bool Verify(const mpd::Song&) override;
+
+   private:
+    std::istream* file_;
+    std::vector<std::string> valid_uris_;
 };
 
 class FileLoader : public Loader {
@@ -41,26 +58,8 @@ class FileLoader : public Loader {
 
     void Load(ShuffleChain* into) override;
 
-   protected:
-    virtual bool Verify(std::string_view);
-
    private:
     std::istream* file_;
-};
-
-class CheckFileLoader : public FileLoader {
-   public:
-    ~CheckFileLoader() override = default;
-    CheckFileLoader(mpd::MPD* mpd, const std::vector<Rule>& ruleset,
-                    std::istream* file);
-
-   protected:
-    bool Verify(std::string_view) override;
-
-   private:
-    mpd::MPD* mpd_;
-    const std::vector<Rule>& rules_;
-    std::vector<std::string> all_uris_;
 };
 
 }  // namespace ashuffle
