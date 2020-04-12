@@ -39,16 +39,6 @@ bool FileLoader::Verify(std::string_view) {
 
 void FileLoader::Load(ShuffleChain *songs) {
     for (std::string uri; std::getline(*file_, uri);) {
-        if (uri.empty()) {
-            Die("invalid URI in input stream");
-        }
-
-        // If this line has terminating newline attached, set it to null
-        // (effectively removing the newline).
-        if (uri[uri.size() - 1] == '\n') {
-            uri.pop_back();
-        }
-
         if (!Verify(uri)) {
             continue;
         }
