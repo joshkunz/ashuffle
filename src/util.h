@@ -11,8 +11,8 @@ namespace {
 // Die logs the given message as if it was printed via `absl::StrFormat`,
 // and then terminates the program with with an error status code.
 template <typename... Args>
-void Die(Args... strs) {
-    std::cerr << absl::StrFormat(strs...) << std::endl;
+void Die(absl::FormatSpec<Args...> format, Args... vars) {
+    std::cerr << absl::StrFormat(format, vars...) << std::endl;
     std::exit(EXIT_FAILURE);
 }
 

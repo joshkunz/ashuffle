@@ -58,7 +58,6 @@ class SongImpl : public Song {
 
     // However, moves are OK, because the "old" owner no longer exists.
     SongImpl(SongImpl&&) = default;
-    SongImpl& operator=(SongImpl&&) = default;
 
     // Free the wrapped struct mpd_song;
     ~SongImpl() override;
@@ -178,7 +177,6 @@ class SongReaderImpl : public SongReader {
 
     // As with the other types, moves are OK.
     SongReaderImpl(SongReaderImpl&&) = default;
-    SongReaderImpl& operator=(SongReaderImpl&&) = default;
 
     // Default destructor should work fine, since the std::optional owns
     // a unique_ptr to an actual Song. The generated destructor will destruct
