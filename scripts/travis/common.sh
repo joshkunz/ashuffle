@@ -20,7 +20,8 @@ setup() {
     sudo apt-get update && \
         sudo apt-get upgrade -y && \
         sudo apt-get install -y \
-            clang \
+            clang-9 \
+            clang-tidy-9 \
             libmpdclient-dev \
             ninja-build \
             python3 python3-pip python3-setuptools python3-wheel \

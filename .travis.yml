@@ -58,7 +58,9 @@ jobs:
     - script: scripts/run-integration
       # Based on Ubuntu 19.04 (disco)
       env:
-        - MPD_VERSION=0.21.4
+        # Actual version is 0.21.4, but that does not compile with gcc-9,
+        # so we bump a minor patch.
+        - MPD_VERSION=0.21.8
         - LIBMPDCLIENT_VERSION=2.16
     - stage: Release Build
       script: scripts/travis/release

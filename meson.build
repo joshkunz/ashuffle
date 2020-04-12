@@ -17,6 +17,7 @@ absl_all = [
     # Via Strings:
     absl.dependency('int128'),
     absl.dependency('str_format_internal'),
+    absl.dependency('strings_internal'),
     absl.dependency('strings'),
 ]
 
