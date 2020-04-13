@@ -255,7 +255,7 @@ std::ostream& operator<<(std::ostream& st, const MPD& mpd) {
        << "  Queue: " << absl::StrJoin(queue, ",") << std::endl
        << "  State: "
        << absl::StrFormat(
-              "State(%s, %s, %s, %s)", mpd.state.single_mode, mpd.state.playing,
+              "State(%d, %d, %u, %u)", mpd.state.single_mode, mpd.state.playing,
               mpd.state.song_position ? *mpd.state.song_position : 0,
               mpd.state.queue_length)
        << std::endl
