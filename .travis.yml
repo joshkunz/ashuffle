@@ -4,6 +4,15 @@ dist: bionic
 services:
   - docker
 
+deploy:
+  provider: releases
+  file: release/ashuffle.x86_64
+  # Use Travis-CI dplv2
+  edge: true
+  on:
+    branch: master
+    tags: true
+
 stages:
   - name: Check
     if: type = pull_request OR branch = master OR tag IS present
@@ -13,6 +22,8 @@ stages:
     if: type = pull_request OR branch = master OR tag IS present
   - name: Integration Test
     if: type = pull_request OR branch = master OR tag IS present
+  - name: Release
+    if: branch = master AND tag IS present
 
 jobs:
   include:
@@ -54,3 +65,5 @@ jobs:
       env:
         - MPD_VERSION=0.21.4
         - LIBMPDCLIENT_VERSION=2.16
+    - stage: Release
+      script: scripts/travis/release
