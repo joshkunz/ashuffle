@@ -6,11 +6,10 @@ services:
 
 deploy:
   provider: releases
-  file: release/ashuffle.x86_64
+  file: release/ashuffle.x86_64-linux-gnu
   # Use Travis-CI dplv2
   edge: true
   on:
-    branch: master
     tags: true
 
 stages:
@@ -23,7 +22,7 @@ stages:
   - name: Integration Test
     if: type = pull_request OR branch = master OR tag IS present
   - name: Release
-    if: branch = master AND tag IS present
+    if: tag IS present
 
 jobs:
   include:
