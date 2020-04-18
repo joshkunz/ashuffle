@@ -1,0 +1,11 @@
+#!/bin/sh
+
+. "scripts/travis/common.sh"
+
+setup
+meson --buildtype=debugoptimized build || die "could not configure build"
+ninja -C build ashuffle || die "failed to build ashuffle"
+test -e build/ashuffle || die "ashuffle failed to build"
+
+mkdir -p release
+cp build/ashuffle release/ashuffle.x86_64-linux-gnu
