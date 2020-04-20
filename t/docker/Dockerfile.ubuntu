@@ -1,12 +1,15 @@
 FROM jkz0/ashuffle-integration-root:latest
 
 COPY /t/docker/scripts/* /opt/helpers/
+COPY /tools/meta/ /opt/meta
+RUN cd /opt/meta && go build
 
 # Install libmpdclient
 
 ARG LIBMPDCLIENT_VERSION
 ENV LIBMPDCLIENT_VERSION ${LIBMPDCLIENT_VERSION:-latest}
-RUN /opt/helpers/install_libmpdclient.sh ${LIBMPDCLIENT_VERSION}
+RUN /opt/meta/meta install libmpdclient \
+    --version=${LIBMPDCLIENT_VERSION} --prefix=/usr
 
 # Install MPD
 
