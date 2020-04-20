@@ -1,6 +1,5 @@
 FROM jkz0/ashuffle-integration-root:latest
 
-COPY /t/docker/scripts/* /opt/helpers/
 COPY /tools/meta/ /opt/meta
 RUN cd /opt/meta && go build
 
@@ -26,7 +25,7 @@ COPY /t/static/mpd.conf /conf
 
 # Copy in the integration test runner
 
-COPY /t/docker/scripts/run_integration.sh /exec/
+COPY /t/docker/run_integration.sh /exec/
 
 # The directory that contains the staged ashuffle source. If unset the
 # build directory (presumably the ashuffle root) is used. This has some
