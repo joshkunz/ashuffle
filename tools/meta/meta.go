@@ -8,6 +8,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"meta/commands/libmpdclient"
+	"meta/commands/mpd"
 )
 
 func doLibmpdclient(ctx *cli.Context) error {
@@ -28,13 +29,12 @@ func main() {
 				Name: "install",
 				Subcommands: []*cli.Command{
 					libmpdclient.Command,
-					{
-						Name:   "mpd",
-						Action: doMPD,
-					},
+					mpd.Command,
 				},
 			},
 		},
 	}
-	app.Run(os.Args)
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
 }

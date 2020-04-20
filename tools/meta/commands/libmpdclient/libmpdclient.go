@@ -7,51 +7,37 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/urfave/cli/v2"
 
 	"meta/exec"
 	"meta/fetch"
+	"meta/semver"
 	"meta/workspace"
 )
 
 const gitURL = "https://github.com/MusicPlayerDaemon/libmpdclient.git"
 
 type version struct {
-	major, minor int
+	semver.Version
 }
 
 func (v version) String() string {
-	return fmt.Sprintf("%d.%d", v.major, v.minor)
+	return fmt.Sprintf("%d.%d", v.Major, v.Minor)
 }
 
 func (v version) ReleaseURL() string {
-	return fmt.Sprintf("https://www.musicpd.org/download/libmpdclient/%d/libmpdclient-%s.tar.xz", v.major, v)
+	return fmt.Sprintf("https://www.musicpd.org/download/libmpdclient/%d/libmpdclient-%s.tar.xz", v.Major, v)
 }
 
-var versionRe = regexp.MustCompile(`v(\d+)\.(\d+)`)
-
 func parseVersion(v string) (version, error) {
-	match := versionRe.FindStringSubmatch(v)
-	if match == nil {
-		return version{}, fmt.Errorf("%q does not match %q", v, versionRe)
-	}
-	if match[0] != v {
-		return version{}, fmt.Errorf("did not fully match")
-	}
-	major, err := strconv.ParseInt(match[1], 10, 32)
+	parsed, err := semver.Parse(v)
 	if err != nil {
-		return version{}, fmt.Errorf("major part of %q invalid: %w", v, err)
+		return version{}, err
 	}
-	minor, err := strconv.ParseInt(match[2], 10, 32)
-	if err != nil {
-		return version{}, fmt.Errorf("minor part of %q invalid: %w", v, err)
-	}
-	return version{int(major), int(minor)}, nil
+	return version{parsed}, nil
 }
 
 func installAutomake(dest string) error {
@@ -103,10 +89,7 @@ func latestVersion() (version, error) {
 	}
 
 	sort.Slice(versions, func(i, j int) bool {
-		if versions[i].major == versions[j].major {
-			return versions[i].minor < versions[j].minor
-		}
-		return versions[i].major < versions[j].major
+		return semver.Less(versions[i].Version, versions[j].Version)
 	})
 
 	return versions[len(versions)-1], nil
@@ -136,11 +119,11 @@ func install(ctx *cli.Context) error {
 	}
 	log.Printf("Using libmpdclient version %s", v)
 
-	if v.major != 2 {
+	if v.Major != 2 {
 		return fmt.Errorf("unexpected major version in %s, only 2.x is supported", v)
 	}
 
-	if v.minor == 12 {
+	if v.Minor == 12 {
 		return fmt.Errorf("version %s not supported", v)
 	}
 
@@ -157,7 +140,7 @@ func install(ctx *cli.Context) error {
 		return fmt.Errorf("cd to workspace root: %w", err)
 	}
 
-	if v.minor < 12 {
+	if v.Minor < 12 {
 		return installAutomake(ctx.String("prefix"))
 	}
 	return installMeson(ctx.String("prefix"))
