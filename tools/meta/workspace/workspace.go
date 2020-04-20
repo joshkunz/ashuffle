@@ -30,6 +30,7 @@ func (w *Workspace) Cleanup() error {
 	if err := os.Chdir(w.prevDir); err != nil {
 		log.Printf("Unable to move to previous dir %q: %v", w.prevDir, err)
 	}
+	log.Printf("CD %q", w.prevDir)
 	if w.cleaned {
 		return errors.New("workspace already cleaned up")
 	}
@@ -62,6 +63,7 @@ func New() (*Workspace, error) {
 		os.RemoveAll(path)
 		return nil, err
 	}
+	log.Printf("CD %q", path)
 
 	return &Workspace{Root: path, prevDir: cwd}, nil
 }

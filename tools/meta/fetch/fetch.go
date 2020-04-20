@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 
+	"meta/exec"
 	"meta/workspace"
 )
 
@@ -32,6 +33,7 @@ func URL(url, dest string) error {
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
+	log.Printf("FETCH %q -> %q", url, dest)
 	return nil
 }
 
@@ -45,15 +47,16 @@ func GitVersions(url string) ([]string, error) {
 	}
 	defer ws.Cleanup()
 
-	if err := exec.Command("git", "init").Run(); err != nil {
+	if err := exec.Silent("git", "init").Run(); err != nil {
 		return nil, fmt.Errorf("failed to init: %w", err)
 	}
 
-	if err := exec.Command("git", "fetch", "--tags", "--depth=1", url).Run(); err != nil {
+	log.Printf("GIT FETCH %q", url)
+	if err := exec.Silent("git", "fetch", "--tags", "--depth=1", url).Run(); err != nil {
 		return nil, fmt.Errorf("failed to fetch: %w", err)
 	}
 
-	tagCmd := exec.Command("git", "tag")
+	tagCmd := exec.Silent("git", "tag")
 	stdout, err := tagCmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git tag pipe: %w", err)

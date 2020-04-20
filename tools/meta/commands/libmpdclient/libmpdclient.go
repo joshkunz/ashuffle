@@ -5,8 +5,8 @@ package libmpdclient
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
-	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
@@ -14,6 +14,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 
+	"meta/exec"
 	"meta/fetch"
 	"meta/workspace"
 )
@@ -54,7 +55,7 @@ func parseVersion(v string) (version, error) {
 }
 
 func installAutomake(dest string) error {
-	fmt.Printf("Configuring libmpdclient...")
+	log.Printf("Configuring libmpdclient...")
 
 	config := exec.Command("./configure", "--quiet", "--enable-silent-rules", "--prefix="+dest, "--disable-documentation")
 	if err := config.Run(); err != nil {
@@ -120,6 +121,7 @@ func install(ctx *cli.Context) error {
 
 	var v version
 	if sv := ctx.String("version"); sv == "latest" {
+		log.Printf("version == latest, searching for latest version")
 		vLatest, err := latestVersion()
 		if err != nil {
 			return err
@@ -132,6 +134,7 @@ func install(ctx *cli.Context) error {
 		}
 		v = vParsed
 	}
+	log.Printf("Using libmpdclient version %s", v)
 
 	if v.major != 2 {
 		return fmt.Errorf("unexpected major version in %s, only 2.x is supported", v)

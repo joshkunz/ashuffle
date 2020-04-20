@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/urfave/cli/v2"
@@ -20,6 +21,7 @@ func doMPD(ctx *cli.Context) error {
 }
 
 func main() {
+	log.SetOutput(os.Stderr)
 	app := &cli.App{
 		Commands: []*cli.Command{
 			{
