@@ -15,8 +15,9 @@ import (
 type Project interface {
 	// Configure configures the project with the given install prefix.
 	Configure(prefix string) error
-	// Build builds the project (but does not install).
-	Build() error
+	// Build builds the given target (but does not install). If target
+	// is empty string, the default target for the project is built.
+	Build(target string) error
 	// Install installs the project to the prefix given in the Configure
 	// stage.
 	Install() error
@@ -104,18 +105,24 @@ func (m *Meson) Configure(dest string) error {
 	cmd := exec.Command(
 		"meson",
 		".", m.opts.BuildDirectory,
-		"--prefix="+dest,
 		m.opts.BuildType.flag(),
 	)
+	if dest != "" {
+		cmd.Args = append(cmd.Args, "--prefix="+dest)
+	}
 	cmd.Args = append(cmd.Args, m.opts.Extra...)
 	return cmd.Run()
 }
 
 // Build implements Project.Build for Meson.
-func (m *Meson) Build() error {
+func (m *Meson) Build(target string) error {
 	cleanup := cd(m.Root)
 	defer cleanup()
-	return exec.Command("ninja", "-C", m.opts.BuildDirectory).Run()
+	cmd := exec.Command("ninja", "-C", m.opts.BuildDirectory)
+	if target != "" {
+		cmd.Args = append(cmd.Args, target)
+	}
+	return cmd.Run()
 }
 
 // Install implements Project.Install for Meson.
@@ -160,10 +167,14 @@ func (a *Automake) Configure(prefix string) error {
 }
 
 // Build implements Project.Build for Automake.
-func (a *Automake) Build() error {
+func (a *Automake) Build(target string) error {
 	cleanup := cd(a.Root)
 	defer cleanup()
-	return exec.Command("make", "-j", "16").Run()
+	cmd := exec.Command("make", "-j", "16")
+	if target != "" {
+		cmd.Args = append(cmd.Args, target)
+	}
+	return cmd.Run()
 }
 
 // Install implements Project.Install for Automake.

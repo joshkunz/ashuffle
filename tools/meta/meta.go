@@ -9,6 +9,7 @@ import (
 
 	"meta/commands/libmpdclient"
 	"meta/commands/mpd"
+	"meta/commands/release"
 )
 
 func doLibmpdclient(ctx *cli.Context) error {
@@ -32,6 +33,7 @@ func main() {
 					mpd.Command,
 				},
 			},
+			release.Command,
 		},
 	}
 	if err := app.Run(os.Args); err != nil {
