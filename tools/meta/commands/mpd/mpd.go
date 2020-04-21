@@ -1,7 +1,6 @@
 package mpd
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,9 +12,12 @@ import (
 
 	"meta/exec"
 	"meta/fetch"
+	"meta/project"
 	"meta/semver"
 	"meta/workspace"
 )
+
+const gitURL = "https://github.com/MusicPlayerDaemon/MPD.git"
 
 type version semver.Version
 
@@ -58,60 +60,6 @@ func parseVersion(s string) (version, error) {
 	return version(parsed), err
 }
 
-func latestVersion() (version, error) {
-	tags, err := fetch.GitVersions("https://github.com/MusicPlayerDaemon/MPD.git")
-	if err != nil {
-		return version{}, err
-	}
-
-	var versions []version
-	for _, tag := range tags {
-		parsed, err := parseVersion(tag)
-		if err != nil {
-			continue
-		}
-		versions = append(versions, parsed)
-	}
-
-	if len(versions) < 1 {
-		return version{}, errors.New("no valid versions found")
-	}
-
-	sort.Slice(versions, func(i, j int) bool {
-		return semver.Less(semver.Version(versions[i]), semver.Version(versions[j]))
-	})
-
-	return versions[len(versions)-1], nil
-}
-
-func installAutomake(target string) error {
-	log.Printf("Configuring MPD...")
-	configure := exec.Command(
-		"./configure", "--quiet", "--enable-silent-rules", "--prefix="+target,
-	)
-	if err := configure.Run(); err != nil {
-		return err
-	}
-
-	makeCmd := exec.Command("make", "-j", "16", "install")
-	return makeCmd.Run()
-}
-
-func installMeson(target string) error {
-	meson := exec.Command(
-		"meson", ".", "build/release",
-		"--prefix="+target,
-		"--buildtype=debugoptimized",
-		"-Db_ndebug=true",
-	)
-	if err := meson.Run(); err != nil {
-		return err
-	}
-
-	ninja := exec.Command("ninja", "-C", "build/release", "install")
-	return ninja.Run()
-}
-
 func install(ctx *cli.Context) error {
 	// Not being able to fined a patch root is only a problem for older
 	// releases, and we'll only do those once in a while. The majority of
@@ -135,11 +83,11 @@ func install(ctx *cli.Context) error {
 	var v version
 	if ver := ctx.String("version"); ver == "latest" {
 		log.Printf("version == latest, looking up latest version")
-		latest, err := latestVersion()
+		latest, err := fetch.GitLatest(gitURL)
 		if err != nil {
 			return err
 		}
-		v = latest
+		v = version(latest)
 	} else {
 		version, err := parseVersion(ver)
 		if err != nil {
@@ -171,10 +119,25 @@ func install(ctx *cli.Context) error {
 		}
 	}
 
+	var proj project.Project
 	if v.Minor < 21 {
-		return installAutomake(ctx.String("prefix"))
+		p, err := project.NewAutomake(ws.Root)
+		if err != nil {
+			return err
+		}
+		proj = p
+	} else {
+		p, err := project.NewMeson(ws.Root, project.MesonOptions{
+			BuildType:      project.BuildDebugOptimized,
+			BuildDirectory: "build/release",
+			Extra:          []string{"-Db_ndebug=true"},
+		})
+		if err != nil {
+			return err
+		}
+		proj = p
 	}
-	return installMeson(ctx.String("prefix"))
+	return project.Install(proj, ctx.String("prefix"))
 }
 
 var Command = &cli.Command{

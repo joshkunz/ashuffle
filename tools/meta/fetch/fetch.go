@@ -1,15 +1,18 @@
 package fetch
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 
 	"meta/exec"
+	"meta/semver"
 	"meta/workspace"
 )
 
@@ -75,4 +78,32 @@ func GitVersions(url string) ([]string, error) {
 	}
 
 	return strings.Split(string(tagsRaw), "\n"), nil
+}
+
+// GitLatest fetches the git tags from the repository at the given URL, and
+// returns the latest tag following Semver versioning semantics.
+func GitLatest(url string) (semver.Version, error) {
+	tags, err := GitVersions(url)
+	if err != nil {
+		return semver.Version{}, fmt.Errorf("failed to fetch git versions: %w", err)
+	}
+
+	var versions []semver.Version
+	for _, tag := range tags {
+		parsed, err := semver.Parse(tag)
+		if err != nil {
+			continue
+		}
+		versions = append(versions, parsed)
+	}
+
+	if len(versions) < 1 {
+		return semver.Version{}, errors.New("found no (semver-compliant) git tags")
+	}
+
+	sort.Slice(versions, func(i, j int) bool {
+		return semver.Less(versions[i], versions[j])
+	})
+
+	return versions[len(versions)-1], nil
 }

@@ -7,22 +7,20 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/urfave/cli/v2"
 
 	"meta/exec"
 	"meta/fetch"
+	"meta/project"
 	"meta/semver"
 	"meta/workspace"
 )
 
 const gitURL = "https://github.com/MusicPlayerDaemon/libmpdclient.git"
 
-type version struct {
-	semver.Version
-}
+type version semver.Version
 
 func (v version) String() string {
 	return fmt.Sprintf("%d.%d", v.Major, v.Minor)
@@ -35,64 +33,9 @@ func (v version) ReleaseURL() string {
 func parseVersion(v string) (version, error) {
 	parsed, err := semver.Parse(v)
 	if err != nil {
-		return version{}, err
+		return version(semver.Version{}), err
 	}
-	return version{parsed}, nil
-}
-
-func installAutomake(dest string) error {
-	log.Printf("Configuring libmpdclient...")
-
-	config := exec.Command("./configure", "--quiet", "--enable-silent-rules", "--prefix="+dest, "--disable-documentation")
-	if err := config.Run(); err != nil {
-		return fmt.Errorf("failed to configure: %w", err)
-	}
-
-	makeCmd := exec.Command("make", "-j", "16", "install")
-	if err := makeCmd.Run(); err != nil {
-		return fmt.Errorf("failed to build/install: %w", err)
-	}
-
-	return nil
-}
-
-func installMeson(dest string) error {
-	meson := exec.Command("meson", ".", "build", "--prefix="+dest)
-	if err := meson.Run(); err != nil {
-		return fmt.Errorf("failed to configure: %w", err)
-	}
-
-	ninja := exec.Command("ninja", "-C", "build", "install")
-	if err := ninja.Run(); err != nil {
-		return fmt.Errorf("failed to build/install: %w", err)
-	}
-	return nil
-}
-
-func latestVersion() (version, error) {
-	tags, err := fetch.GitVersions(gitURL)
-	if err != nil {
-		return version{}, fmt.Errorf("failed to fetch git versions: %w", err)
-	}
-
-	var versions []version
-	for _, tag := range tags {
-		parsed, err := parseVersion(tag)
-		if err != nil {
-			continue
-		}
-		versions = append(versions, parsed)
-	}
-
-	if len(versions) < 1 {
-		return version{}, errors.New("found no git versions")
-	}
-
-	sort.Slice(versions, func(i, j int) bool {
-		return semver.Less(versions[i].Version, versions[j].Version)
-	})
-
-	return versions[len(versions)-1], nil
+	return version(parsed), nil
 }
 
 func install(ctx *cli.Context) error {
@@ -105,17 +48,17 @@ func install(ctx *cli.Context) error {
 	var v version
 	if sv := ctx.String("version"); sv == "latest" {
 		log.Printf("version == latest, searching for latest version")
-		vLatest, err := latestVersion()
+		latest, err := fetch.GitLatest(gitURL)
 		if err != nil {
 			return err
 		}
-		v = vLatest
+		v = version(latest)
 	} else {
-		vParsed, err := parseVersion(sv)
+		parsed, err := parseVersion(sv)
 		if err != nil {
 			return err
 		}
-		v = vParsed
+		v = parsed
 	}
 	log.Printf("Using libmpdclient version %s", v)
 
@@ -140,10 +83,21 @@ func install(ctx *cli.Context) error {
 		return fmt.Errorf("cd to workspace root: %w", err)
 	}
 
+	var proj project.Project
 	if v.Minor < 12 {
-		return installAutomake(ctx.String("prefix"))
+		p, err := project.NewAutomake(ws.Root)
+		if err != nil {
+			return err
+		}
+		proj = p
+	} else {
+		p, err := project.NewMeson(ws.Root)
+		if err != nil {
+			return err
+		}
+		proj = p
 	}
-	return installMeson(ctx.String("prefix"))
+	return project.Install(proj, ctx.String("prefix"))
 }
 
 var Command = &cli.Command{
