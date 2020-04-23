@@ -38,10 +38,25 @@ func (w *Workspace) Cleanup() error {
 	return os.RemoveAll(w.Root)
 }
 
+type options struct {
+	skipCD bool
+}
+
+type Option func(*options)
+
+func NoCD(o *options) {
+	o.skipCD = true
+}
+
 // New creates and returns a new workspace. The working directory is moved to
 // new workspace when it is created, and moved back to the original
 // working directory when Workspace.Cleanup() is called.
-func New() (*Workspace, error) {
+func New(opts ...Option) (*Workspace, error) {
+	var wopts options
+	for _, o := range opts {
+		o(&wopts)
+	}
+
 	path, err := ioutil.TempDir("", "workspace-*")
 	if err != nil {
 		return nil, err
@@ -59,11 +74,13 @@ func New() (*Workspace, error) {
 		return nil, err
 	}
 
-	if err := os.Chdir(path); err != nil {
-		os.RemoveAll(path)
-		return nil, err
+	if !wopts.skipCD {
+		if err := os.Chdir(path); err != nil {
+			os.RemoveAll(path)
+			return nil, err
+		}
+		log.Printf("CD %q", path)
 	}
-	log.Printf("CD %q", path)
 
 	return &Workspace{Root: path, prevDir: cwd}, nil
 }

@@ -8,3 +8,6 @@ t/integration/src/github.com/**
 
 # Common meson build directory
 build/**
+
+# The default meta binary created by `go build`
+tools/meta/meta

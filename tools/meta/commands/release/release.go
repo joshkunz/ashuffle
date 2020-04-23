@@ -46,8 +46,8 @@ func releaseAArch64(ctx *cli.Context, out string) error {
 	if err != nil {
 		return err
 	}
-	crosstoolAr := filepath.Join(src, "scripts/cross/gcc-arm.tar.xz")
 
+	crosstoolAr := filepath.Join(src, "scripts/cross/gcc-arm.tar.xz")
 	crosstool, err := workspace.New()
 	if err != nil {
 		return err
@@ -92,9 +92,15 @@ func releaseAArch64(ctx *cli.Context, out string) error {
 		fmt.Errorf("failed to build libmpdclient: %w", err)
 	}
 
+	build, err := workspace.New(workspace.NoCD)
+	if err != nil {
+		return err
+	}
+	defer build.Cleanup()
+
 	p, err := project.NewMeson(src, project.MesonOptions{
 		BuildType:      project.BuildDebugOptimized,
-		BuildDirectory: "build",
+		BuildDirectory: build.Root,
 		Extra:          []string{"--cross-file", crossF.Name()},
 	})
 	if err != nil {
@@ -109,7 +115,7 @@ func releaseAArch64(ctx *cli.Context, out string) error {
 		return fmt.Errorf("failed to build ashuffle: %w", err)
 	}
 
-	return fileutil.Copy("build/ashuffle", out)
+	return fileutil.Copy(build.Path("ashuffle"), out)
 }
 
 func releasex86(out string) error {
@@ -117,9 +123,16 @@ func releasex86(out string) error {
 	if err != nil {
 		return err
 	}
+
+	build, err := workspace.New(workspace.NoCD)
+	if err != nil {
+		return err
+	}
+	defer build.Cleanup()
+
 	p, err := project.NewMeson(cwd, project.MesonOptions{
 		BuildType:      project.BuildDebugOptimized,
-		BuildDirectory: "build",
+		BuildDirectory: build.Root,
 	})
 	if err != nil {
 		return err
@@ -133,7 +146,7 @@ func releasex86(out string) error {
 		return err
 	}
 
-	return fileutil.Copy("build/ashuffle", out)
+	return fileutil.Copy(build.Path("ashuffle"), out)
 }
 
 func release(ctx *cli.Context) error {
