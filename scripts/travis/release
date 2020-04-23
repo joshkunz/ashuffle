@@ -4,4 +4,5 @@
 
 setup
 mkdir -p release
-tools/meta/meta release -o release/ashuffle.x86_64-linux-gnu x86_64
+tools/meta/meta release -o release/ashuffle.x86_64-linux-gnu x86_64 || die "couldn't build x86_64"
+tools/meta/meta release -o release/ashuffle.aarch64-linux-gnu aarch64 || die "couldn't build aarch64"
