@@ -12,12 +12,24 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"meta/exec"
+	"meta/fetch"
 	"meta/fileutil"
 	"meta/project"
 	"meta/workspace"
 )
 
-const aarch64Crosstool = "scripts/cross/gcc-arm.tar.xz"
+type remoteFile struct {
+	URL    string
+	SHA256 string
+}
+
+// Obtained from the offical ARM crosstool release:
+//  https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-a/downloads
+// Current Version: 9.2-2019.12
+var aarch64Crosstool = remoteFile{
+	URL:    "https://storage.googleapis.com/ashuffle-data/gcc-arm.tar.xz",
+	SHA256: "8dfe681531f0bd04fb9c53cf3c0a3368c616aa85d48938eebe2b516376e06a66",
+}
 
 var aarch64Crossfile = template.Must(
 	template.New("aarch64-crossfile").
@@ -47,14 +59,21 @@ func releaseAArch64(ctx *cli.Context, out string) error {
 		return err
 	}
 
-	crosstoolAr := filepath.Join(src, "scripts/cross/gcc-arm.tar.xz")
 	crosstool, err := workspace.New()
 	if err != nil {
 		return err
 	}
 	defer crosstool.Cleanup()
 
-	untar := exec.Command("tar", "--strip-components=1", "-xJf", crosstoolAr)
+	if err := fetch.URL(aarch64Crosstool.URL, crosstool.Path("archive.tar.xz")); err != nil {
+		return err
+	}
+
+	if err := fileutil.Verify(crosstool.Path("archive.tar.xz"), aarch64Crosstool.SHA256); err != nil {
+		return fmt.Errorf("fetched crosstool failed to verify: %w", err)
+	}
+
+	untar := exec.Command("tar", "--strip-components=1", "-xJf", crosstool.Path("archive.tar.xz"))
 	if err := untar.Run(); err != nil {
 		return fmt.Errorf("failed to unpack crosstool: %w", err)
 	}
