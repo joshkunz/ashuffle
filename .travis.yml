@@ -67,7 +67,7 @@ jobs:
       script: scripts/travis/release
       deploy:
         provider: releases
-        file: release/ashuffle.x86_64-linux-gnu
+        file: release/ashuffle.*
         token: $GITHUB_TOKEN
         # Use Travis-CI dplv2
         edge: true
