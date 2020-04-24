@@ -25,6 +25,8 @@ func URL(url, dest string) error {
 	}
 	defer f.Close()
 
+	log.Printf("FETCH %q -> %q", url, dest)
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to fetch %q: %w", url, err)
@@ -36,7 +38,6 @@ func URL(url, dest string) error {
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
-	log.Printf("FETCH %q -> %q", url, dest)
 	return nil
 }
 
