@@ -2,12 +2,12 @@
 package fileutil
 
 import (
-	"os"
+	"meta/exec"
 )
 
 // Copy the src file to the destination.
 func Copy(src, dest string) error {
-	// Optimistically link.
-	return os.Link(src, dest)
-	// TODO(jkz): Revist this, if we need additional features.
+	// There's probably a better way to do this, but we know that cp will
+	// handle permission and mode bits correctly. So just use that.
+	return exec.Command("cp", src, dest).Run()
 }

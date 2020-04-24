@@ -85,13 +85,20 @@ func install(ctx *cli.Context) error {
 
 	var proj project.Project
 	if v.Minor < 12 {
+		if ctx.String("cross_file") != "" {
+			return errors.New("cross compilation via --cross_file not supported with this version of libmpdclient")
+		}
 		p, err := project.NewAutomake(ws.Root)
 		if err != nil {
 			return err
 		}
 		proj = p
 	} else {
-		p, err := project.NewMeson(ws.Root)
+		var opts project.MesonOptions
+		if cf := ctx.String("cross_file"); cf != "" {
+			opts.Extra = append(opts.Extra, "--cross-file", cf)
+		}
+		p, err := project.NewMeson(ws.Root, opts)
 		if err != nil {
 			return err
 		}
@@ -118,6 +125,11 @@ var Command = &cli.Command{
 			Value:    "",
 			Usage:    "The root of the target installation path.",
 			Required: true,
+		},
+		&cli.StringFlag{
+			Name:  "cross_file",
+			Value: "",
+			Usage: "The Meson 'cross-file' to use when cross-compiling",
 		},
 	},
 	Action: install,
