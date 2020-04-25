@@ -4,22 +4,6 @@ ashuffle
 [![Build Status](https://travis-ci.org/joshkunz/ashuffle.svg?branch=master)](https://travis-ci.org/joshkunz/ashuffle)
 [![GitHub](https://img.shields.io/github/license/joshkunz/ashuffle?color=informational)](LICENSE)
 
-**Notice:** [ashuffle-v2 has just been released!][latest]
-Check out the release for a full description of the changes. Since this is a
-major version, it contains a couple backwards incompatible changes:
-
-* `Makefile` support has been fully removed. All builds must now be done
-   using meson. See [getting-ashuffle](#getting-ashuffle) below for
-   instructions on how to install ashuffle.
-* `--nocheck` has been renamed to `--no-check` to be consistent with
-  the other command line flags.
-
-If you would like to be notified before another major version change in the
-future, subscribe to the [new ashuffle "Announce" list][announce] (the Google
-group also has RSS feeds if you would prefer).
-
----
-
 Table of Contents:
 * [features](#features)
   * [usage](#usage)
@@ -28,6 +12,7 @@ Table of Contents:
   * [shuffle algorithm](#shuffle-algorithm)
   * [mpd version support](#mpd-version-support)
 * [getting ashuffle](#getting-ashuffle)
+  * [pre-built binaries](#pre-built-binaries)
   * [install from source](#installing-from-source)
     * [dependencies](#dependencies)
     * [building](#building)
@@ -240,12 +225,27 @@ please open an issue.
 
 # getting ashuffle
 
-ashuffle is officially distributed via its source. Users are expected to
-build the software themselves. ashuffle has been designed to make building from
-source as easy as possible. If you would rather install using a pre-made
-package, check below for some 3rd-party packages.
+## pre-built binaries
+
+ashuffle is officially distributed via pre-compiled binaries, and via its
+source. Binaries are currently available for `x86_64`, and `aarch64`
+(cortex-a53+, including Raspberry Pi3+) targets running linux. You can
+download the latest binary for your platform [on the releases page](
+https://github.com/joshkunz/ashuffle/releases).
+
+If you'd like to add binary support to another platform, pull requests are
+welcome.
 
 ## installing from source
+
+For platforms without a binary release, you'll have to build from source. 
+ashuffle is designed to have a small number of dependencies, and we try to
+keep the build relatively straightforward. That said, you will need a
+relatively recent C++ compiler. Clang 7+, or GCC 8+ should work.
+
+If you have any trouble building ashuffle, please file an issue on Github,
+or email the ashuffle users group. Make sure to your compiler version, meson
+version, the commands you tried to execute, and any errors that were produced. 
 
 ### dependencies
 
@@ -261,16 +261,35 @@ or on OS X using brew:
 
 ashuffle is built using `ninja`, and the meson build system, you can obtain meson
 by following the instruction's on
-[meson's site](https://mesonbuild.com/Getting-meson.html). Ninja is available
-on most distributions. On debian-based distributions (including ubuntu) it
-can be installed like so:
+[meson's site](https://mesonbuild.com/Getting-meson.html). Meson version
+`>=0.54.0` is required. Ninja is available on most distributions. On
+debian-based distributions (including ubuntu) it can be installed like so:
 
     sudo apt-get install ninja-build
 
 ### building
 
-Download the [latest release][latest], untar/unzip it and then cd into the
-source directory and run:
+ashuffle relies on git submodules to track libraries it depends on. These
+libraries are not distributed in the source tarballs provided by Github,
+so you need to use git to get ashuffle when building from source. 
+
+Start by cloning ashuffle:
+
+    git clone https://github.com/joshkunz/ashuffle.git
+    cd ashuffle
+
+The check what the [latest release][latest] is on the releases page, and
+checkout the corresponding git tag. For example, If the latest release was
+v1.22.3 you would run:
+
+    git checkout v1.22.3
+
+Then init and update the submodules:
+
+    git submodule update --init --recursive
+
+Now you have the source needed to build ashuffle. Next, you need to configure
+the build, using meson. Luckily this is easy:
 
     meson -Dbuildtype=release build
 
@@ -278,8 +297,8 @@ Then run
 
     ninja -C build install
 
-to install the binary. If you want to use a prefix other than `/usr/local` you
-can supply an alternate by running `meson` like so:
+to build and install the binary. If you want to use a prefix other than
+`/usr/local` you can supply an alternate by running `meson` like so:
 
     meson build -Dbuildtype=release --prefix <prefix>
 
@@ -287,7 +306,7 @@ You can uninstall the program later by running
 
     sudo ninja -C build uninstall
 
-**Note:** See meson's [documentation][2] for more information.
+**Note:** See meson's [documentation][2] for more information on configuration.
 
 Oh, and in case you're wondering why it's called 'ashuffle' it's
 because it implements 'automatic shuffle' mode for mpd.

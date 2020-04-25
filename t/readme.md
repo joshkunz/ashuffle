@@ -11,25 +11,27 @@ This document describes how the various ashuffle tests work.
 ## unit testing
 
 The first line of defense from software defects is ashuffle's unit test suite.
-These tests run against only ashuffle sources (though they do depend on
-libmpdclient headers), and attempt to target individual ashuffle subsystems
-like "list", or "rule". You can run the unit tests like so:
+These tests run against only ashuffle, not libmpdclient. They attempt to
+target individual ashuffle subsystems like "shuffle", or "rule". You can run the
+unit tests like so:
 
     meson -Dtests=enabled build
     ninja -C build test 
 
 Unit tests are located in the root of the testing directory. All unit-tests
-are written using [libtap](https://github.com/zorgnax/libtap). `libtap` is
-is fairly lightweight, and has comprehensive documentation. However, if you're
-interested in writing a test, it's probably easiest to copy and modify an
+are writing using googletest (sometimes know as gtest) and googlemock. These
+libraries are fairly popular for C++ code, so you may already be familiar
+with them. If you're not, you can find documentation for them on the
+[googletest github page](https://github.com/google/googletest). If you're
+not familiar with the framework, you can also try copying and tweaking an
 existing test.
 
 ashuffle uses a C++ wrapper (`src/mpd.h`) to interact with `libmpdclient`.
 This wrapper has a "real" implementation (`src/mpd_client.{h,cc}`) that
-proxies to the libmpdclient API, and a "fake" implementation (`t/mpdfake.h`)
-that can be easily mocked for unit-testing. ashuffle itself is written
-against the "generic" API exposed by `src/mpd.h`, so it's easy to inject fake
-dependencies (MPD connection, songs, etc.) when needed.
+proxies to the libmpdclient API, and a "fake" implementation (`t/mpdfake.h`).
+ashuffle itself is written against the "generic" API exposed by `src/mpd.h`, so
+it's easy to inject fake dependencies (MPD connection, songs, etc.)
+from `t/mpdfake.h` when needed.
 
 As part of ashuffle's continuous integration testing, these unit tests are also
 run under Clang's AddressSanitizer, and MemorySanitizer to check for leaks,
