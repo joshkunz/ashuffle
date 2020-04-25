@@ -10,7 +10,7 @@ src_files() {
 
 src_files "$@" | while read F; do
     case $F in
-        *.c|*.h)
+        *.cc|*.c|*.h)
             clang-format -i "$F"
             ;;
         *.go)

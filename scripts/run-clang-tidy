@@ -1,5 +1,7 @@
 #!/bin/sh
 
+cp "${MESON_BUILD_ROOT}/compile_commands.json" "${MESON_BUILD_ROOT}/compile_commands.json.orig"
+
 # meson generates a `-pipe` flag for some reason, which clang chokes on.
 sed -iE 's/-pipe//g' "${MESON_BUILD_ROOT}/compile_commands.json"
 if test $? -ne 0; then
@@ -7,4 +9,19 @@ if test $? -ne 0; then
     exit 1
 fi
 
-exec clang-tidy -p "${MESON_BUILD_ROOT}" "$@"
+cat "${MESON_BUILD_ROOT}/compile_commands.json" | jq '
+    [.[] | select(.file | test(".*subprojects/.*") | not)]
+' > "${MESON_BUILD_ROOT}/compile_commands.json.fixed"
+
+cp "${MESON_BUILD_ROOT}/compile_commands.json.fixed" "${MESON_BUILD_ROOT}/compile_commands.json"
+rm "${MESON_BUILD_ROOT}/compile_commands.json.fixed"
+
+CLANG_TIDY="${CLANG_TIDY:-clang-tidy}"
+
+"${CLANG_TIDY}" -p "${MESON_BUILD_ROOT}" "$@"
+code=$?
+
+# restore the original compile commands.
+mv "${MESON_BUILD_ROOT}/compile_commands.json.orig" "${MESON_BUILD_ROOT}/compile_commands.json"
+
+exit "${code}"

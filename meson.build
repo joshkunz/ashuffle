@@ -1,37 +1,46 @@
-project('ashuffle', 'c', default_options: ['c_std=c11'])
+project('ashuffle', ['c', 'cpp'], default_options: ['cpp_std=c++17', 'warning_level=2'])
 
-add_global_arguments([
-	'-Wextra',
-	'-pedantic' ],
-	language: 'c'
+cmake = import('cmake')
+
+absl = cmake.subproject('absl', cmake_options: [
+  '-DCMAKE_CXX_STANDARD=17',
+])
+
+# Note: Unfortunately, meson does not pull in the "dependent" libraries
+# correctly so we have to list them here. If you take a dependency on some
+# addtional absl features, you will probably need to add more `dependency`
+# lines here. This could also be broken on upgrades.
+absl_all = [
+    # Via Base:
+    absl.dependency('raw_logging_internal'),
+
+    # Via Strings:
+    absl.dependency('int128'),
+    absl.dependency('str_format_internal'),
+    absl.dependency('strings_internal'),
+    absl.dependency('strings'),
+]
+
+libmpdclient = dependency('libmpdclient')
+
+sources = files(
+    'src/ashuffle.cc',
+    'src/load.cc',
+	'src/args.cc',
+	'src/getpass.cc',
+	'src/rule.cc',
+    'src/shuffle.cc',
 )
 
-high_dep_sources = files(
-    'src/ashuffle.c',
-)
-
-low_dep_sources = files(
-	'src/args.c',
-	'src/getpass.c',
-	'src/list.c',
-	'src/rule.c',
-    'src/shuffle.c',
-    'src/util.c',
-)
-
-sources = low_dep_sources + high_dep_sources
-
-executable_sources = sources + files('src/main.c')
+executable_sources = sources + files('src/mpd_client.cc', 'src/main.cc')
 
 src_inc = include_directories('src')
 root_inc = include_directories('.')
 
-clientlib = dependency('libmpdclient')
-
 ashuffle = executable(
 	'ashuffle',
 	executable_sources,
-	dependencies: clientlib,
+	dependencies: absl_all + [libmpdclient],
 	install: true
 )
 
@@ -42,33 +51,39 @@ clang_tidy = run_target('ashuffle-clang-tidy',
 # We only generate tests if we are *not running in tidy mode
 if get_option('tests').enabled()
 
-subdir('t')
+googletest = cmake.subproject('googletest', cmake_options: [
+  '-DBUILD_GMOCK=ON',
+  '-DCMAKE_CXX_STANDARD=17',
+])
 
-test_c_args = [
-    '-Wall', '-Wextra', '-pedantic',
+gtest_deps = [
+  dependency('threads'),
+  googletest.dependency('gtest'),
+  googletest.dependency('gmock'),
+  googletest.dependency('gmock_main'),
 ]
+
+mpdfake_inc = include_directories('t')
+mpdfake_dep = declare_dependency(include_directories : mpdfake_inc)
 
 test_options = [
     'werror=true',
-    'b_sanitize=address',
-    'b_sanitize=undefined',
 ]
 
 tests = {
-    'args': ['t/args_test.c'],
-    'ashuffle': ['src/ashuffle.c', 't/ashuffle_test.c'],
-    'list': ['t/list_test.c'],
-    'rule': ['t/rule_test.c'],
-    'shuffle': ['t/shuffle_test.c'],
+    'rule': ['t/rule_test.cc'],
+    'shuffle': ['t/shuffle_test.cc'],
+    'load': ['t/load_test.cc'],
+    'args': ['t/args_test.cc'],
+    'ashuffle': ['t/ashuffle_test.cc'],
 }
 
 foreach test_name, test_sources : tests
     test_exe = executable(
         test_name + '_test',
-        low_dep_sources + test_sources,
+        sources + test_sources,
         include_directories : src_inc,
-        dependencies : [libtap_dep, testhelpers_dep, clientfake_dep],
-        c_args : test_c_args,
+        dependencies : absl_all + gtest_deps + [mpdfake_dep],
         override_options : test_options,
     )
     test(test_name, test_exe)

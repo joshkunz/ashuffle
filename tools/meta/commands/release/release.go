@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	osexec "os/exec"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -36,14 +37,20 @@ var aarch64Crossfile = template.Must(
 		Parse(strings.Join([]string{
 			"[binaries]",
 			"c = '{{ .Sysroot }}/bin/aarch64-none-linux-gnu-gcc'",
-			// We have to set /usr/bin/pkg-config explicitly here, or meson won't
-			// use pkg-config to find libmpdclient.
-			"pkgconfig = '/usr/bin/pkg-config'",
+			"cpp = '{{ .Sysroot }}/bin/aarch64-none-linux-gnu-g++'",
+			// We have to set pkgconfig and cmake explicitly here, otherwise
+			// meson will not be able to find them. We just re-use the
+			// system versions, since we don't need any special arch-specific
+			// handing.
+			"pkgconfig = '{{ .PkgConfig }}'",
+			"cmake = '{{ .CMake }}'",
 			"",
 			"[properties]",
 			"sys_root = '{{ .Sysroot }}'",
 			"c_args = '-I{{ .Sysroot }}/include'",
 			"c_link_args = '-L{{ .Sysroot }}/lib'",
+			"cpp_args = '-I{{ .Sysroot }}/include'",
+			"cpp_link_args = '-L{{ .Sysroot }}/lib'",
 			"",
 			"[host_machine]",
 			"system = 'linux'",
@@ -88,10 +95,23 @@ func releaseAArch64(ctx *cli.Context, out string) error {
 	}
 	defer os.Remove(crossF.Name())
 
+	pkgConfig, err := osexec.LookPath("pkg-config")
+	if err != nil {
+		return fmt.Errorf("unable to find pkg-config: %w", err)
+	}
+	cmake, err := osexec.LookPath("cmake")
+	if err != nil {
+		return fmt.Errorf("unable to find cmake: %w", err)
+	}
+
 	sysroot := struct {
-		Sysroot string
+		Sysroot   string
+		PkgConfig string
+		CMake     string
 	}{
-		Sysroot: crosstool.Root,
+		Sysroot:   crosstool.Root,
+		PkgConfig: pkgConfig,
+		CMake:     cmake,
 	}
 
 	if err := aarch64Crossfile.Execute(crossF, sysroot); err != nil {
@@ -134,6 +154,10 @@ func releaseAArch64(ctx *cli.Context, out string) error {
 		return fmt.Errorf("failed to build ashuffle: %w", err)
 	}
 
+	if err := fileutil.RemoveRPath(build.Path("ashuffle")); err != nil {
+		return fmt.Errorf("failed to remove rpath: %w", err)
+	}
+
 	return fileutil.Copy(build.Path("ashuffle"), out)
 }
 
@@ -163,6 +187,10 @@ func releasex86(out string) error {
 
 	if err := p.Build("ashuffle"); err != nil {
 		return err
+	}
+
+	if err := fileutil.RemoveRPath(build.Path("ashuffle")); err != nil {
+		return fmt.Errorf("failed to remove rpath: %w", err)
 	}
 
 	return fileutil.Copy(build.Path("ashuffle"), out)

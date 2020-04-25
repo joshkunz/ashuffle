@@ -1,52 +1,67 @@
-#include <stdbool.h>
-#include <stdio.h>
-#include "list.h"
+#ifndef __ASHUFFLE_ARGS_H__
+#define __ASHUFFLE_ARGS_H__
 
-#ifndef ASHUFFLE_ARGS_H
-#define ASHUFFLE_ARGS_H
+#include <cstdio>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <variant>
+#include <vector>
 
-const unsigned ARGS_QUEUE_BUFFER_NONE;  // 0
+#include "mpd.h"
+#include "rule.h"
 
-struct ashuffle_test_options {
-    bool print_all_songs_and_exit;
+namespace ashuffle {
+
+struct ParseError {
+    enum Type {
+        kUnknown,  // Initial error type, unknown error.
+        kGeneric,  // Generic failure. Described by 'msg'.
+        kHelp,     // The user requested the help to be printed.
+    };
+    Type type;
+    std::string msg;
+
+    ParseError() : type(kUnknown){};
+    ParseError(std::string_view m) : ParseError(kGeneric, m){};
+    ParseError(Type t, std::string_view m) : type(t), msg(m){};
 };
 
-struct ashuffle_options {
-    struct list ruleset;
-    unsigned queue_only;
-    FILE *file_in;
-    bool check_uris;
-    unsigned queue_buffer;
-    char *host;
-    unsigned port;
-    struct ashuffle_test_options test;
+class Options {
+   public:
+    std::vector<Rule> ruleset;
+    unsigned queue_only = 0;
+    FILE *file_in = nullptr;
+    bool check_uris = true;
+    unsigned queue_buffer = 0;
+    std::optional<std::string> host = {};
+    unsigned port = 0;
+    // Special test-only options.
+    struct {
+        bool print_all_songs_and_exit = false;
+    } test = {};
+
+    // Parse parses the arguments in the given vector and returns ParseResult
+    // based on the success/failure of the parse.
+    static std::variant<Options, ParseError> Parse(
+        const mpd::TagParser &, const std::vector<std::string> &);
+
+    // ParseFromC parses the arguments in the given c-style arguments list,
+    // like would be given in `main`.
+    static std::variant<Options, ParseError> ParseFromC(
+        const mpd::TagParser &tag_parser, const char **argv, int argc) {
+        std::vector<std::string> args;
+        // Start from '1' to skip the program name itself.
+        for (int i = 1; i < argc; i++) {
+            args.push_back(argv[i]);
+        }
+        return Options::Parse(tag_parser, args);
+    }
 };
 
-typedef enum {
-    PARSE_FAILURE,  // We failed to parse the input args.
-    PARSE_HELP,     // The user requested help text to be printed.
-    PARSE_OK,       // Options fully parsed.
-} parse_status_t;
+// Print the help message on the given output stream.
+void PrintHelp(FILE *output_stream);
 
-struct options_parse_result {
-    parse_status_t status;
-    char *msg;
-};
-
-void options_parse_result_free(struct options_parse_result *);
-
-void options_init(struct ashuffle_options *);
-
-/* parse the options in to the 'ashuffle options' structure. The returned
- * parse result describes the results of the parse.
- * options_parse_result_free *must* be called reguardless of the status
- * of the parse. */
-struct options_parse_result options_parse(struct ashuffle_options *, int argc,
-                                          const char *argv[]);
-
-// Free all data stored by the given options.
-void options_free(struct ashuffle_options *);
-
-void options_help(FILE *output_stream);
+}  // namespace ashuffle
 
 #endif

@@ -235,8 +235,7 @@ func TestFromFile(t *testing.T) {
 	}
 
 	// These are the songs we'll ask ashuffle to use. They should all be
-	// in t/static/tracks (which is where /music points to in the docker
-	// container).
+	// in the integration root container.
 	db := []string{
 		"BoxCat_Games_-_10_-_Epic_Song.mp3",
 		"Broke_For_Free_-_01_-_Night_Owl.mp3",

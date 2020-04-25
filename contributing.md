@@ -61,7 +61,7 @@ test suite to be run against your change. We don't expect new requests to be
 perfect. Reviewers will let you know if you need to add more comprehensive
 testing to your change, and help to diagnose test failures.
 
-**Formatting:** ashuffle follows the Google formatting style for C code
+**Formatting:** ashuffle follows the Google formatting style for C/C++ code
 with some slight tweaks (e.g., 4 spaces for indentation instead of 2). Go
 code follows the canonical Go style as checked by `go fmt`. There is a
 [`.clang-format`](.clang-format) in the root of this repository that works with

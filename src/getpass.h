@@ -1,8 +1,18 @@
-#ifndef __GETPASS_H__
-#define __GETPASS_H__
+#ifndef __ASHUFFLE_GETPASS_H__
+#define __ASHUFFLE_GETPASS_H__
 
-#include <stdio.h>
+#include <cstdio>
+#include <string>
+#include <string_view>
 
-char *as_getpass(FILE *in_stream, FILE *out_stream, const char *prompt);
+namespace ashuffle {
+
+// GetPass obtains a password from the user. It writes the given prompt to
+// `out_stream` and then waits for the user to type a line on `in_stream`
+// which is then returned. Terminal echoing is disabled while the user is
+// writing their password, to add additional privacy.
+std::string GetPass(FILE *in_stream, FILE *out_stream, std::string_view prompt);
+
+}  // namespace ashuffle
 
 #endif
