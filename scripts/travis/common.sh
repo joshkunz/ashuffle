@@ -1,4 +1,4 @@
-MESON_VERSION="0.52.0"
+MESON_VERSION="0.54.0"
 
 die() {
     echo "$@" >&2
@@ -22,8 +22,10 @@ setup() {
         sudo apt-get install -y \
             clang-9 \
             clang-tidy-9 \
+            cmake \
             libmpdclient-dev \
             ninja-build \
+            patchelf \
             python3 python3-pip python3-setuptools python3-wheel \
     || die "couldn't apt-get required packages" 
     sudo pip3 install meson=="${MESON_VERSION}" || die "couldn't install meson"

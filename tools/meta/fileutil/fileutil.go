@@ -42,3 +42,9 @@ func Verify(file, want string) error {
 	log.Printf("VERIFY OK %q ", file)
 	return nil
 }
+
+// RemoveRPath removes the DT_RPATH entry from the given ELF file using
+// `patchelf` from the build system.
+func RemoveRPath(file string) error {
+	return exec.Command("patchelf", "--remove-rpath", file).Run()
+}

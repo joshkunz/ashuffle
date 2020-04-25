@@ -10,20 +10,7 @@
 #include <string_view>
 
 #include <absl/strings/str_format.h>
-#include <mpd/capabilities.h>
-#include <mpd/connection.h>
-#include <mpd/database.h>
-#include <mpd/error.h>
 #include <mpd/idle.h>
-#include <mpd/pair.h>
-#include <mpd/password.h>
-#include <mpd/player.h>
-#include <mpd/protocol.h>
-#include <mpd/queue.h>
-#include <mpd/recv.h>
-#include <mpd/search.h>
-#include <mpd/song.h>
-#include <mpd/status.h>
 
 #include "args.h"
 #include "ashuffle.h"
