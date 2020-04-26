@@ -17,9 +17,8 @@ setup() {
     if test -n "${IN_DEBUG_MODE}"; then
         return 0
     fi
-    sudo apt-get update && \
-        sudo apt-get upgrade -y && \
-        sudo apt-get install -y \
+    sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y && \
+        sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
             clang-9 \
             clang-tidy-9 \
             cmake \
