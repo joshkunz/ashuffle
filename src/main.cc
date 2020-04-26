@@ -83,9 +83,10 @@ int main(int argc, const char* argv[]) {
     // For integration testing, we sometimes just want to have ashuffle
     // dump the list of songs in its shuffle chain.
     if (options.test.print_all_songs_and_exit) {
-        std::vector<std::string> all_songs = songs.Items();
-        for (auto song : all_songs) {
-            std::cout << song << std::endl;
+        for (auto&& group : songs.Items()) {
+            for (auto&& song : group) {
+                std::cout << song << std::endl;
+            }
         }
         exit(EXIT_SUCCESS);
     }
@@ -94,8 +95,15 @@ int main(int argc, const char* argv[]) {
         std::cerr << "Song pool is empty." << std::endl;
         exit(EXIT_FAILURE);
     }
-    std::cout << "Picking random songs out of a pool of " << songs.Len() << "."
-              << std::endl;
+
+    if (!options.group_by.empty()) {
+        std::cout << absl::StrFormat("Picking from %u groups (%u songs).",
+                                     songs.Len(), songs.LenURIs())
+                  << std::endl;
+    } else {
+        std::cout << "Picking random songs out of a pool of " << songs.Len()
+                  << "." << std::endl;
+    }
 
     /* Seed the random number generator */
     srand(time(NULL));

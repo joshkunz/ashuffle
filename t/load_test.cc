@@ -29,7 +29,7 @@ TEST(MPDLoaderTest, Basic) {
     MPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset);
     loader.Load(&chain);
 
-    std::vector<std::string> want = {"song_a", "song_b"};
+    std::vector<std::vector<std::string>> want = {{"song_a"}, {"song_b"}};
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
 
@@ -52,7 +52,7 @@ TEST(MPDLoaderTest, WithFilter) {
     MPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset);
     loader.Load(&chain);
 
-    std::vector<std::string> want = {"song_a", "song_c"};
+    std::vector<std::vector<std::string>> want = {{"song_a"}, {"song_c"}};
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
 
@@ -73,7 +73,8 @@ TEST(FileLoaderTest, Basic) {
     FileLoader loader(s.get());
     loader.Load(&chain);
 
-    std::vector<std::string> want = {song_a.URI(), song_b.URI(), song_c.URI()};
+    std::vector<std::vector<std::string>> want = {
+        {song_a.URI()}, {song_b.URI()}, {song_c.URI()}};
 
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
@@ -123,6 +124,7 @@ TEST(FileMPDLoaderTest, Basic) {
     FileMPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, s.get());
     loader.Load(&chain);
 
-    std::vector<std::string> want = {song_a.URI(), song_c.URI()};
+    std::vector<std::vector<std::string>> want = {{song_a.URI()},
+                                                  {song_c.URI()}};
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }

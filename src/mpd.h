@@ -129,6 +129,14 @@ class MPD {
     // Add, adds the song wit the given URI to the MPD queue.
     virtual void Add(const std::string& uri) = 0;
 
+    // Add also works on vectors of URIs, by repeatedly invoking Add for each
+    // element.
+    void Add(const std::vector<std::string>& uris) {
+        for (auto& u : uris) {
+            Add(u);
+        }
+    };
+
     enum PasswordStatus {
         kAccepted,
         kRejected,

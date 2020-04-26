@@ -14,6 +14,7 @@ using namespace ashuffle;
 
 using ::testing::ContainerEq;
 using ::testing::Each;
+using ::testing::ElementsAre;
 using ::testing::Range;
 using ::testing::Values;
 using ::testing::WhenSorted;
@@ -24,8 +25,23 @@ TEST(ShuffleChainTest, AddPick) {
 
     chain.Add(test_str);
 
-    EXPECT_EQ(chain.Pick(), test_str);
-    EXPECT_EQ(chain.Pick(), test_str)
+    EXPECT_EQ(chain.Len(), 1);
+    EXPECT_EQ(chain.LenURIs(), 1);
+    EXPECT_THAT(chain.Pick(), ElementsAre(test_str));
+    EXPECT_THAT(chain.Pick(), ElementsAre(test_str))
+        << "could not double-pick from the same 1-item chain.";
+}
+
+TEST(ShuffleChainTest, AddPickGroup) {
+    ShuffleChain chain;
+    std::vector<std::string> g = {"a", "b", "c"};
+
+    chain.Add(g);
+
+    EXPECT_EQ(chain.Len(), 1);
+    EXPECT_EQ(chain.LenURIs(), 3);
+    EXPECT_THAT(chain.Pick(), ContainerEq(g));
+    EXPECT_THAT(chain.Pick(), ContainerEq(g))
         << "could not double-pick from the same 1-item chain.";
 }
 
@@ -44,7 +60,8 @@ TEST(ShuffleChainTest, PickN) {
 
     std::vector<std::string> picked;
     for (int i = 0; i < test_rounds; i++) {
-        picked.emplace_back(chain.Pick());
+        const std::vector<std::string>& got = chain.Pick();
+        picked.insert(picked.end(), got.begin(), got.end());
     }
 
     EXPECT_THAT(picked, Each(IsInCollection(test_items)))
@@ -71,7 +88,8 @@ TEST_P(WindowTest, Repeats) {
     // length of "picked", it should match window_size.
     std::unordered_set<std::string> picked;
     for (int i = 0; i < WindowSize(); i++) {
-        picked.insert(chain_.Pick());
+        auto got = chain_.Pick();
+        picked.insert(got.begin(), got.end());
     }
 
     EXPECT_EQ(picked.size(), static_cast<unsigned>(WindowSize()))
@@ -79,7 +97,8 @@ TEST_P(WindowTest, Repeats) {
 
     // Since we only put in window_size songs, we should now be forced to get
     // a repeat by picking one more song.
-    picked.insert(chain_.Pick());
+    auto got = chain_.Pick();
+    picked.insert(got.begin(), got.end());
 
     EXPECT_EQ(picked.size(), static_cast<unsigned>(WindowSize()))
         << "should have gotten a repeat by picking one more song";
@@ -105,8 +124,11 @@ TEST(ShuffleChainTest, IsRandom) {
     chain.Add("test c");
 
     std::vector<std::string> want{"test b", "test c", "test a", "test b"};
-    std::vector<std::string> got = {chain.Pick(), chain.Pick(), chain.Pick(),
-                                    chain.Pick()};
+    std::vector<std::string> got;
+    for (int i = 0; i < 4; i++) {
+        auto pick = chain.Pick();
+        got.insert(got.end(), pick.begin(), pick.end());
+    }
 
     EXPECT_THAT(got, ContainerEq(want));
 }
@@ -115,10 +137,12 @@ TEST(ShuffleChainTest, Items) {
     ShuffleChain chain(2);
 
     const std::vector<std::string> test_uris{"test a", "test b", "test c"};
+    const std::vector<std::string> test_group{"group a", "group b"};
 
     chain.Add(test_uris[0]);
     chain.Add(test_uris[1]);
     chain.Add(test_uris[2]);
+    chain.Add(test_group);
 
     // This is a gross hack to ensure that we've initialized the window pool.
     // We want to make sure shuffle_chain also picks up songs in the window.
@@ -126,7 +150,13 @@ TEST(ShuffleChainTest, Items) {
     // be OK, it just won't do anything.
     (void)chain.Pick();
 
-    std::vector<std::string> got = chain.Items();
+    std::vector<std::vector<std::string>> got = chain.Items();
+    std::vector<std::vector<std::string>> want = {
+        test_group,
+        {"test a"},
+        {"test b"},
+        {"test c"},
+    };
 
-    EXPECT_THAT(got, WhenSorted(ContainerEq(test_uris)));
+    EXPECT_THAT(got, WhenSorted(ContainerEq(want)));
 }
