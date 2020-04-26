@@ -16,7 +16,7 @@ namespace {
 
 constexpr char kHelpMessage[] =
     "usage: ashuffle [-h] [-n] [-e PATTERN ...] [-o NUMBER] [-f FILENAME] "
-    "[-q NUMBER]\n"
+    "[-q NUMBER] [-g TAG ...]\n"
     "\n"
     "Optional Arguments:\n"
     "   -h,-?,--help      Display this help message.\n"
@@ -27,6 +27,12 @@ constexpr char kHelpMessage[] =
     "                     filename to retrive URI's from standard in. This\n"
     "                     can be used to pipe song URI's from another program\n"
     "                     into ashuffle.\n"
+    "   -g,--group-by     Shuffle songs grouped by the given tags. For "
+    "example\n"
+    "                     'album' could be used as the tag, and an entire\n"
+    "                     album's worth of songs would be queued instead of "
+    "one\n"
+    "                     song at a time.\n"
     "   --host            Specify a hostname or IP address to connect to.\n"
     "                     Defaults to `localhost`.\n"
     "   -n,--no-check     When reading URIs from a file, don't check to\n"
@@ -72,6 +78,8 @@ class Parser {
         kFile,         // Expecting file path
         kFinal,        // (final) Final state
         kError,        // (final) Error state
+        kGroup,        // (generic) Expecting tag for group.
+        kGroupBegin,   // Expecting first tag for group.
         kHost,         // Expecting hostname
         kNone,         // (generic) Default state, and initial state.
         kPort,         // Expecting port
@@ -111,7 +119,9 @@ class Parser {
     std::variant<State, ParseError> ConsumeInternal(std::string_view arg);
 };
 
-bool Parser::InGenericState() { return state_ == kNone || state_ == kRule; }
+bool Parser::InGenericState() {
+    return state_ == kNone || state_ == kRule || state_ == kGroup;
+}
 
 bool Parser::InFinalState() { return state_ == kFinal || state_ == kError; }
 
@@ -206,6 +216,9 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
         if (arg == "--test_enable_option_do_not_use") {
             return kTest;
         }
+        if (arg == "--group-by" || arg == "-g") {
+            return kGroupBegin;
+        }
     }
     switch (state_) {
         case kFile:
@@ -257,6 +270,16 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
                 return kNone;
             }
             return ParseError(absl::StrFormat("bad test option '%s'", arg));
+        case kGroup:
+        case kGroupBegin: {
+            std::optional<enum mpd_tag_type> tag = tag_parser_.Parse(arg);
+            if (!tag) {
+                return ParseError(
+                    absl::StrFormat("invalid tag name '%s'", arg));
+            }
+            opts_.group_by.push_back(*tag);
+            return kGroup;
+        }
         case kFinal:
         case kError:
             assert(false && "unreachable, should not be possible");

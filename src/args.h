@@ -40,6 +40,7 @@ class Options {
     struct {
         bool print_all_songs_and_exit = false;
     } test = {};
+    std::vector<enum mpd_tag_type> group_by = {};
 
     // Parse parses the arguments in the given vector and returns ParseResult
     // based on the success/failure of the parse.

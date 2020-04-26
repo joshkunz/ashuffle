@@ -60,6 +60,10 @@ int main(int argc, const char* argv[]) {
 
     Options options = std::move(std::get<Options>(parse));
 
+    if (!options.group_by.empty()) {
+        std::cerr << "-g/--group-by not yet supported" << std::endl;
+    }
+
     std::function<std::string()> pass_f = [] {
         return GetPass(stdin, stdout, "mpd password: ");
     };
