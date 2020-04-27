@@ -50,6 +50,36 @@ class Song : public mpd::Song {
     bool operator==(const Song& other) const {
         return uri == other.uri && tags == other.tags;
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const Song& s) {
+        os << "Song(\"" << s.uri << "\"";
+
+        if (s.tags.empty()) {
+            return os << ")";
+        }
+
+        os << ", {";
+        bool first = true;
+        for (auto& [tag, val] : s.tags) {
+            if (!first) {
+                os << ", ";
+            }
+            first = false;
+            std::string tag_name;
+            switch (tag) {
+                case MPD_TAG_ARTIST:
+                    tag_name = "artist";
+                    break;
+                case MPD_TAG_ALBUM:
+                    tag_name = "album";
+                    break;
+                default:
+                    tag_name = "<unknown>";
+            }
+            os << tag_name << ": " << val;
+        }
+        return os << "})";
+    }
 };
 
 class TagParser : public mpd::TagParser {
@@ -141,8 +171,8 @@ class MPD : public mpd::MPD {
         state.playing = true;
     };
     void PlayAt(unsigned position) override {
-        assert(position < queue.size() && "can't play song outside of queue");
         dbg() << "call:PlayAt(" << position << ")" << std::endl;
+        assert(position < queue.size() && "can't play song outside of queue");
         state.song_position = position;
         state.playing = true;
     };

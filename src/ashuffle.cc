@@ -74,15 +74,18 @@ void TryEnqueue(mpd::MPD *mpd, ShuffleChain *songs, const Options &options) {
     /* Add another song to the list and restart the player */
     if (should_add) {
         if (options.queue_buffer != 0) {
-            unsigned to_enqueue = options.queue_buffer;
+            int needed = static_cast<int>(options.queue_buffer) -
+                         static_cast<int>(queue_songs_remaining);
             // If we're not currently "on" a song, then we need to not only
             // enqueue options->queue_buffer songs, but also the song we're
             // about to play, so increment the `to_enqueue' count by one.
             if (past_last || queue_empty) {
-                to_enqueue += 1;
+                needed += 1;
             }
-            for (unsigned i = queue_songs_remaining; i < to_enqueue; i++) {
-                mpd->Add(songs->Pick());
+            while (needed > 0) {
+                std::vector<std::string> picked = songs->Pick();
+                needed -= static_cast<int>(picked.size());
+                mpd->Add(picked);
             }
         } else {
             mpd->Add(songs->Pick());
