@@ -85,7 +85,12 @@ int main(int argc, const char* argv[]) {
     // For integration testing, we sometimes just want to have ashuffle
     // dump the list of songs in its shuffle chain.
     if (options.test.print_all_songs_and_exit) {
+        bool first = true;
         for (auto&& group : songs.Items()) {
+            if (!first) {
+                std::cout << "---" << std::endl;
+            }
+            first = false;
             for (auto&& song : group) {
                 std::cout << song << std::endl;
             }
