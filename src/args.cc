@@ -27,12 +27,11 @@ constexpr char kHelpMessage[] =
     "                     filename to retrive URI's from standard in. This\n"
     "                     can be used to pipe song URI's from another program\n"
     "                     into ashuffle.\n"
-    "   -g,--group-by     Shuffle songs grouped by the given tags. For "
-    "example\n"
-    "                     'album' could be used as the tag, and an entire\n"
-    "                     album's worth of songs would be queued instead of "
-    "one\n"
-    "                     song at a time.\n"
+    "   --by-album        Same as '--group-by album date'.\n"
+    "   -g,--group-by     Shuffle songs grouped by the given tags. For\n"
+    "                     example 'album' could be used as the tag, and an\n"
+    "                     entire album's worth of songs would be queued\n"
+    "                     instead of one song at a time.\n"
     "   --host            Specify a hostname or IP address to connect to.\n"
     "                     Defaults to `localhost`.\n"
     "   -n,--no-check     When reading URIs from a file, don't check to\n"
@@ -217,7 +216,20 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
             return kTest;
         }
         if (arg == "--group-by" || arg == "-g") {
+            if (!opts_.group_by.empty()) {
+                return ParseError(
+                    absl::StrFormat("'%s' can only be provided once", arg));
+            }
             return kGroupBegin;
+        }
+        if (arg == "--by-album") {
+            if (!opts_.group_by.empty()) {
+                return ParseError(
+                    absl::StrFormat("'%s' can only be provided once", arg));
+            }
+            opts_.group_by.push_back(MPD_TAG_ALBUM);
+            opts_.group_by.push_back(MPD_TAG_DATE);
+            return kNone;
         }
     }
     switch (state_) {

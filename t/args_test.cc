@@ -156,6 +156,15 @@ TEST(ParseTest, FileInStdin) {
     EXPECT_EQ(opts.file_in, &std::cin);
 }
 
+TEST(ParseTest, ByAlbum) {
+    Options opts;
+    fake::TagParser tagger;
+
+    opts = std::get<Options>(Options::Parse(fake::TagParser(), {"--by-album"}));
+    EXPECT_THAT(opts.group_by, ElementsAre(MPD_TAG_ALBUM, MPD_TAG_DATE))
+        << "--by-album should be equivalent to --group-by album date";
+}
+
 using ParseFailureParam =
     std::tuple<std::vector<std::string>, Matcher<std::string>>;
 
@@ -211,6 +220,12 @@ std::vector<ParseFailureParam> partial_cases = {
      HasSubstr("no argument supplied for '--test_enable_option_do_not_use'")},
     {{"-g"}, HasSubstr("no argument supplied for '-g'")},
     {{"--group-by"}, HasSubstr("no argument supplied for '--group-by'")},
+    {{"-g", "artist", "--by-album"},
+     HasSubstr("'--by-album' can only be provided once")},
+    {{"-g", "artist", "-g", "invalid"},
+     HasSubstr("'-g' can only be provided once")},
+    {{"--by-album", "-g", "artist"},
+     HasSubstr("'-g' can only be provided once")},
 };
 
 INSTANTIATE_TEST_SUITE_P(Partials, ParseFailureTest, ValuesIn(partial_cases));
