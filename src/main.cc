@@ -25,12 +25,13 @@ const int kWindowSize = 7;
 
 std::unique_ptr<Loader> BuildLoader(mpd::MPD* mpd, const Options& opts) {
     if (opts.file_in != nullptr && opts.check_uris) {
-        return std::make_unique<FileMPDLoader>(mpd, opts.ruleset, opts.file_in);
+        return std::make_unique<FileMPDLoader>(mpd, opts.ruleset, opts.group_by,
+                                               opts.file_in);
     } else if (opts.file_in != nullptr) {
         return std::make_unique<FileLoader>(opts.file_in);
     }
 
-    return std::make_unique<MPDLoader>(mpd, opts.ruleset);
+    return std::make_unique<MPDLoader>(mpd, opts.ruleset, opts.group_by);
 }
 
 }  // namespace
@@ -60,8 +61,9 @@ int main(int argc, const char* argv[]) {
 
     Options options = std::move(std::get<Options>(parse));
 
-    if (!options.group_by.empty()) {
-        std::cerr << "-g/--group-by not yet supported" << std::endl;
+    if (!options.check_uris && !options.group_by.empty()) {
+        std::cerr << "-g/--group-by not supported with no-check" << std::endl;
+        exit(EXIT_FAILURE);
     }
 
     std::function<std::string()> pass_f = [] {

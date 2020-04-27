@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -298,17 +297,19 @@ func New(ctx context.Context, opts *Options) (*Instance, error) {
 	connectBackoff := backoff.WithContext(backoff.NewConstantBackOff(mpdConnectBackoff), connectCtx)
 
 	var cli *mpdc.Client
-	backoff.Retry(func() error {
+	err = backoff.Retry(func() error {
 		onceCli, err := mpdc.Dial("unix", root.socket)
 		if err != nil {
-			log.Printf("failed to connect to mpd: %v", err)
 			return err
 		}
 		cli = onceCli
 		return nil
 	}, connectBackoff)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to mpd at %s: %v", root.socket, err)
+	}
 	if cli == nil {
-		return nil, fmt.Errorf("failed to connect to mpd at %s", root.socket)
+		panic("backoff did not return an error. This should not happen.")
 	}
 
 	if err != nil {

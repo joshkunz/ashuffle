@@ -140,6 +140,42 @@ func TestStartup(t *testing.T) {
 	mpdi.Shutdown()
 }
 
+func TestStartupFail(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	tests := []struct {
+		desc               string
+		options            *ashuffle.Options
+		wantStderrContains string
+	}{
+		{
+			desc:               "No MPD server running",
+			wantStderrContains: "could not connect to mpd",
+		},
+		{
+			desc:               "Group by and no-check",
+			options:            &ashuffle.Options{Args: []string{"-g", "album", "--no-check"}},
+			wantStderrContains: "group-by not supported with no-check",
+		},
+	}
+
+	for _, test := range tests {
+		as, err := ashuffle.New(ctx, ashuffleBin, test.options)
+		if err != nil {
+			t.Errorf("failed to start ashuffle: %v", err)
+			continue
+		}
+		if err := as.Shutdown(ashuffle.ShutdownSoft); err == nil {
+			t.Errorf("ashuffle shutdown cleanly, but we wanted an error: %v", err)
+		}
+		if stderr := as.Stderr.String(); !strings.Contains(stderr, test.wantStderrContains) {
+			t.Errorf("want stderr contains %q, got stderr:\n%s", test.wantStderrContains, stderr)
+		}
+	}
+
+}
+
 func TestShuffleOnce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -424,6 +460,10 @@ func TestFastStartup(t *testing.T) {
 		{
 			name: "from file, with filter",
 			args: []string{"-f", dbF.Path(), "-o", "1", "-e", "artist", "AA"},
+		},
+		{
+			name: "from mpd, group-by artist",
+			args: []string{"-f", dbF.Path(), "-o", "1", "-g", "artist"},
 		},
 	}
 

@@ -1,20 +1,54 @@
 #include "load.h"
 
 #include <iostream>
+#include <unordered_map>
+#include <vector>
 
+#include <absl/hash/hash.h>
 #include <absl/strings/str_format.h>
 
 namespace ashuffle {
 
+namespace {
+
+// A Group is a vector of field values, present or not.
+typedef std::vector<std::optional<std::string>> Group;
+
+// A GroupMap is a mapping from Groups to song URI vectors of the URIs in the
+// given group.
+typedef std::unordered_map<Group, std::vector<std::string>, absl::Hash<Group>>
+    GroupMap;
+
+}  // namespace
+
 /* build the list of songs to shuffle from using MPD */
 void MPDLoader::Load(ShuffleChain *songs) {
+    GroupMap groups;
+
     std::unique_ptr<mpd::SongReader> reader = mpd_->ListAll();
     while (!reader->Done()) {
         std::unique_ptr<mpd::Song> song = *reader->Next();
         if (!Verify(*song)) {
             continue;
         }
-        songs->Add(song->URI());
+
+        if (group_by_.empty()) {
+            songs->Add(song->URI());
+            continue;
+        }
+        Group group;
+        for (auto &field : group_by_) {
+            group.emplace_back(song->Tag(field));
+        }
+        groups[group].push_back(song->URI());
+    }
+
+    if (group_by_.empty()) {
+        return;
+    }
+
+    for (auto &&[_, group] : groups) {
+        songs->Add(group);
     }
 }
 
@@ -28,8 +62,9 @@ bool MPDLoader::Verify(const mpd::Song &song) {
 }
 
 FileMPDLoader::FileMPDLoader(mpd::MPD *mpd, const std::vector<Rule> &ruleset,
+                             const std::vector<enum mpd_tag_type> &group_by,
                              std::istream *file)
-    : MPDLoader(mpd, ruleset), file_(file) {
+    : MPDLoader(mpd, ruleset, group_by), file_(file) {
     for (std::string uri; std::getline(*file_, uri);) {
         valid_uris_.emplace_back(uri);
     }
