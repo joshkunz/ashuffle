@@ -1,5 +1,8 @@
 #include <cassert>
-#include <cstdio>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <ostream>
 #include <string_view>
 
 #include <absl/strings/numbers.h>
@@ -207,9 +210,11 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
     switch (state_) {
         case kFile:
             if (arg == "-") {
-                opts_.file_in = stdin;
+                opts_.file_in = &std::cin;
             } else {
-                opts_.file_in = fopen(arg.data(), "r");
+                std::string filepath(arg);
+                opts_.InternalTakeIstream(
+                    std::make_unique<std::ifstream>(filepath));
             }
             return kNone;
         case kHost:
@@ -274,6 +279,9 @@ std::variant<Options, ParseError> Options::Parse(
     return p.Finish();
 }
 
-void PrintHelp(FILE* output) { fputs(kHelpMessage, output); }
+std::ostream& DisplayHelp(std::ostream& output) {
+    output << kHelpMessage;
+    return output;
+}
 
 }  // namespace ashuffle

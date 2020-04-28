@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include <iostream>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -19,8 +19,10 @@
 using namespace ashuffle;
 
 using ::testing::HasSubstr;
+using ::testing::IsNull;
 using ::testing::Matcher;
 using ::testing::MatchesRegex;
+using ::testing::NotNull;
 using ::testing::Values;
 
 TEST(ParseTest, Empty) {
@@ -28,11 +30,11 @@ TEST(ParseTest, Empty) {
     auto result = Options::Parse(tagger, std::vector<std::string>());
     ASSERT_EQ(std::get_if<ParseError>(&result), nullptr);
 
-    Options opts = std::get<Options>(result);
+    Options opts = std::move(std::get<Options>(result));
 
     EXPECT_TRUE(opts.ruleset.empty()) << "there should be no rules by default";
     EXPECT_EQ(opts.queue_only, 0U);
-    EXPECT_EQ(opts.file_in, nullptr);
+    EXPECT_THAT(opts.file_in, IsNull());
     EXPECT_TRUE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 0U);
     EXPECT_EQ(opts.host, std::nullopt);
@@ -58,7 +60,7 @@ TEST(ParseTest, Short) {
 
     EXPECT_EQ(opts.ruleset.size(), 2U);
     EXPECT_EQ(opts.queue_only, 5U);
-    EXPECT_NE(opts.file_in, nullptr);
+    EXPECT_THAT(opts.file_in, NotNull());
     EXPECT_FALSE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 10U);
     EXPECT_EQ(opts.port, 1234U);
@@ -84,7 +86,7 @@ TEST(ParseTest, Long) {
 
     EXPECT_EQ(opts.ruleset.size(), 2U);
     EXPECT_EQ(opts.queue_only, 5U);
-    EXPECT_NE(opts.file_in, nullptr);
+    EXPECT_THAT(opts.file_in, NotNull());
     EXPECT_FALSE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 10U);
     EXPECT_EQ(opts.host, "foo");
@@ -109,7 +111,7 @@ TEST(ParseTest, MixedLongShort) {
 
     EXPECT_EQ(opts.ruleset.size(), 2U);
     EXPECT_EQ(opts.queue_only, 5U);
-    EXPECT_NE(opts.file_in, nullptr);
+    EXPECT_THAT(opts.file_in, NotNull());
     EXPECT_FALSE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 10U);
 }
@@ -142,10 +144,10 @@ TEST(ParseTest, FileInStdin) {
     fake::TagParser tagger;
 
     opts = std::get<Options>(Options::Parse(tagger, {"-f", "-"}));
-    EXPECT_EQ(opts.file_in, stdin);
+    EXPECT_EQ(opts.file_in, &std::cin);
 
     opts = std::get<Options>(Options::Parse(tagger, {"--file", "-"}));
-    EXPECT_EQ(opts.file_in, stdin);
+    EXPECT_EQ(opts.file_in, &std::cin);
 }
 
 using ParseFailureParam =

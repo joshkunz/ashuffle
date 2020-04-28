@@ -1,7 +1,7 @@
 #ifndef __ASHUFFLE_ARGS_H__
 #define __ASHUFFLE_ARGS_H__
 
-#include <cstdio>
+#include <istream>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -31,7 +31,7 @@ class Options {
    public:
     std::vector<Rule> ruleset;
     unsigned queue_only = 0;
-    FILE *file_in = nullptr;
+    std::istream *file_in = nullptr;
     bool check_uris = true;
     unsigned queue_buffer = 0;
     std::optional<std::string> host = {};
@@ -57,10 +57,26 @@ class Options {
         }
         return Options::Parse(tag_parser, args);
     }
+
+    // Take ownership fo the given istream, and set the file_in member to
+    // point to the referenced istream. This should only be used while the
+    // Options are being constructed.
+    void InternalTakeIstream(std::unique_ptr<std::istream> &&is) {
+        file_in = is.get();
+        owned_file_ = std::move(is);
+    };
+
+   private:
+    // The owned_file is set if this Options class owns the file_in ptr.
+    // The file_in ptr is only *sometimes* owned. For example, the file_in ptr
+    // may point to std::cin, which has static lifetime, and is not owned by
+    // this object.
+    std::unique_ptr<std::istream> owned_file_;
 };
 
-// Print the help message on the given output stream.
-void PrintHelp(FILE *output_stream);
+// Print the help message on the given output stream, and return the input
+// ostream.
+std::ostream &DisplayHelp(std::ostream &);
 
 }  // namespace ashuffle
 

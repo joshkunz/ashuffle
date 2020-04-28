@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <cassert>
@@ -26,8 +25,7 @@ const int kWindowSize = 7;
 
 std::unique_ptr<Loader> BuildLoader(mpd::MPD* mpd, const Options& opts) {
     if (opts.file_in != nullptr && opts.check_uris) {
-        return std::make_unique<CheckFileLoader>(mpd, opts.ruleset,
-                                                 opts.file_in);
+        return std::make_unique<FileMPDLoader>(mpd, opts.ruleset, opts.file_in);
     } else if (opts.file_in != nullptr) {
         return std::make_unique<FileLoader>(opts.file_in);
     }
@@ -43,24 +41,24 @@ int main(int argc, const char* argv[]) {
     if (ParseError* err = std::get_if<ParseError>(&parse); err != nullptr) {
         switch (err->type) {
             case ParseError::Type::kUnknown:
-                fprintf(stderr,
-                        "unknown option parsing error. Please file a bug "
-                        "at https://github.com/joshkunz/ashuffle");
+                std::cerr << "unknown option parsing error. Please file a bug "
+                          << "at https://github.com/joshkunz/ashuffle"
+                          << std::endl;
                 break;
             case ParseError::Type::kHelp:
                 // We always print the help, so just break here.
                 break;
             case ParseError::Type::kGeneric:
-                fprintf(stderr, "error: %s\n", err->msg.data());
+                std::cerr << "error: " << err->msg << std::endl;
                 break;
             default:
                 assert(false && "unreachable");
         }
-        PrintHelp(stderr);
+        std::cerr << DisplayHelp;
         exit(EXIT_FAILURE);
     }
 
-    Options options = std::get<Options>(parse);
+    Options options = std::move(std::get<Options>(parse));
 
     std::function<std::string()> pass_f = [] {
         return GetPass(stdin, stdout, "mpd password: ");
@@ -89,10 +87,11 @@ int main(int argc, const char* argv[]) {
     }
 
     if (songs.Len() == 0) {
-        fputs("Song pool is empty.", stderr);
+        std::cerr << "Song pool is empty." << std::endl;
         exit(EXIT_FAILURE);
     }
-    printf("Picking random songs out of a pool of %u.\n", songs.Len());
+    std::cout << "Picking random songs out of a pool of " << songs.Len() << "."
+              << std::endl;
 
     /* Seed the random number generator */
     srand(time(NULL));
@@ -102,7 +101,7 @@ int main(int argc, const char* argv[]) {
         for (unsigned i = 0; i < options.queue_only; i++) {
             mpd->Add(songs.Pick());
         }
-        printf("Added %u songs.\n", options.queue_only);
+        std::cout << "Added " << options.queue_only << " songs." << std::endl;
     } else {
         Loop(mpd.get(), &songs, options);
     }
