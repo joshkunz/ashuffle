@@ -44,7 +44,6 @@ and once those songs finish, the random music will resume.
 ashuffle uses MPD's "idle" command to listen for MPD events so it won't
 drain cpu polling to check if the current song has advanced.
 
-
 If you only want to enqueue a set number of songs, use the `--only` flag like
 this:
 
@@ -58,8 +57,10 @@ like:
   * Custom shuffle filter rules, using `--exclude`.
   * Shuffling based on a list of MPD URIs, like would be output from
     `mpc search` using the `--file` option.
-  * MPD authentication
+  * MPD authentication.
   * Crossfade support using `--queue-buffer`.
+  * Shuffling by album or other groupings of songs using the `--by-album` or
+    `--group-by` option.
 
 If any of these sound interesting, read on!
 
@@ -121,31 +122,60 @@ effectively. Most crossfade users will probably want to use this flag like so:
 
     $ ashuffle --queue-buffer 1
 
+### shuffling by album, or other groups, with `--group-by`
+
+If you'd rather shuffle songs in groups, instead of individually, ashuffle can
+group songs by any combination of tag values using the `-g`/`--group-by`
+option. For example, you could run:
+
+    $ ashuffle --group-by album
+
+In this mode, when loading songs from MPD or a file, ashuffle will first group
+the songs by the given tag. Album in this case. Then, when a song needs to be
+added to the queue, ashuffle will pick a random group (e.g., album) and
+enqueue all songs from that group. Once the end of the queue is reached, a new
+group is picked and the process is repeated.
+
+Multiple tags can be provided to `--group-by`, and songs will be grouped
+together as long as all the given tags match. A `--by-album` option is provided
+for convenience that is probably what you want to use when shuffling by album.
+It's equivalent to `--group-by album date`.
+
+Note that `-g`/`--group-by`/`--by-album` can only be provided once.
+
 ## help text
 
 ```
-usage: ashuffle [-h] [-n] [-e PATTERN ...] [-o NUMBER] [-f FILENAME] [-q NUMBER]
+usage: ashuffle [-h] [-n] [-e PATTERN ...] [-o NUMBER] [-f FILENAME] [-q NUMBER] [-g TAG ...]
 
 Optional Arguments:
    -h,-?,--help      Display this help message.
-   -e,--exclude      Specify things to remove from shuffle (think blacklist).
-   -f,--file         Use MPD URI's found in 'file' instead of using the entire
-                     MPD library. You can supply `-` instead of a filename to
-                     retrive URI's from standard in. This can be used to pipe
-                     song URI's from another program into ashuffle.
-   --host            Specify a hostname or IP address to connect to. Defaults
-                     to `localhost`.
-   -n,--no-check     When reading URIs from a file, don't check to ensure that
-                     the URIs match the given exclude rules. This option is most
-                     helpful when shuffling songs with -f, that aren't in the
-                     MPD library.
-   -o,--only         Instead of continuously adding songs, just add 'NUMBER'
-                     songs and then exit.
-   -p,--port         Specify a port number to connect to. Defaults to `6600`.
-   -q,--queue-buffer Specify to keep a buffer of `n` songs queued after the
-                     currently playing song. This is to support MPD features
-                     like crossfade that don't work if there are no more
-                     songs in the queue.
+   -e,--exclude      Specify things to remove from shuffle (think
+                     blacklist).
+   -f,--file         Use MPD URI's found in 'file' instead of using the
+                     entire MPD library. You can supply `-` instead of a
+                     filename to retrive URI's from standard in. This
+                     can be used to pipe song URI's from another program
+                     into ashuffle.
+   --by-album        Same as '--group-by album date'.
+   -g,--group-by     Shuffle songs grouped by the given tags. For
+                     example 'album' could be used as the tag, and an
+                     entire album's worth of songs would be queued
+                     instead of one song at a time.
+   --host            Specify a hostname or IP address to connect to.
+                     Defaults to `localhost`.
+   -n,--no-check     When reading URIs from a file, don't check to
+                     ensure that the URIs match the given exclude rules.
+                     This option is most helpful when shuffling songs
+                     with -f, that aren't in the MPD library.
+   -o,--only         Instead of continuously adding songs, just add
+                     'NUMBER' songs and then exit.
+   -p,--port         Specify a port number to connect to. Defaults to
+                     `6600`.
+   -q,--queue-buffer Specify to keep a buffer of `n` songs queued after
+                     the currently playing song. This is to support MPD
+                     features like crossfade that don't work if there
+                     are no more songs in the queue.
 See included `readme.md` file for PATTERN syntax.
 ```
 
@@ -167,17 +197,17 @@ search string. For example, if I wanted to match Arctic Monkeys album
 
     $ ashuffle --exclude artist arctic album whatever
 
-Multiple `--exclude` flags can be given. If a song matches any exlude pattern,
+Multiple `--exclude` flags can be given. If a song matches any exclude pattern,
 it will be excluded. For example, if I wanted to exclude songs by MGMT and
 songs by the Arctic Monkeys, I could write:
 
     $ ashuffle --exclude artist MGMT --exclude artist arctic
 
 MPC and the `-f` flag can be used with `--exclude` to shuffle over more
-complex matches. For
-example, if we wanted to listen to only songs by Girl Talk *except* the Secret
-Diary album, we could use `mpc` to generate a list of Girl Talk songs and then
-use an `--exclude` statement to filter out the Secret Diary album:
+complex matches. For example, if we wanted to listen to only songs by
+Girl Talk *except* the Secret Diary album, we could use `mpc` to generate a
+list of Girl Talk songs and then use an `--exclude` statement to filter out the
+Secret Diary album:
 
     $ mpc search artist "Girl Talk" | ashuffle --exclude album "Secret Diary" --file -
 
@@ -189,7 +219,7 @@ Most applications fall into one of two camps:
   * **true random shuffle:** With true random shuffle, no restrictions are
     placed on what songs can be selected for play. It's possible that a
     single song could be played two or even three times in a row because
-    songs are just being draw out of a hat.
+    songs are just drawn out of a hat.
   * **random list shuffle:** With 'random list' shuffle, songs to be shuffled
     are organized into a list of songs behind the scenes. This list is then
     scrambled (imagine a deck of cards), and then the scrambled playlist is
@@ -198,21 +228,22 @@ Most applications fall into one of two camps:
     same random set again), or be re-scrambled and played again, so it can
     still get repetitive. Also, since there's no chance that a song can be
     played again, it won't *feel* very random, especially when listening for
-    a long time. I often start noticing song order once the random-list
+    a long time. Every song has to be played once before any song can be
+    repeated. I often start noticing song order once the random-list
     wraps around.
 
-ashuffle's approach is an attempt at a happy medium between these two approaches.
-Essentially, it keeps two lists of songs, a 'pool' of the songs it's shuffling,
+ashuffle's approach is an attempt at a happy medium between these two styles.
+It keeps two lists of songs: a 'pool' of the songs it's shuffling,
 and a 'window' which is a short, ordered, playlist of songs. When the program
-starts, ashuffle builds the window randomly by taking songs out of the pool,
-and adding them to the window. When a new random song is added to the MPD
-queue, the 'top' song of the window, is taken off, added to the queue, and
-then put back into the pool. Then another song is added to the window
-so that the next request can be fulfilled. This ensures that no songs are
-repeated (every song in the window is unique), but you also don't have to
-listen to every song in your library before a song comes up again. That is
-great for people like me, who use the "skip" button to jump over songs
-we're not interested in right now.
+starts, ashuffle builds the window by randomly taking songs out of the pool,
+and adding them to the window. When a new random song needs to be added to the
+MPD queue, the 'top' song of the window is removed, added to the queue, and
+then put back into the pool. Then, another song is taken from the pool and
+added to the window so that the next request can be fulfilled. This ensures
+that no songs are repeated (every song in the window is unique), but you also
+don't have to listen to every song in your library before a song comes up
+again. I like this style a lot better, because I can "skip" between songs I
+want to listen to.
 
 ## MPD version support
 
