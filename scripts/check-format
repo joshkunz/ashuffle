@@ -23,7 +23,6 @@ function check_c() {
     fi
 }
 
-
 while read F; do
     if test -z "$F"; then continue; fi
     case "$F" in
