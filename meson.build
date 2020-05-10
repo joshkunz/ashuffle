@@ -99,7 +99,7 @@ if get_option('tests').enabled()
             test_name + '_test',
             sources + test_sources,
             include_directories : src_inc,
-            dependencies : absl_deps, gtest_deps + [mpdfake_dep],
+            dependencies : absl_deps + gtest_deps + [mpdfake_dep],
             override_options : test_options,
         )
         test(test_name, test_exe)
