@@ -1,6 +1,8 @@
 # vim: set sw=2 ts=2:
 project('ashuffle', ['c', 'cpp'], default_options: ['cpp_std=c++17', 'warning_level=2'])
 
+add_global_arguments('-fno-omit-frame-pointer', language : ['c', 'cpp'])
+
 # absl dependencies need to be explicited...
 # It might be possible to use cmake dependencies (e.g. "absl:string"
 # defined in abslTargets.cmake in the future but that does not seem

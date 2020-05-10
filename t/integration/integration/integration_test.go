@@ -21,6 +21,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/joshkunz/fakelib/filesystem"
 	"github.com/joshkunz/fakelib/library"
+	"github.com/joshkunz/massif"
+	"github.com/martinlindhe/unit"
 	"github.com/montanaflynn/stats"
 	"golang.org/x/sync/semaphore"
 )
@@ -140,7 +142,7 @@ func TestMain(m *testing.M) {
 	}
 
 	fmt.Println("===> Running MESON")
-	mesonCmd := exec.Command("meson", "build")
+	mesonCmd := exec.Command("meson", "--buildtype=debugoptimized", "build")
 	mesonCmd.Stdout = os.Stdout
 	mesonCmd.Stderr = os.Stderr
 	if err := mesonCmd.Run(); err != nil {
@@ -677,6 +679,150 @@ func TestFastStartup(t *testing.T) {
 
 			if d95 := time.Duration(pct95) * time.Millisecond; d95 > threshold {
 				t.Errorf("ashuffle took %v to startup, want %v or less.", d95, threshold)
+			}
+		})
+	}
+}
+
+func peakUsage(m *massif.Massif) unit.Datasize {
+	var max unit.Datasize
+	for _, snapshot := range m.Snapshots {
+		// MemoryHeapExtra is the "overhead", any heap bytes used for tracking
+		// allocations, but not part of the allocations themselves.
+		total := snapshot.MemoryHeap + snapshot.MemoryHeapExtra
+		if total > max {
+			max = total
+		}
+	}
+	return max
+}
+
+// Tests peak memory usage when enqueuing 1k songs with libraries of different
+// sizes. Memory usage is measured by running `ashuffle` under `massif`, part
+// of the Valgrind suite of tools. The most significant contributor to
+// ashuffle's memory usage by far is the in-memory list of tracks that need
+// to be shuffled. The measured memory should be roughly equivalent to the
+// maximum memory ashuffle will use over its runtime.
+//
+// Each ashuffle instance is run against a real MPD instance. `fakelib` is used
+// to generate extremely large libraries.
+func TestMaxMemoryUsage(t *testing.T) {
+	// No t.Parallel(), this is a performance test.
+	ctx := context.Background()
+
+	// The mean URI length in my personal music library.
+	observedPathLength := 71
+
+	cases := []struct {
+		name          string
+		librarySetup  func(*library.Library)
+		wantMaxMemory unit.Datasize
+		// Larger MPD buffers, and longer timeouts are needed when working with
+		// very large libraries.
+		mpdMaxOutputBufferSize  unit.Datasize
+		mpdUpdateDBTimeout      time.Duration
+		ashuffleShutdownTimeout time.Duration
+	}{
+		{
+			name: "realistic (30k tracks with realistic path length)",
+			librarySetup: func(lib *library.Library) {
+				lib.Tracks = 30_000
+				lib.MinPathLength = observedPathLength * 2
+			},
+			wantMaxMemory:           25 * unit.Mebibyte,
+			mpdMaxOutputBufferSize:  30 * unit.Mebibyte,
+			mpdUpdateDBTimeout:      20 * time.Second,
+			ashuffleShutdownTimeout: 15 * time.Second,
+		},
+		{
+			name: "massive (500k tracks with realistic path length)",
+			librarySetup: func(lib *library.Library) {
+				lib.Tracks = 500_000
+				lib.MinPathLength = observedPathLength * 2
+			},
+			wantMaxMemory:           250 * unit.Mebibyte,
+			mpdMaxOutputBufferSize:  500 * unit.Mebibyte,
+			mpdUpdateDBTimeout:      10 * time.Minute,
+			ashuffleShutdownTimeout: 2 * time.Minute,
+		},
+		{
+			name: "worst case (500k tracks with long paths)",
+			librarySetup: func(lib *library.Library) {
+				lib.Tracks = 500_000
+				lib.MinPathLength = 500
+			},
+			wantMaxMemory:           512 * unit.Mebibyte,
+			mpdMaxOutputBufferSize:  6 * unit.Gibibyte,
+			mpdUpdateDBTimeout:      10 * time.Minute,
+			ashuffleShutdownTimeout: 2 * time.Minute,
+		},
+	}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			lib, err := newLibrary()
+			if err != nil {
+				t.Fatalf("failed to create new library: %v", err)
+			}
+			test.librarySetup(lib)
+
+			libDir, err := ioutil.TempDir("", "ashuffle.max-memory-usage")
+			if err != nil {
+				t.Fatalf("failed to create library dir: %v", err)
+			}
+
+			srv, err := filesystem.Mount(lib, libDir, nil)
+			if err != nil {
+				t.Fatalf("failed to mount fake library: %v", err)
+			}
+			defer func() {
+				srv.Unmount()
+				os.Remove(libDir)
+			}()
+
+			mpdOpts := &testmpd.Options{LibraryRoot: libDir}
+			if test.mpdMaxOutputBufferSize != 0.0 {
+				mpdOpts.MaxOutputBufferSize = test.mpdMaxOutputBufferSize
+			}
+			if test.mpdUpdateDBTimeout != 0 {
+				mpdOpts.UpdateDBTimeout = test.mpdUpdateDBTimeout
+			}
+			mpd, err := testmpd.New(ctx, mpdOpts)
+			if err != nil {
+				t.Fatalf("failed to create new MPD instance: %v", err)
+			}
+
+			asOpts := &testashuffle.Options{
+				MPDAddress:        mpd,
+				Args:              []string{"--only", "1000"},
+				EnableHeapProfile: true,
+			}
+			if test.ashuffleShutdownTimeout != 0 {
+				asOpts.ShutdownTimeout = test.ashuffleShutdownTimeout
+			}
+
+			as, err := testashuffle.New(ctx, ashuffleBin, asOpts)
+			if err != nil {
+				t.Fatalf("failed to create new ashuffle instance")
+			}
+
+			if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
+				t.Logf("stderr:\n%s", as.Stderr)
+				t.Logf("MPD stderr:\n%s", mpd.Stderr)
+				t.Logf("MPD stdout:\n%s", mpd.Stdout)
+				t.Fatalf("ashuffle did not shut down cleanly: %v", err)
+			}
+
+			profile, err := as.HeapProfile()
+			if err != nil {
+				t.Fatalf("failed to read heap profile: %v", err)
+			}
+
+			memPeak := peakUsage(profile)
+
+			t.Logf("Max memory usage: %.2f MiBs", memPeak.Mebibytes())
+			if memPeak > test.wantMaxMemory {
+				t.Errorf("ashuffle max memory usage %.2f MiB, want <= %.2f MiBs", memPeak.Mebibytes(), test.wantMaxMemory.Mebibytes())
 			}
 		})
 	}

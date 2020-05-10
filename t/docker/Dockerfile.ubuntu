@@ -1,7 +1,5 @@
 FROM jkz0/ashuffle-integration-root:latest
 
-RUN apt-get install -y fuse
-
 COPY /tools/meta/ /opt/meta
 RUN cd /opt/meta && go build
 

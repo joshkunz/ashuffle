@@ -6,11 +6,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"syscall"
 	"time"
+
+	"github.com/joshkunz/massif"
 )
+
+// The default amount of time to wait for ashuffle to shutdown.
+const maxShutdownWait = 5 * time.Second
 
 type Ashuffle struct {
 	cmd        *exec.Cmd
@@ -18,9 +24,13 @@ type Ashuffle struct {
 
 	Stdout *bytes.Buffer
 	Stderr *bytes.Buffer
-}
 
-const MaxShutdownWait = 5 * time.Second
+	// The filename of the massif output file.
+	massifOutputFile string
+
+	// Maximum duration to wait for ashuffle to shutdown before forced shutdown.
+	shutdownTimeout time.Duration
+}
 
 type ShutdownType uint
 
@@ -49,7 +59,7 @@ func (a *Ashuffle) safeWait() error {
 	select {
 	case err := <-a.tryWait():
 		return err
-	case <-time.After(MaxShutdownWait):
+	case <-time.After(a.shutdownTimeout):
 		a.cancelFunc()
 		return errors.New("ashuffle took too long to exit. It has been killed")
 	}
@@ -90,6 +100,23 @@ func (a *Ashuffle) Shutdown(sType ...ShutdownType) error {
 	return err
 }
 
+func (a *Ashuffle) HeapProfile() (*massif.Massif, error) {
+	if a.massifOutputFile == "" {
+		return nil, errors.New("heap profiling not enabled for this run")
+	}
+
+	profile, err := os.Open(a.massifOutputFile)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		profile.Close()
+		os.Remove(a.massifOutputFile)
+	}()
+
+	return massif.Parse(profile)
+}
+
 type MPDAddress interface {
 	// Address returns the MPD host and port (port may be empty if no
 	// port is needed.
@@ -112,20 +139,45 @@ func LiteralMPDAddress(host, port string) MPDAddress {
 }
 
 type Options struct {
-	MPDAddress MPDAddress
-	Args       []string
+	MPDAddress        MPDAddress
+	Args              []string
+	EnableHeapProfile bool
+	ShutdownTimeout   time.Duration
 }
 
 func New(ctx context.Context, path string, opts *Options) (*Ashuffle, error) {
 	runCtx, cancel := context.WithCancel(ctx)
-	var args []string
-	cmd := exec.CommandContext(runCtx, path, args...)
+	var cmd *exec.Cmd
+	var massifOutput string
+	if opts != nil && opts.EnableHeapProfile {
+		mOut, err := ioutil.TempFile("", "ashuffle.massif")
+		if err != nil {
+			cancel()
+			return nil, err
+		}
+		massifOutput = mOut.Name()
+		cmd = exec.CommandContext(runCtx,
+			"valgrind",
+			"--tool=massif",
+			"--massif-out-file="+massifOutput,
+			path,
+		)
+		mOut.Close()
+	} else {
+		cmd = exec.CommandContext(runCtx, path)
+	}
+
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
+	cmd.Stdout = &stdout
+
+	shutdownTimeout := maxShutdownWait
+	if opts != nil && opts.ShutdownTimeout != 0 {
+		shutdownTimeout = opts.ShutdownTimeout
+	}
 
 	if opts != nil {
-		cmd.Args = append([]string{path}, opts.Args...)
+		cmd.Args = append(cmd.Args, opts.Args...)
 		env := os.Environ()
 		if opts.MPDAddress != nil {
 			mpdHost, mpdPort := opts.MPDAddress.Address()
@@ -140,12 +192,15 @@ func New(ctx context.Context, path string, opts *Options) (*Ashuffle, error) {
 	}
 
 	if err := cmd.Start(); err != nil {
+		cancel()
 		return nil, err
 	}
 	return &Ashuffle{
-		cmd:        cmd,
-		cancelFunc: cancel,
-		Stdout:     &stdout,
-		Stderr:     &stderr,
+		cmd:              cmd,
+		cancelFunc:       cancel,
+		Stdout:           &stdout,
+		Stderr:           &stderr,
+		massifOutputFile: massifOutput,
+		shutdownTimeout:  shutdownTimeout,
 	}, nil
 }

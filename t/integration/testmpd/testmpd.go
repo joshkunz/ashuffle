@@ -17,6 +17,7 @@ import (
 
 	"github.com/cenkalti/backoff"
 	mpdc "github.com/fhs/gompd/mpd"
+	"github.com/martinlindhe/unit"
 )
 
 const (
@@ -49,6 +50,14 @@ type Options struct {
 	// users. Leave it empty or nil to use the MPD default.
 	DefaultPermissions []string
 
+	// If non-zero, this value is set as the `max_output_buffer_size` option
+	// in the MPD configuration.
+	MaxOutputBufferSize unit.Datasize
+
+	// The maximum amount of time to wait for MPD to update its database. If
+	// unset, the default timeout is used.
+	UpdateDBTimeout time.Duration
+
 	// Passwords is the list of passwords to configure on this instance. See
 	// `Password' for per-password options.
 	Passwords []Password
@@ -59,7 +68,13 @@ type mpdTemplateInput struct {
 	MPDRoot string
 }
 
-var mpdConfTemplate = template.Must(template.New("mpd.conf").Parse(`
+var mpdConfTemplate = template.Must(template.New("mpd.conf").
+	Funcs(map[string]interface{}{
+		"floatToInt": func(f float64) int64 {
+			return int64(f)
+		},
+	}).
+	Parse(`
 music_directory     "{{ .LibraryRoot }}"
 playlist_directory  "{{ .MPDRoot }}/playlists"
 db_file             "{{ .MPDRoot }}/database"
@@ -67,6 +82,7 @@ pid_file            "{{ .MPDRoot }}/pid"
 state_file          "{{ .MPDRoot }}/state"
 sticker_file        "{{ .MPDRoot }}/sticker.sql"
 bind_to_address     "{{ .MPDRoot }}/socket"
+{{ if ne .MaxOutputBufferSize 0.0 }}max_output_buffer_size "{{ .MaxOutputBufferSize.Kibibytes | floatToInt }}"{{ end }}
 audio_output {
 	type		"null"
 	name		"null"
@@ -280,7 +296,7 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 		return nil, err
 	}
 
-	mpdCtx, cancel := context.WithCancel(ctx)
+	mpdCtx, mpdCancel := context.WithCancel(ctx)
 	stdout := bytes.Buffer{}
 	stderr := bytes.Buffer{}
 	mpdBin := "mpd"
@@ -291,14 +307,15 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
-		cancel()
+		mpdCancel()
 		root.cleanup()
 		return nil, err
 	}
 
 	// Keep re-trying to connect to mpd every mpdConnectBackoff, aborting
 	// if mpdConnectMax time units have gone by.
-	connectCtx, _ := context.WithTimeout(ctx, mpdConnectMax)
+	connectCtx, cancel := context.WithTimeout(ctx, mpdConnectMax)
+	defer cancel()
 	connectBackoff := backoff.WithContext(backoff.NewConstantBackOff(mpdConnectBackoff), connectCtx)
 
 	var cli *mpdc.Client
@@ -311,6 +328,7 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 		return nil
 	}, connectBackoff)
 	if err != nil {
+		mpdCancel()
 		return nil, fmt.Errorf("failed to connect to mpd at %s: %v", root.socket, err)
 	}
 	if cli == nil {
@@ -318,12 +336,18 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 	}
 
 	if err != nil {
-		cancel()
+		mpdCancel()
 		root.cleanup()
 		return nil, err
 	}
 
-	updateCtx, _ := context.WithTimeout(ctx, mpdUpdateDBMax)
+	updateTimeout := mpdUpdateDBMax
+	if opts != nil && opts.UpdateDBTimeout != 0 {
+		updateTimeout = opts.UpdateDBTimeout
+	}
+
+	updateCtx, cancel := context.WithTimeout(ctx, updateTimeout)
+	defer cancel()
 	updateBackoff := backoff.WithContext(backoff.NewConstantBackOff(mpdUpdateDBBackoff), updateCtx)
 	err = backoff.Retry(func() error {
 		attr, err := cli.Status()
@@ -337,7 +361,7 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 
 	}, updateBackoff)
 	if err != nil {
-		cancel()
+		mpdCancel()
 		root.cleanup()
 		return nil, fmt.Errorf("failed to wait for MPD db to update: %v", err)
 	}
@@ -350,6 +374,6 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 		root:       *root,
 		cmd:        cmd,
 		cli:        cli,
-		cancelFunc: cancel,
+		cancelFunc: mpdCancel,
 	}, nil
 }
