@@ -531,10 +531,10 @@ func TestFastStartup(t *testing.T) {
 	// collected.
 	trials := 50
 	// Threshold is the level at which the 95th percentile startup time is
-	// considered a "failure" for the purposes of this test. Right now it
-	// is pegged to 400ms. Note: making this threshold less than 1ms may not
-	// work, since the 95th percentile is calculated in milliseconds.
-	threshold := 400 * time.Millisecond
+	// considered a "failure" for the purposes of this test. Note: making this
+	// threshold less than 1ms may not work, since the 95th percentile is
+	// calculated in milliseconds.
+	threshold := 750 * time.Millisecond
 
 	// Start up MPD and read out the DB, so we can build a file list for the
 	// "from file" test. We will immediately shut down this instance, because

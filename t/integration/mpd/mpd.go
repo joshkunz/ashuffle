@@ -3,6 +3,7 @@ package mpd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -17,8 +18,10 @@ import (
 )
 
 const (
-	mpdConnectBackoff = 500 * time.Millisecond
-	mpdConnectMax     = 10 * time.Second
+	mpdConnectBackoff  = 500 * time.Millisecond
+	mpdConnectMax      = 10 * time.Second
+	mpdUpdateDBBackoff = 100 * time.Millisecond
+	mpdUpdateDBMax     = 10 * time.Second
 )
 
 // Password is the type of an MPD password. A literal password, a collection
@@ -316,6 +319,25 @@ func New(ctx context.Context, opts *Options) (*Instance, error) {
 		cancel()
 		root.cleanup()
 		return nil, err
+	}
+
+	updateCtx, _ := context.WithTimeout(ctx, mpdUpdateDBMax)
+	updateBackoff := backoff.WithContext(backoff.NewConstantBackOff(mpdUpdateDBBackoff), updateCtx)
+	err = backoff.Retry(func() error {
+		attr, err := cli.Status()
+		if err != nil {
+			return backoff.Permanent(err)
+		}
+		if attr["updating_db"] == "1" {
+			return errors.New("db still updating")
+		}
+		return nil
+
+	}, updateBackoff)
+	if err != nil {
+		cancel()
+		root.cleanup()
+		return nil, fmt.Errorf("failed to wait for MPD db to update: %v", err)
 	}
 
 	return &Instance{
