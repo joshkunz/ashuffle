@@ -168,8 +168,7 @@ class MPDImpl : public MPD {
 
 class SongReaderImpl : public SongReader {
    public:
-    SongReaderImpl(MPDImpl& mpd)
-        : mpd_(mpd), song_(std::nullopt), has_song_(false){};
+    SongReaderImpl(MPDImpl& mpd) : mpd_(mpd), song_(std::nullopt){};
 
     // SongReaderImpl is also pointer owning (the pointer to the next song_).
     SongReaderImpl(SongReaderImpl&) = delete;
@@ -193,11 +192,10 @@ class SongReaderImpl : public SongReader {
 
     MPDImpl& mpd_;
     std::optional<std::unique_ptr<Song>> song_;
-    bool has_song_;
 };
 
 void SongReaderImpl::FetchNext() {
-    if (has_song_) {
+    if (song_) {
         return;
     }
     struct mpd_song* raw_song = mpd_recv_song(mpd_.mpd_);
@@ -214,13 +212,11 @@ void SongReaderImpl::FetchNext() {
         song_ = std::nullopt;
         return;
     }
-    has_song_ = true;
     song_ = std::unique_ptr<Song>(new SongImpl(raw_song));
 }
 
 std::optional<std::unique_ptr<Song>> SongReaderImpl::Next() {
     FetchNext();
-    has_song_ = false;
     return std::exchange(song_, std::nullopt);
 }
 
