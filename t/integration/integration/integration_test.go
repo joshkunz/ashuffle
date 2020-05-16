@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -526,7 +527,7 @@ func TestFastStartup(t *testing.T) {
 
 	// Parallelism controls the number of parallel startup tests that are
 	// allowed to run at once.
-	parallelism := 10
+	parallelism := runtime.NumCPU()
 	// Trials controls the number of startup time samples that will be
 	// collected.
 	trials := 50
