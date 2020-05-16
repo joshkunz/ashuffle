@@ -4,5 +4,20 @@ die() {
     exit 1
 }
 
-./scripts/build-test-image "$@" || die "couldn't build test image"
-exec docker run --name mpd_test --rm -it test/mpd:latest
+run_id="$(head -c 100 /dev/urandom | sha256sum | head -c 30)"
+
+tagname="test/ashuffle:run_${run_id}"
+
+tty="-t"
+extra=()
+
+while test $# -gt 0; do
+    case "$1" in
+        --no_tty) tty="" ;;
+        *) extra+=( "$1" ) ;;
+    esac
+    shift
+done
+
+./scripts/build-test-image --image-tag "${tagname}" "${extra[@]}" || die "couldn't build test image"
+exec docker run --name "ashuffle_integration_run_${run_id}" --rm $tty -i "${tagname}"

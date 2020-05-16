@@ -11,7 +11,7 @@ function die() {
 # Use the environment variables by default.
 MPD_VERSION="${MPD_VERSION:-}"
 LIBMPDCLIENT_VERSION="${LIBMPDCLIENT_VERSION:-}"
-
+IMAGE_TAG="${IMAGE_TAG:-test/mpd:latest}"
 
 declare -a DOCKER_ARGS
 while test "$#" -gt 0; do
@@ -24,6 +24,10 @@ while test "$#" -gt 0; do
             LIBMPDCLIENT_VERSION="$2"
             shift 2
             ;;
+        -t|--image-tag)
+            IMAGE_TAG="$2"
+            shift 2
+            ;;
         *)
             DOCKER_ARGS+=( "$1" )
             shift
@@ -32,10 +36,6 @@ while test "$#" -gt 0; do
 done
 
 cd $(git rev-parse --show-toplevel)
-
-if test -d "${TEMPDIR}"; then
-    die "Directory /tmp exists, can't create stage"
-fi
 
 mkdir "${TEMPDIR}"
 STAGE_DIR=$(mktemp -p "${TEMPDIR}" --directory)
@@ -59,18 +59,18 @@ case "${IMAGE_BASE}" in
             args+=( "--build-arg" "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" )
         fi
         docker build "${args[@]}" --build-arg "STAGE_DIR=${STAGE_DIR}" \
-            -t "test/mpd:latest" -f ./t/docker/Dockerfile.ubuntu .
+            -t "${IMAGE_TAG}" -f ./t/docker/Dockerfile.ubuntu .
         ;;
     alpine)
         if test -n "${MPD_VERSION}" || test -n "${LIBMPDCLIENT_VERSION}"; then
             die "alpine does not support setting mpd/libmpdclient version"
         fi
         docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
-            -t "test/mpd:latest" -f ./t/docker/Dockerfile.alpine .
+            -t "${IMAGE_TAG}" -f ./t/docker/Dockerfile.alpine .
         ;;
     *)
         die "invalid image base: ${IMAGE_BASE}"
 esac
 
 rm -r "${STAGE_DIR}"
-rm -r "${TEMPDIR}"
+rmdir --ignore-fail-on-non-empty "${TEMPDIR}"
