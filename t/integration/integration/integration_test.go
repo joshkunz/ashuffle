@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -140,6 +141,42 @@ func TestStartup(t *testing.T) {
 	mpdi.Shutdown()
 }
 
+func TestStartupFail(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	tests := []struct {
+		desc               string
+		options            *ashuffle.Options
+		wantStderrContains string
+	}{
+		{
+			desc:               "No MPD server running",
+			wantStderrContains: "could not connect to mpd",
+		},
+		{
+			desc:               "Group by and no-check",
+			options:            &ashuffle.Options{Args: []string{"-g", "album", "--no-check"}},
+			wantStderrContains: "group-by not supported with no-check",
+		},
+	}
+
+	for _, test := range tests {
+		as, err := ashuffle.New(ctx, ashuffleBin, test.options)
+		if err != nil {
+			t.Errorf("failed to start ashuffle: %v", err)
+			continue
+		}
+		if err := as.Shutdown(ashuffle.ShutdownSoft); err == nil {
+			t.Errorf("ashuffle shutdown cleanly, but we wanted an error: %v", err)
+		}
+		if stderr := as.Stderr.String(); !strings.Contains(stderr, test.wantStderrContains) {
+			t.Errorf("want stderr contains %q, got stderr:\n%s", test.wantStderrContains, stderr)
+		}
+	}
+
+}
+
 func TestShuffleOnce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -226,69 +263,175 @@ func TestBasic(t *testing.T) {
 	mpdi.Shutdown()
 }
 
+type Groups [][]string
+
+func (g Groups) Len() int      { return len(g) }
+func (g Groups) Swap(i, j int) { g[i], g[j] = g[j], g[i] }
+func (g Groups) Less(i, j int) bool {
+	a, b := g[i], g[j]
+	if len(a) < len(b) {
+		return true
+	}
+	if len(b) < len(a) {
+		return false
+	}
+	for idx := range b {
+		if a[idx] < b[idx] {
+			return true
+		}
+		if a[idx] > b[idx] {
+			return false
+		}
+	}
+	return false
+}
+
+func splitGroups(lines string) Groups {
+	var groups Groups
+	var cur []string
+	for _, line := range strings.Split(strings.TrimSpace(lines), "\n") {
+		if line == "---" {
+			sort.Strings(cur)
+			groups = append(groups, cur)
+			cur = nil
+			continue
+		}
+		cur = append(cur, line)
+	}
+	if len(cur) > 0 {
+		sort.Strings(cur)
+		groups = append(groups, cur)
+	}
+	return groups
+}
+
 func TestFromFile(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music"})
-	if err != nil {
-		t.Fatalf("failed to create mpd instance: %v", err)
-	}
-
-	// These are the songs we'll ask ashuffle to use. They should all be
-	// in the integration root container.
-	db := []string{
-		"BoxCat_Games_-_10_-_Epic_Song.mp3",
-		"Broke_For_Free_-_01_-_Night_Owl.mp3",
-		"Jahzzar_-_05_-_Siesta.mp3",
-		"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3",
-		"Tours_-_01_-_Enthusiast.mp3",
-	}
-
-	// The same as "db", but without the songs by Jahzzar and Tours
-	want := []string{
-		"BoxCat_Games_-_10_-_Epic_Song.mp3",
-		"Broke_For_Free_-_01_-_Night_Owl.mp3",
-		"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3",
-	}
-
-	linesF, err := writeLines(db)
-	if err != nil {
-		t.Fatalf("couldn't write db lines to file: %v", err)
-	}
-	defer linesF.Cleanup()
-
-	as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
-		MPDAddress: mpdi,
-		Args: []string{
-			"--exclude", "artist", "tours",
-			// The real album name is "Traveller's Guide", partial match should
-			// work.
-			"--exclude", "artist", "jahzzar", "album", "traveller",
-			// Pass in our list of songs.
-			"-f", linesF.Path(),
-			// Then, we make ashuffle just print the list of songs and quit
-			"--test_enable_option_do_not_use", "print_all_songs_and_exit",
+	tests := []struct {
+		desc    string
+		library string
+		flags   []string
+		input   []string
+		want    Groups
+	}{
+		{
+			desc:    "With excludes",
+			library: "/music",
+			flags: []string{
+				"--exclude", "artist", "tours",
+				// The real album name is "Traveller's Guide", partial match should
+				// work.
+				"--exclude", "artist", "jahzzar", "album", "traveller",
+			},
+			input: []string{
+				"BoxCat_Games_-_10_-_Epic_Song.mp3",
+				"Broke_For_Free_-_01_-_Night_Owl.mp3",
+				"Jahzzar_-_05_-_Siesta.mp3",
+				"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3",
+				"Tours_-_01_-_Enthusiast.mp3",
+			},
+			want: Groups{
+				{"BoxCat_Games_-_10_-_Epic_Song.mp3"},
+				{"Broke_For_Free_-_01_-_Night_Owl.mp3"},
+				{"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3"},
+			},
 		},
-	})
-	if err != nil {
-		t.Fatalf("failed to start ashuffle: %v", err)
+		{
+			desc:    "By Album",
+			library: "/music.huge",
+			flags:   []string{"--by-album"},
+			input: []string{
+				"A/A-A/A-A-A.mp3",
+				"A/A-A/A-A-B.mp3",
+				"A/A-A/A-A-C.mp3",
+				"A/A-A/A-A-D.mp3",
+				"A/A-A/A-A-E.mp3",
+				"A/A-A/A-A-F.mp3",
+				"A/A-A/A-A-G.mp3",
+				"A/A-A/A-A-H.mp3",
+				"A/A-A/A-A-I.mp3",
+				"A/A-A/A-A-J.mp3",
+				"A/A-A/A-A-K.mp3",
+				"A/A-B/A-B-A.mp3",
+				"A/A-B/A-B-B.mp3",
+				"A/A-B/A-B-C.mp3",
+				"A/A-B/A-B-D.mp3",
+				"A/A-B/A-B-E.mp3",
+				"A/A-B/A-B-F.mp3",
+				"A/A-B/A-B-G.mp3",
+				"A/A-B/A-B-H.mp3",
+				"A/A-B/A-B-I.mp3",
+				"A/A-B/A-B-J.mp3",
+				"A/A-B/A-B-K.mp3",
+			},
+			want: Groups{
+				{
+					"A/A-A/A-A-A.mp3",
+					"A/A-A/A-A-B.mp3",
+					"A/A-A/A-A-C.mp3",
+					"A/A-A/A-A-D.mp3",
+					"A/A-A/A-A-E.mp3",
+					"A/A-A/A-A-F.mp3",
+					"A/A-A/A-A-G.mp3",
+					"A/A-A/A-A-H.mp3",
+					"A/A-A/A-A-I.mp3",
+					"A/A-A/A-A-J.mp3",
+					"A/A-A/A-A-K.mp3",
+				},
+				{
+					"A/A-B/A-B-A.mp3",
+					"A/A-B/A-B-B.mp3",
+					"A/A-B/A-B-C.mp3",
+					"A/A-B/A-B-D.mp3",
+					"A/A-B/A-B-E.mp3",
+					"A/A-B/A-B-F.mp3",
+					"A/A-B/A-B-G.mp3",
+					"A/A-B/A-B-H.mp3",
+					"A/A-B/A-B-I.mp3",
+					"A/A-B/A-B-J.mp3",
+					"A/A-B/A-B-K.mp3",
+				},
+			},
+		},
 	}
 
-	// Wait for ashuffle to exit.
-	if err := as.Shutdown(ashuffle.ShutdownSoft); err != nil {
-		t.Errorf("ashuffle did not shut down cleanly: %v", err)
+	ctx := context.Background()
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			test := test
+			t.Parallel()
+			mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: test.library})
+			if err != nil {
+				t.Fatalf("failed to create mpd instance: %v", err)
+			}
+			defer mpdi.Shutdown()
+
+			linesF, err := writeLines(test.input)
+			if err != nil {
+				t.Fatalf("couldn't write db lines to file: %v", err)
+			}
+			defer linesF.Cleanup()
+			as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
+				MPDAddress: mpdi,
+				Args: append(test.flags,
+					"-f", linesF.Path(),
+					"--test_enable_option_do_not_use", "print_all_songs_and_exit",
+				),
+			})
+			// Wait for ashuffle to exit.
+			if err := as.Shutdown(ashuffle.ShutdownSoft); err != nil {
+				t.Errorf("ashuffle did not shut down cleanly: %v", err)
+			}
+
+			got := splitGroups(as.Stdout.String())
+
+			sort.Sort(got)
+			sort.Sort(test.want)
+
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("shuffle songs differ, diff want got:\n%s", diff)
+			}
+		})
 	}
-
-	got := strings.Split(strings.TrimSpace(as.Stdout.String()), "\n")
-
-	sort.Strings(want)
-	sort.Strings(got)
-
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("shuffle songs differ, diff want got:\n%s", diff)
-	}
-
-	mpdi.Shutdown()
 }
 
 // Implements MPDAddress, wrapping the given MPDAddress with the appropriate
@@ -384,15 +527,15 @@ func TestFastStartup(t *testing.T) {
 
 	// Parallelism controls the number of parallel startup tests that are
 	// allowed to run at once.
-	parallelism := 10
+	parallelism := runtime.NumCPU()
 	// Trials controls the number of startup time samples that will be
 	// collected.
 	trials := 50
 	// Threshold is the level at which the 95th percentile startup time is
-	// considered a "failure" for the purposes of this test. Right now it
-	// is pegged to 400ms. Note: making this threshold less than 1ms may not
-	// work, since the 95th percentile is calculated in milliseconds.
-	threshold := 400 * time.Millisecond
+	// considered a "failure" for the purposes of this test. Note: making this
+	// threshold less than 1ms may not work, since the 95th percentile is
+	// calculated in milliseconds.
+	threshold := 750 * time.Millisecond
 
 	// Start up MPD and read out the DB, so we can build a file list for the
 	// "from file" test. We will immediately shut down this instance, because
@@ -424,6 +567,10 @@ func TestFastStartup(t *testing.T) {
 		{
 			name: "from file, with filter",
 			args: []string{"-f", dbF.Path(), "-o", "1", "-e", "artist", "AA"},
+		},
+		{
+			name: "from mpd, group-by artist",
+			args: []string{"-f", dbF.Path(), "-o", "1", "-g", "artist"},
 		},
 	}
 

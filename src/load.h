@@ -6,6 +6,8 @@
 #include <string_view>
 #include <vector>
 
+#include <mpd/tag.h>
+
 #include "mpd.h"
 #include "rule.h"
 #include "shuffle.h"
@@ -25,7 +27,10 @@ class MPDLoader : public Loader {
    public:
     ~MPDLoader() override = default;
     MPDLoader(mpd::MPD* mpd, const std::vector<Rule>& ruleset)
-        : mpd_(mpd), rules_(ruleset){};
+        : MPDLoader(mpd, ruleset, std::vector<enum mpd_tag_type>()){};
+    MPDLoader(mpd::MPD* mpd, const std::vector<Rule>& ruleset,
+              const std::vector<enum mpd_tag_type>& group_by)
+        : mpd_(mpd), rules_(ruleset), group_by_(group_by){};
 
     void Load(ShuffleChain* into) override;
 
@@ -35,12 +40,14 @@ class MPDLoader : public Loader {
    private:
     mpd::MPD* mpd_;
     const std::vector<Rule>& rules_;
+    const std::vector<enum mpd_tag_type> group_by_;
 };
 
 class FileMPDLoader : public MPDLoader {
    public:
     ~FileMPDLoader() override = default;
     FileMPDLoader(mpd::MPD* mpd, const std::vector<Rule>& ruleset,
+                  const std::vector<enum mpd_tag_type>& group_by,
                   std::istream* file);
 
    protected:

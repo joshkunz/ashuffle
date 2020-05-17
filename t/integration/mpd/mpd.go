@@ -3,9 +3,9 @@ package mpd
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,8 +18,10 @@ import (
 )
 
 const (
-	mpdConnectBackoff = 500 * time.Millisecond
-	mpdConnectMax     = 10 * time.Second
+	mpdConnectBackoff  = 500 * time.Millisecond
+	mpdConnectMax      = 10 * time.Second
+	mpdUpdateDBBackoff = 100 * time.Millisecond
+	mpdUpdateDBMax     = 10 * time.Second
 )
 
 // Password is the type of an MPD password. A literal password, a collection
@@ -298,23 +300,44 @@ func New(ctx context.Context, opts *Options) (*Instance, error) {
 	connectBackoff := backoff.WithContext(backoff.NewConstantBackOff(mpdConnectBackoff), connectCtx)
 
 	var cli *mpdc.Client
-	backoff.Retry(func() error {
+	err = backoff.Retry(func() error {
 		onceCli, err := mpdc.Dial("unix", root.socket)
 		if err != nil {
-			log.Printf("failed to connect to mpd: %v", err)
 			return err
 		}
 		cli = onceCli
 		return nil
 	}, connectBackoff)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to mpd at %s: %v", root.socket, err)
+	}
 	if cli == nil {
-		return nil, fmt.Errorf("failed to connect to mpd at %s", root.socket)
+		panic("backoff did not return an error. This should not happen.")
 	}
 
 	if err != nil {
 		cancel()
 		root.cleanup()
 		return nil, err
+	}
+
+	updateCtx, _ := context.WithTimeout(ctx, mpdUpdateDBMax)
+	updateBackoff := backoff.WithContext(backoff.NewConstantBackOff(mpdUpdateDBBackoff), updateCtx)
+	err = backoff.Retry(func() error {
+		attr, err := cli.Status()
+		if err != nil {
+			return backoff.Permanent(err)
+		}
+		if attr["updating_db"] == "1" {
+			return errors.New("db still updating")
+		}
+		return nil
+
+	}, updateBackoff)
+	if err != nil {
+		cancel()
+		root.cleanup()
+		return nil, fmt.Errorf("failed to wait for MPD db to update: %v", err)
 	}
 
 	return &Instance{

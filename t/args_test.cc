@@ -18,6 +18,7 @@
 
 using namespace ashuffle;
 
+using ::testing::ElementsAre;
 using ::testing::HasSubstr;
 using ::testing::IsNull;
 using ::testing::Matcher;
@@ -40,6 +41,7 @@ TEST(ParseTest, Empty) {
     EXPECT_EQ(opts.host, std::nullopt);
     EXPECT_EQ(opts.port, 0U);
     EXPECT_FALSE(opts.test.print_all_songs_and_exit);
+    EXPECT_TRUE(opts.group_by.empty());
 }
 
 TEST(ParseTest, Short) {
@@ -55,6 +57,7 @@ TEST(ParseTest, Short) {
         "-e", "artist", "test artist", "artist", "another one",
         "-f", "/dev/zero",
         "-p", "1234",
+        "-g", "artist",
     }));
     // clang-format on
 
@@ -64,6 +67,7 @@ TEST(ParseTest, Short) {
     EXPECT_FALSE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 10U);
     EXPECT_EQ(opts.port, 1234U);
+    EXPECT_THAT(opts.group_by, ElementsAre(MPD_TAG_ARTIST));
 }
 
 TEST(ParseTest, Long) {
@@ -81,6 +85,7 @@ TEST(ParseTest, Long) {
             "--queue-buffer", "10",
             "--host", "foo",
             "--port", "1234",
+            "--group-by", "artist",
     }));
     // clang-format on
 
@@ -91,6 +96,7 @@ TEST(ParseTest, Long) {
     EXPECT_EQ(opts.queue_buffer, 10U);
     EXPECT_EQ(opts.host, "foo");
     EXPECT_EQ(opts.port, 1234U);
+    EXPECT_THAT(opts.group_by, ElementsAre(MPD_TAG_ARTIST));
 }
 
 TEST(ParseTest, MixedLongShort) {
@@ -150,6 +156,15 @@ TEST(ParseTest, FileInStdin) {
     EXPECT_EQ(opts.file_in, &std::cin);
 }
 
+TEST(ParseTest, ByAlbum) {
+    Options opts;
+    fake::TagParser tagger;
+
+    opts = std::get<Options>(Options::Parse(fake::TagParser(), {"--by-album"}));
+    EXPECT_THAT(opts.group_by, ElementsAre(MPD_TAG_ALBUM, MPD_TAG_DATE))
+        << "--by-album should be equivalent to --group-by album date";
+}
+
 using ParseFailureParam =
     std::tuple<std::vector<std::string>, Matcher<std::string>>;
 
@@ -203,6 +218,14 @@ std::vector<ParseFailureParam> partial_cases = {
     {{"--port"}, HasSubstr("no argument supplied for '--port'")},
     {{"--test_enable_option_do_not_use"},
      HasSubstr("no argument supplied for '--test_enable_option_do_not_use'")},
+    {{"-g"}, HasSubstr("no argument supplied for '-g'")},
+    {{"--group-by"}, HasSubstr("no argument supplied for '--group-by'")},
+    {{"-g", "artist", "--by-album"},
+     HasSubstr("'--by-album' can only be provided once")},
+    {{"-g", "artist", "-g", "invalid"},
+     HasSubstr("'-g' can only be provided once")},
+    {{"--by-album", "-g", "artist"},
+     HasSubstr("'-g' can only be provided once")},
 };
 
 INSTANTIATE_TEST_SUITE_P(Partials, ParseFailureTest, ValuesIn(partial_cases));

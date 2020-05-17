@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+. "scripts/travis/common.sh"
+
+sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y && \
+    sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y clang-format-9 \
+    || die "failed to update clang-format-9"
+
+CLANG_FORMAT=clang-format-9
+
 declare -a BAD_FORMAT
 
 function check_go() {
@@ -12,12 +20,13 @@ function check_go() {
 
 function check_c() {
     F=$1
-    cmp "$F" <(clang-format "$F") >/dev/null
+    cmp "$F" <("${CLANG_FORMAT}" "$F") >/dev/null
     if test $? -ne 0; then
         BAD_FORMAT+=( "$F" )
     fi
 }
 
+"${CLANG_FORMAT}" --version
 
 while read F; do
     if test -z "$F"; then continue; fi

@@ -29,7 +29,7 @@ TEST(MPDLoaderTest, Basic) {
     MPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset);
     loader.Load(&chain);
 
-    std::vector<std::string> want = {"song_a", "song_b"};
+    std::vector<std::vector<std::string>> want = {{"song_a"}, {"song_b"}};
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
 
@@ -52,8 +52,25 @@ TEST(MPDLoaderTest, WithFilter) {
     MPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset);
     loader.Load(&chain);
 
-    std::vector<std::string> want = {"song_a", "song_c"};
+    std::vector<std::vector<std::string>> want = {{"song_a"}, {"song_c"}};
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
+}
+
+TEST(MPDLoaderTest, WithGroup) {
+    fake::MPD mpd;
+    mpd.db.push_back(fake::Song("song_a", {{MPD_TAG_ALBUM, "__album__"}}));
+    mpd.db.push_back(fake::Song("song_b", {{MPD_TAG_ALBUM, "__album__"}}));
+
+    std::vector<enum mpd_tag_type> group_by = {MPD_TAG_ARTIST};
+
+    ShuffleChain chain;
+    std::vector<Rule> ruleset;
+
+    MPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, group_by);
+    loader.Load(&chain);
+
+    std::vector<std::string> want = {"song_a", "song_b"};
+    EXPECT_THAT(chain.Pick(), WhenSorted(ContainerEq(want)));
 }
 
 std::unique_ptr<std::istream> TestStream(std::vector<std::string> lines) {
@@ -73,7 +90,8 @@ TEST(FileLoaderTest, Basic) {
     FileLoader loader(s.get());
     loader.Load(&chain);
 
-    std::vector<std::string> want = {song_a.URI(), song_b.URI(), song_c.URI()};
+    std::vector<std::vector<std::string>> want = {
+        {song_a.URI()}, {song_b.URI()}, {song_c.URI()}};
 
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }
@@ -120,9 +138,12 @@ TEST(FileMPDLoaderTest, Basic) {
     });
 
     // step 6. Run! (and validate)
-    FileMPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, s.get());
+    std::vector<enum mpd_tag_type> group_by;
+    FileMPDLoader loader(static_cast<mpd::MPD *>(&mpd), ruleset, group_by,
+                         s.get());
     loader.Load(&chain);
 
-    std::vector<std::string> want = {song_a.URI(), song_c.URI()};
+    std::vector<std::vector<std::string>> want = {{song_a.URI()},
+                                                  {song_c.URI()}};
     EXPECT_THAT(chain.Items(), WhenSorted(ContainerEq(want)));
 }

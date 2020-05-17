@@ -15,7 +15,11 @@ absl_libs = [
     'int128',
     'str_format_internal',
     'strings_internal',
-    'strings'
+    'strings',
+
+    # Via Hash:
+    'hash',
+    'city',
 ]
 
 absl_deps = []

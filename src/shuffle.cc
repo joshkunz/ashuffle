@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstdlib>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -10,11 +11,22 @@ namespace ashuffle {
 void ShuffleChain::Clear() {
     _window.clear();
     _pool.clear();
+    _items.clear();
 }
 
-void ShuffleChain::Add(std::string val) { _pool.push_back(val); }
+void ShuffleChain::Add(ShuffleItem item) {
+    _items.emplace_back(item);
+    _pool.push_back(static_cast<int>(_items.size()) - 1);
+}
 
-unsigned ShuffleChain::Len() { return _window.size() + _pool.size(); }
+unsigned ShuffleChain::Len() { return _items.size(); }
+unsigned ShuffleChain::LenURIs() {
+    unsigned sum = 0;
+    for (auto& group : _items) {
+        sum += group._uris.size();
+    }
+    return sum;
+}
 
 /* ensure that our window is as full as it can possibly be. */
 void ShuffleChain::FillWindow() {
@@ -26,20 +38,21 @@ void ShuffleChain::FillWindow() {
     }
 }
 
-std::string ShuffleChain::Pick() {
+const std::vector<std::string>& ShuffleChain::Pick() {
     assert(Len() != 0 && "cannot pick from empty chain");
     FillWindow();
-    std::string picked = _window[0];
+    int picked_idx = _window[0];
     _window.pop_front();
-    _pool.push_back(picked);
-    return picked;
+    _pool.push_back(picked_idx);
+    return _items[picked_idx]._uris;
 }
 
-std::vector<std::string> ShuffleChain::Items() {
-    std::vector<std::string> items;
-    items.insert(items.end(), _window.begin(), _window.end());
-    items.insert(items.end(), _pool.begin(), _pool.end());
-    return items;
+std::vector<std::vector<std::string>> ShuffleChain::Items() {
+    std::vector<std::vector<std::string>> result;
+    for (auto group : _items) {
+        result.push_back(group._uris);
+    }
+    return result;
 }
 
 }  // namespace ashuffle

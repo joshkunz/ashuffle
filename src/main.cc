@@ -25,12 +25,13 @@ const int kWindowSize = 7;
 
 std::unique_ptr<Loader> BuildLoader(mpd::MPD* mpd, const Options& opts) {
     if (opts.file_in != nullptr && opts.check_uris) {
-        return std::make_unique<FileMPDLoader>(mpd, opts.ruleset, opts.file_in);
+        return std::make_unique<FileMPDLoader>(mpd, opts.ruleset, opts.group_by,
+                                               opts.file_in);
     } else if (opts.file_in != nullptr) {
         return std::make_unique<FileLoader>(opts.file_in);
     }
 
-    return std::make_unique<MPDLoader>(mpd, opts.ruleset);
+    return std::make_unique<MPDLoader>(mpd, opts.ruleset, opts.group_by);
 }
 
 }  // namespace
@@ -60,6 +61,11 @@ int main(int argc, const char* argv[]) {
 
     Options options = std::move(std::get<Options>(parse));
 
+    if (!options.check_uris && !options.group_by.empty()) {
+        std::cerr << "-g/--group-by not supported with no-check" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
     std::function<std::string()> pass_f = [] {
         return GetPass(stdin, stdout, "mpd password: ");
     };
@@ -79,9 +85,15 @@ int main(int argc, const char* argv[]) {
     // For integration testing, we sometimes just want to have ashuffle
     // dump the list of songs in its shuffle chain.
     if (options.test.print_all_songs_and_exit) {
-        std::vector<std::string> all_songs = songs.Items();
-        for (auto song : all_songs) {
-            std::cout << song << std::endl;
+        bool first = true;
+        for (auto&& group : songs.Items()) {
+            if (!first) {
+                std::cout << "---" << std::endl;
+            }
+            first = false;
+            for (auto&& song : group) {
+                std::cout << song << std::endl;
+            }
         }
         exit(EXIT_SUCCESS);
     }
@@ -90,8 +102,15 @@ int main(int argc, const char* argv[]) {
         std::cerr << "Song pool is empty." << std::endl;
         exit(EXIT_FAILURE);
     }
-    std::cout << "Picking random songs out of a pool of " << songs.Len() << "."
-              << std::endl;
+
+    if (!options.group_by.empty()) {
+        std::cout << absl::StrFormat("Picking from %u groups (%u songs).",
+                                     songs.Len(), songs.LenURIs())
+                  << std::endl;
+    } else {
+        std::cout << "Picking random songs out of a pool of " << songs.Len()
+                  << "." << std::endl;
+    }
 
     /* Seed the random number generator */
     srand(time(NULL));

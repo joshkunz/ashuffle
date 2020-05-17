@@ -217,6 +217,35 @@ TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilled) {
     EXPECT_THAT(mpd.Playing(), Optional(song_b));
 }
 
+// Test that when we have a partially filled queue buffer, and we have groups
+// of songs, we re-queue just enough songs to fill the buffer.
+TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilledAndGrouping) {
+    opts.queue_buffer = 4;
+
+    // Make future IDLE calls return IDLE_QUEUE for this test.
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
+
+    mpd.queue.push_back(song_b);
+    mpd.queue.push_back(song_b);
+    mpd.queue.push_back(song_b);
+    mpd.PlayAt(1);  // Second song.
+
+    chain.Clear();
+    chain.Add(std::vector<std::string>{song_a.URI(), song_b.URI()});
+
+    Loop(&mpd, &chain, opts, loop_once_d);
+
+    // We start the chain with only one group <song_a, song_b>. The queue buffer
+    // is 4, and there's only one song after the current song, so we need to
+    // add 3 more songs. The one group in the chain has 2 songs, so we should
+    // call Pick() twice, and end up with one extra song.
+    EXPECT_THAT(mpd.queue, ElementsAre(song_b, song_b, song_b, song_a, song_b,
+                                       song_a, song_b));
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_EQ(mpd.state.song_position, 1);
+    EXPECT_THAT(mpd.Playing(), Optional(song_b));
+}
+
 struct ConnectTestCase {
     // Want is used to set the actual server host/port.
     mpd::Address want;
