@@ -112,9 +112,6 @@ int main(int argc, const char* argv[]) {
                   << "." << std::endl;
     }
 
-    /* Seed the random number generator */
-    srand(time(NULL));
-
     /* do the main action */
     if (options.queue_only) {
         for (unsigned i = 0; i < options.queue_only; i++) {

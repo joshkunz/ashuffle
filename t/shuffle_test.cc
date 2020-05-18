@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include <random>
 
 #include <absl/strings/str_cat.h>
 #include <gmock/gmock.h>
@@ -115,15 +116,15 @@ INSTANTIATE_TEST_SUITE_P(BigWindows, WindowTest, Values(50, 99, 100, 1000));
 //  how we index the song list when picking randomly. It's hard to test
 //  that something is random :/.
 TEST(ShuffleChainTest, IsRandom) {
-    srand(4);
+    std::mt19937 rnd_engine(4);
 
-    ShuffleChain chain(2);
+    ShuffleChain chain(2, rnd_engine);
 
     chain.Add("test a");
     chain.Add("test b");
     chain.Add("test c");
 
-    std::vector<std::string> want{"test b", "test c", "test a", "test b"};
+    std::vector<std::string> want{ "test c", "test b", "test a", "test c" };
     std::vector<std::string> got;
     for (int i = 0; i < 4; i++) {
         auto pick = chain.Pick();
