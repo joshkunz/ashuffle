@@ -159,7 +159,7 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
             songs->Clear();
             MPDLoader loader(mpd, options.ruleset);
             loader.Load(songs);
-            printf("Picking random songs out of a pool of %u.\n", songs->Len());
+            printf("Picking random songs out of a pool of %lu.\n", songs->Len());
         } else if (events.Has(MPD_IDLE_QUEUE) || events.Has(MPD_IDLE_PLAYER)) {
             TryEnqueue(mpd, songs, options);
         }

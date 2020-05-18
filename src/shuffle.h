@@ -27,7 +27,7 @@ class ShuffleChain {
     ShuffleChain() : ShuffleChain(1){};
 
     // Create a new ShuffleChain with the given window length.
-    ShuffleChain(unsigned window) : _max_window(window){};
+    explicit ShuffleChain(size_t window) : _max_window(window){};
 
     // Clear this shuffle chain, removing anypreviously added songs.
     void Clear();
@@ -37,10 +37,10 @@ class ShuffleChain {
     void Add(ShuffleItem i);
 
     // Return the total number of Items (groups) in this chain.
-    unsigned Len();
+    size_t Len();
 
     // Return the total number of URIs in this chain, in all items.
-    unsigned LenURIs();
+    size_t LenURIs();
 
     // Pick a group of songs out of this chain.
     const std::vector<std::string>& Pick();
@@ -53,10 +53,10 @@ class ShuffleChain {
    private:
     void FillWindow();
 
-    unsigned _max_window;
+    size_t _max_window;
     std::vector<ShuffleItem> _items;
-    std::deque<int> _window;
-    std::deque<int> _pool;
+    std::deque<size_t> _window;
+    std::deque<size_t> _pool;
 };
 
 }  // namespace ashuffle
