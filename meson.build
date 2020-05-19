@@ -88,6 +88,7 @@ if get_option('tests').enabled()
       googletest = cmake.subproject('googletest', cmake_options: [
           '-DBUILD_GMOCK=ON',
           '-DCMAKE_CXX_STANDARD=17',
+          '-DINSTALL_GTEST=OFF',
       ])
 
       gtest_deps = [
