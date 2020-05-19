@@ -1,31 +1,42 @@
 project('ashuffle', ['c', 'cpp'], default_options: ['cpp_std=c++17', 'warning_level=2'])
 
-cmake = import('cmake')
-cpp = meson.get_compiler('cpp')
-
 # absl dependencies need to be explicited...
 # It might be possible to use cmake dependencies (e.g. "absl:string"
 # defined in abslTargets.cmake in the future but that does not seem
 # worth the time trying to figure that out.
 absl_libs = [
     # Via Base:
-    'raw_logging_internal',
+    'absl_raw_logging_internal',
 
     # Via Strings:
-    'int128',
-    'str_format_internal',
-    'strings_internal',
-    'strings',
+    'absl_int128',
+    'absl_str_format_internal',
+    'absl_strings_internal',
+    'absl_strings',
 
     # Via Hash:
-    'hash',
-    'city',
+    'absl_hash',
+    'absl_city',
 ]
 
 absl_deps = []
 if not get_option('unsupported_use_system_absl')
+    cmake = import('cmake')
+
+    # HACK: absl detects if it's being built in "system" mode, or "subproject"
+    # mode depending on the cmake PROJECT_SOURCE_DIR variable. Since meson
+    # parses the cmake package info in isolation, absl assumes that it is in
+    # "system" mode and generates install rules that meson propogates to the
+    # library targets by setting the `install` attribute. Since we want absl
+    # to remain internal, we hack this check by forcing the PROJECT_SOURCE_DIR
+    # to match the true source root. This is done by using
+    # CMAKE_PROJECT_..._INCLUDE to inject a cmake snippet after absl's
+    # invocation of `project()` to update PROJECT_SOURCE_DIR.
+    absl_project_inc = join_paths(meson.current_source_dir(), 'tools/cmake/inject_project_source_dir.cmake')
+
     absl = cmake.subproject('absl', cmake_options: [
         '-DCMAKE_CXX_STANDARD=17',
+        '-DCMAKE_PROJECT_absl_INCLUDE=' + absl_project_inc,
     ])
 
     absl_deps = []
@@ -33,10 +44,12 @@ if not get_option('unsupported_use_system_absl')
         absl_deps += absl.dependency(lib)
     endforeach
 else
+    cpp = meson.get_compiler('cpp')
+
     # note that the system's absl needs to be compiled for C++17 standard
     # or final link will fail.
     foreach lib : absl_libs
-        dep = cpp.find_library('absl_' + lib)
+        dep = cpp.find_library(lib)
         if dep.found()
             absl_deps += dep
         endif
