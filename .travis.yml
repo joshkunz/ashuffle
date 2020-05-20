@@ -71,6 +71,7 @@ jobs:
         provider: releases
         file: release/ashuffle.*
         token: $GITHUB_TOKEN
+        draft: true
         # Use Travis-CI dplv2
         edge: true
         on:
