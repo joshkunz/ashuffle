@@ -69,6 +69,9 @@ code follows the canonical Go style as checked by `go fmt`. There is a
 format your C and Go code using `clang-format` and `go fmt` respectively. There
 is also a format checker, [`scripts/check-format`](scripts/check-format) that
 can be used as a pre-commit hook for checking that your code is well formatted.
+Meson configuration should follow the [Meson style guide](
+https://mesonbuild.com/Style-guide.html). Meson files should use 2-space
+indents.
 
 **Unit Testing:** All code should be tested. New features should have at least
 some test coverage for common usage. We will still accept patches for code
