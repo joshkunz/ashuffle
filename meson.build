@@ -71,17 +71,26 @@ clang_tidy = run_target('ashuffle-clang-tidy',
 
 if get_option('tests').enabled()
 
-    googletest = cmake.subproject('googletest', cmake_options: [
-        '-DBUILD_GMOCK=ON',
-        '-DCMAKE_CXX_STANDARD=17',
-    ])
+    if not get_option('unsupported_use_system_gtest')
+      googletest = cmake.subproject('googletest', cmake_options: [
+          '-DBUILD_GMOCK=ON',
+          '-DCMAKE_CXX_STANDARD=17',
+      ])
 
-    gtest_deps = [
+      gtest_deps = [
+          dependency('threads'),
+          googletest.dependency('gtest'),
+          googletest.dependency('gmock'),
+          googletest.dependency('gmock_main'),
+      ]
+    else
+      gtest_deps = [
         dependency('threads'),
-        googletest.dependency('gtest'),
-        googletest.dependency('gmock'),
-        googletest.dependency('gmock_main'),
-    ]
+        dependency('gtest', version: '>=1.10'),
+        dependency('gmock', version: '>=1.10'),
+        dependency('gmock_main', version: '>=1.10'),
+      ]
+    endif
 
     mpdfake_inc = include_directories('t')
     mpdfake_dep = declare_dependency(include_directories : mpdfake_inc)
