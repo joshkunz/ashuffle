@@ -2,6 +2,7 @@
 #define __ASHUFFLE_SHUFFLE_H__
 
 #include <deque>
+#include <random>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -27,7 +28,15 @@ class ShuffleChain {
     ShuffleChain() : ShuffleChain(1){};
 
     // Create a new ShuffleChain with the given window length.
-    explicit ShuffleChain(size_t window) : _max_window(window){};
+    explicit ShuffleChain(size_t window) : _max_window(window) {
+        std::random_device rd;
+        _rng.seed(rd());
+    }
+
+    // Create a new ShuffleChain with the given window length
+    // and using the given RandomNumberEngine
+    ShuffleChain(size_t window, std::mt19937 rng)
+        : _max_window(window), _rng(rng) {}
 
     // Clear this shuffle chain, removing anypreviously added songs.
     void Clear();
@@ -57,6 +66,7 @@ class ShuffleChain {
     std::vector<ShuffleItem> _items;
     std::deque<size_t> _window;
     std::deque<size_t> _pool;
+    std::mt19937 _rng;
 };
 
 }  // namespace ashuffle
