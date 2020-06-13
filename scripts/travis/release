@@ -6,3 +6,5 @@ setup
 mkdir -p release
 tools/meta/meta release -o release/ashuffle.x86_64-linux-gnu x86_64 || die "couldn't build x86_64"
 tools/meta/meta release -o release/ashuffle.aarch64-linux-gnu aarch64 || die "couldn't build aarch64"
+tools/meta/meta release -o release/ashuffle.armv7h-linux-gnueabihf armv7h|| die "couldn't build armv7h"
+tools/meta/meta release -o release/ashuffle.armv6h-linux-gnueabihf armv6h|| die "couldn't build armv6h"
