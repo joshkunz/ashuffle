@@ -2,10 +2,10 @@
 
 #include <stdlib.h>
 #include <algorithm>
+#include <random>
 #include <string>
 #include <unordered_set>
 #include <vector>
-#include <random>
 
 #include <absl/strings/str_cat.h>
 #include <gmock/gmock.h>
@@ -124,7 +124,7 @@ TEST(ShuffleChainTest, IsRandom) {
     chain.Add("test b");
     chain.Add("test c");
 
-    std::vector<std::string> want{ "test c", "test b", "test a", "test c" };
+    std::vector<std::string> want{"test c", "test b", "test a", "test c"};
     std::vector<std::string> got;
     for (int i = 0; i < 4; i++) {
         auto pick = chain.Pick();
