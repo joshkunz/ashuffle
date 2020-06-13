@@ -256,16 +256,34 @@ please open an issue.
 
 # getting ashuffle
 
+ashuffle is officially distributed via pre-compiled binaries, and via its
+source. Linux-compatible binaries are currently available for `x86_64`,
+and several ARM flavors that should support most ARM users, including
+Raspberry Pi.
+
 ## pre-built binaries
 
-ashuffle is officially distributed via pre-compiled binaries, and via its
-source. Binaries are currently available for `x86_64`, and `aarch64`
-(cortex-a53+, including Raspberry Pi3+) targets running linux. You can
-download the latest binary for your platform [on the releases page](
-https://github.com/joshkunz/ashuffle/releases).
+First, install 'libmpdclient', the library ashuffle uses to interact with MPD.
+It can be obtained from most package managers. E.g. via `sudo apt install
+libmpdclient2`, or `brew install libmpdclient`. Once libmpdclient is installed
+you can download the latest binary release for your platform [on the releases
+page](https://github.com/joshkunz/ashuffle/releases). Binaries are currently
+available for the following platforms:
 
-If you'd like to add binary support to another platform, pull requests are
-welcome.
+| Binary | Architecture | Minimum CPU | Popular Devices |
+| ------ | ------------ | ----------- | --------------- |
+| `ashuffle.x86_64-linux-gnu` | `x86_64` |||
+| `ashuffle.aarch64-linux-gnu` | `aarch64` | `cortex-a53` | Raspberry Pi 3B+ running 64-bit OS (not RPi OS) |
+| `ashuffle.armv7h-linux-gnueabihf` | `armv7hl` | `cortex-a7` | Raspberry Pi 2B+ Running RPi OS (f.k.a. Raspbian) |
+| `ashuffle.armv6h-linux-gnueabihf` | `armv6hl` | `arm1176jzf-s` | Raspberry Pi 0/1 |
+
+Once you've downloaded the binary, it should "just work" when run
+(e.g. `$ ./ashuffle.x86_64-linux-gnu`). If they do not, please [file an
+issue](https://github.com/joshkunz/ashuffle/issues) or send an email to the
+ashuffle users list at `users@ashuffle.app`.
+
+If you'd like to add binary support to another platform, pull
+requests are welcome.
 
 ## installing from source
 
