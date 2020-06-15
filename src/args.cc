@@ -299,6 +299,7 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
             return ParseError(absl::StrFormat("bad option '%s'", arg));
     }
     assert(false && "unreachable, invalid state");
+    __builtin_unreachable();
 }
 
 }  // namespace
