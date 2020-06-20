@@ -40,6 +40,11 @@ class Options {
     struct {
         bool print_all_songs_and_exit = false;
     } test = {};
+    // Minor "tweak" options that are not part of the main options.
+    struct {
+        // Window size to use for the global shuffle chain.
+        int window_size = 7;
+    } tweak = {};
     std::vector<enum mpd_tag_type> group_by = {};
 
     // Parse parses the arguments in the given vector and returns ParseResult
@@ -78,6 +83,9 @@ class Options {
 // Print the help message on the given output stream, and return the input
 // ostream.
 std::ostream &DisplayHelp(std::ostream &);
+
+// Print the given ParseError to the given output stream.
+std::ostream &operator<<(std::ostream &out, const ParseError &e);
 
 }  // namespace ashuffle
 

@@ -7,6 +7,8 @@
 
 #include <absl/strings/numbers.h>
 #include <absl/strings/str_format.h>
+#include <absl/strings/str_join.h>
+#include <absl/strings/str_split.h>
 
 #include "args.h"
 #include "rule.h"
@@ -15,8 +17,9 @@ namespace ashuffle {
 namespace {
 
 constexpr char kHelpMessage[] =
-    "usage: ashuffle [-h] [-n] [-e PATTERN ...] [-o NUMBER] [-f FILENAME] "
-    "[-q NUMBER] [-g TAG ...]\n"
+    "usage: ashuffle [-h] [-n] [[-e PATTERN ...] ...] [-o NUMBER] "
+    "[-f FILENAME] [-q NUMBER]\n"
+    "    [-g TAG ...] [[-t TWEAK] ...]\n"
     "\n"
     "Optional Arguments:\n"
     "   -h,-?,--help      Display this help message.\n"
@@ -46,6 +49,8 @@ constexpr char kHelpMessage[] =
     "                     the currently playing song. This is to support MPD\n"
     "                     features like crossfade that don't work if there\n"
     "                     are no more songs in the queue.\n"
+    "   -t,--tweak        Tweak an infrequently used ashuffle option. See\n"
+    "                     `readme.md` for a list of available options.\n"
     "See included `readme.md` file for PATTERN syntax.\n";
 
 class Parser {
@@ -88,6 +93,7 @@ class Parser {
         kRuleBegin,    // Expecting first rule tag (not generic)
         kRuleValue,    // Expecting rule matcher for previous tag
         kTest,         // Expecting test-only flag name
+        kTweak,        // Expecting a tweak
     };
     State state_;
     // opts_ is modified as tokens are `Consume`d.
@@ -116,6 +122,10 @@ class Parser {
     // Actual consume logic is here. It maps an argument to a state update or
     // parse error as appropriate.
     std::variant<State, ParseError> ConsumeInternal(std::string_view arg);
+
+    // Parse a tweak argument specifically (anything when we're in kTweak
+    // state). Return value has the same semantics as ConsumeInternal.
+    std::variant<State, ParseError> ParseTweak(std::string_view arg);
 };
 
 bool Parser::InGenericState() {
@@ -183,6 +193,33 @@ std::variant<Options, ParseError> Parser::Finish() {
     return std::exchange(opts_, Options());
 }
 
+std::variant<Parser::State, ParseError> Parser::ParseTweak(
+    std::string_view arg) {
+    std::vector<std::string> assignment = absl::StrSplit(arg, "=");
+    // Match on things like 'window-size=' as well.
+    if (assignment.size() < 2 || assignment[1].empty()) {
+        return ParseError("tweak must be of the form <name>=<value>");
+    }
+    auto& key = assignment[0];
+    std::vector<std::string> value_parts(assignment.begin() + 1,
+                                         assignment.end());
+    auto value = absl::StrJoin(value_parts, "=");
+
+    if (key == "window-size") {
+        if (!absl::SimpleAtoi(value, &opts_.tweak.window_size)) {
+            return ParseError(absl::StrFormat(
+                "couldn't convert window-size value '%s'", value));
+        }
+        if (opts_.tweak.window_size < 1) {
+            return ParseError(absl::StrFormat(
+                "tweak window-size must be >= 1 (%s given)", value));
+        }
+        return kNone;
+    }
+
+    return ParseError(absl::StrFormat("unrecognized tweak '%s'", arg));
+}
+
 std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
     std::string_view arg) {
     if (arg == "--help" || arg == "-h" || arg == "-?") {
@@ -231,8 +268,13 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
             opts_.group_by.push_back(MPD_TAG_DATE);
             return kNone;
         }
+        if (arg == "--tweak" || arg == "-t") {
+            return kTweak;
+        }
     }
     switch (state_) {
+        case kTweak:
+            return ParseTweak(arg);
         case kFile:
             if (arg == "-") {
                 opts_.file_in = &std::cin;
@@ -318,6 +360,26 @@ std::variant<Options, ParseError> Options::Parse(
 std::ostream& DisplayHelp(std::ostream& output) {
     output << kHelpMessage;
     return output;
+}
+
+std::ostream& operator<<(std::ostream& out, const ParseError& e) {
+    std::string type;
+    switch (e.type) {
+        case ParseError::Type::kGeneric:
+            type = "generic";
+            break;
+        case ParseError::Type::kHelp:
+            type = "help";
+            break;
+        case ParseError::Type::kUnknown:
+            type = "unknown";
+            break;
+        default:
+            assert(false && "unreachable");
+            __builtin_unreachable();
+    }
+    out << "ParseError(" << type << ", \"" << e.msg << "\")" << std::endl;
+    return out;
 }
 
 }  // namespace ashuffle
