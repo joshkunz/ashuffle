@@ -144,7 +144,7 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
 
     // If the test delegate's `skip_init` is set to true, then skip the
     // initializer.
-    if (!test_d.skip_init) {
+    if (options.tweak.play_on_startup) {
         TryFirst(mpd, songs);
         TryEnqueue(mpd, songs, options);
     }

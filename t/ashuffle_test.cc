@@ -60,14 +60,12 @@ void xclearenv() {
 // This test delegate only allows the "init" part of the loop to run. No
 // continous logic runs.
 TestDelegate init_only_d = {
-    .skip_init = false,
     .until_f = [] { return false; },
 };
 
 // This delegate *only* runs the core loop logic, and it only runs the
 // logic once.
 TestDelegate loop_once_d{
-    .skip_init = true,
     .until_f =
         [] {
             static unsigned count;
@@ -144,6 +142,8 @@ TEST_F(LoopTest, InitWhileStopped) {
 }
 
 TEST_F(LoopTest, Requeue) {
+    opts.tweak.play_on_startup = false;
+
     // Pretend like we already have a song in our queue, that was playing,
     // but now we've stopped.
     mpd.queue.push_back(song_b);
@@ -162,6 +162,8 @@ TEST_F(LoopTest, Requeue) {
 }
 
 TEST_F(LoopTest, RequeueEmpty) {
+    opts.tweak.play_on_startup = false;
+
     // Leaving the MPD queue empty.
 
     Loop(&mpd, &chain, opts, loop_once_d);
@@ -174,6 +176,7 @@ TEST_F(LoopTest, RequeueEmpty) {
 }
 
 TEST_F(LoopTest, RequeueEmptyWithQueueBuffer) {
+    opts.tweak.play_on_startup = false;
     opts.queue_buffer = 3;
 
     Loop(&mpd, &chain, opts, loop_once_d);
@@ -190,6 +193,7 @@ TEST_F(LoopTest, RequeueEmptyWithQueueBuffer) {
 }
 
 TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilled) {
+    opts.tweak.play_on_startup = false;
     opts.queue_buffer = 3;
 
     // Make future IDLE calls return IDLE_QUEUE for this test.
@@ -220,6 +224,7 @@ TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilled) {
 // Test that when we have a partially filled queue buffer, and we have groups
 // of songs, we re-queue just enough songs to fill the buffer.
 TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilledAndGrouping) {
+    opts.tweak.play_on_startup = false;
     opts.queue_buffer = 4;
 
     // Make future IDLE calls return IDLE_QUEUE for this test.

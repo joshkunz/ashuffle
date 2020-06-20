@@ -23,7 +23,6 @@ std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer& d, const Options& options,
                                   std::function<std::string()>& getpass_f);
 
 struct TestDelegate {
-    bool skip_init = false;
     bool (*until_f)() = nullptr;
 };
 
