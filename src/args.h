@@ -44,6 +44,10 @@ class Options {
     struct {
         // Window size to use for the global shuffle chain.
         int window_size = 7;
+        // If true, start playing music when ashuffle is first started.
+        // Otherwise, ashuffle will wait for an MPD event before playing
+        // music.
+        bool play_on_startup = true;
     } tweak = {};
     std::vector<enum mpd_tag_type> group_by = {};
 

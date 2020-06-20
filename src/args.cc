@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <fstream>
 #include <iostream>
@@ -52,6 +53,20 @@ constexpr char kHelpMessage[] =
     "   -t,--tweak        Tweak an infrequently used ashuffle option. See\n"
     "                     `readme.md` for a list of available options.\n"
     "See included `readme.md` file for PATTERN syntax.\n";
+
+// Parse the given string as a boolean. Produces an empty option if no value
+// can be parsed.
+std::optional<bool> ParseBool(std::string val) {
+    std::transform(val.begin(), val.end(), val.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    if (val == "yes" || val == "true" || val == "on" || val == "1") {
+        return true;
+    }
+    if (val == "no" || val == "false" || val == "off" || val == "0") {
+        return false;
+    }
+    return std::nullopt;
+}
 
 class Parser {
    public:
@@ -214,6 +229,16 @@ std::variant<Parser::State, ParseError> Parser::ParseTweak(
             return ParseError(absl::StrFormat(
                 "tweak window-size must be >= 1 (%s given)", value));
         }
+        return kNone;
+    }
+
+    if (key == "play-on-startup") {
+        auto v = ParseBool(value);
+        if (!v) {
+            return ParseError(absl::StrFormat(
+                "play-on-startup must be a boolean value ('%s' given)", value));
+        }
+        opts_.tweak.play_on_startup = *v;
         return kNone;
     }
 

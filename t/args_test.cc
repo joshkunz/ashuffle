@@ -43,6 +43,7 @@ TEST(ParseTest, Empty) {
     EXPECT_FALSE(opts.test.print_all_songs_and_exit);
     EXPECT_TRUE(opts.group_by.empty());
     EXPECT_EQ(opts.tweak.window_size, 7);
+    EXPECT_EQ(opts.tweak.play_on_startup, true);
 }
 
 TEST(ParseTest, Short) {
@@ -179,6 +180,20 @@ TEST(ParseTest, ByAlbum) {
         << "--by-album should be equivalent to --group-by album date";
 }
 
+TEST(ParseTest, TweakPlayOnStartup) {
+    std::vector<std::tuple<std::string, bool>> cases = {
+        {"on", true},   {"true", true}, {"yes", true},    {"1", true},
+        {"True", true}, {"yEs", true},  {"off", false},   {"false", false},
+        {"no", false},  {"0", false},   {"False", false}, {"nO", false},
+    };
+
+    for (auto [val, want] : cases) {
+        Options opts = std::get<Options>(Options::Parse(
+            fake::TagParser(), {"--tweak", "play-on-startup=" + val}));
+        EXPECT_EQ(opts.tweak.play_on_startup, want) << "Case: " << val;
+    }
+}
+
 using ParseFailureParam =
     std::tuple<std::vector<std::string>, Matcher<std::string>>;
 
@@ -245,6 +260,8 @@ std::vector<ParseFailureParam> partial_cases = {
      HasSubstr("tweak must be of the form <name>=<value>")},
     {{"--tweak", "window-size="},
      HasSubstr("tweak must be of the form <name>=<value>")},
+    {{"--tweak", "play-on-startup="},
+     HasSubstr("tweak must be of the form <name>=<value>")},
 };
 
 INSTANTIATE_TEST_SUITE_P(Partials, ParseFailureTest, ValuesIn(partial_cases));
@@ -263,6 +280,8 @@ std::vector<ParseFailureParam> constraint_cases = {
      HasSubstr("window-size must be >= 1 (0 given)")},
     {{"--tweak", "window-size=-2"},
      HasSubstr("window-size must be >= 1 (-2 given)")},
+    {{"--tweak", "play-on-startup=2"},
+     HasSubstr("play-on-startup must be a boolean value ('2' given)")},
 };
 
 INSTANTIATE_TEST_SUITE_P(Constraint, ParseFailureTest,
