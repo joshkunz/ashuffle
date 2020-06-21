@@ -19,108 +19,220 @@ import (
 	"meta/workspace"
 )
 
-type remoteFile struct {
+var (
+	// Both crosstools obtained from the offical ARM crosstool release:
+	//	https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-a/downloads
+	// Current Version: 9.2-2019.12
+	aarch64CrosstoolArchive = remoteArchive{
+		URL:    "https://storage.googleapis.com/ashuffle-data/gcc-arm.tar.xz",
+		SHA256: "8dfe681531f0bd04fb9c53cf3c0a3368c616aa85d48938eebe2b516376e06a66",
+	}
+	armCrosstoolArchive = remoteArchive{
+		URL:    "https://storage.googleapis.com/ashuffle-data/gcc-arm32.tar.xz",
+		SHA256: "51bbaf22a4d3e7a393264c4ef1e45566701c516274dde19c4892c911caa85617",
+	}
+
+	aarch64Triple = triple{
+		Architecture: "aarch64",
+		Vendor:       "none",
+		System:       "linux",
+		ABI:          "gnu",
+	}
+
+	armTriple = triple{
+		Architecture: "arm",
+		Vendor:       "none",
+		System:       "linux",
+		ABI:          "gnueabihf",
+	}
+)
+
+type remoteArchive struct {
 	URL    string
 	SHA256 string
 }
 
-// Obtained from the offical ARM crosstool release:
-//  https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-a/downloads
-// Current Version: 9.2-2019.12
-var aarch64Crosstool = remoteFile{
-	URL:    "https://storage.googleapis.com/ashuffle-data/gcc-arm.tar.xz",
-	SHA256: "8dfe681531f0bd04fb9c53cf3c0a3368c616aa85d48938eebe2b516376e06a66",
+func (r remoteArchive) FetchTo(dest string) error {
+	d, err := filepath.Abs(dest)
+	if err != nil {
+		return err
+	}
+
+	ws, err := workspace.New()
+	if err != nil {
+		return err
+	}
+	defer ws.Cleanup()
+
+	if err := fetch.URL(r.URL, ws.Path("archive.tar.xz")); err != nil {
+		return err
+	}
+
+	if err := fileutil.Verify(ws.Path("archive.tar.xz"), r.SHA256); err != nil {
+		return fmt.Errorf("failed to verify: %w", err)
+	}
+
+	untar := exec.Command("tar", "--strip-components=1", "-C", d, "-xJf", ws.Path("archive.tar.xz"))
+	if err := untar.Run(); err != nil {
+		return fmt.Errorf("failed to unpack: %w", err)
+	}
+
+	return nil
 }
 
-var aarch64Crossfile = template.Must(
-	template.New("aarch64-crossfile").
+type triple struct {
+	Architecture string
+	Vendor       string
+	System       string
+	ABI          string
+}
+
+func (t triple) String() string {
+	return strings.Join([]string{
+		t.Architecture,
+		t.Vendor,
+		t.System,
+		t.ABI,
+	}, "-")
+}
+
+type armCrosstool struct {
+	PkgConfig string
+	CMake     string
+	Triple    triple
+
+	*workspace.Workspace
+}
+
+func newARMCrosstool(triple triple) (*armCrosstool, error) {
+	pkgConfig, err := osexec.LookPath("pkg-config")
+	if err != nil {
+		return nil, fmt.Errorf("unable to find pkg-config: %w", err)
+	}
+	cmake, err := osexec.LookPath("cmake")
+	if err != nil {
+		return nil, fmt.Errorf("unable to find cmake: %w", err)
+	}
+
+	var archive remoteArchive
+	switch triple.Architecture {
+	case "aarch64":
+		archive = aarch64CrosstoolArchive
+	case "arm":
+		archive = armCrosstoolArchive
+	default:
+		return nil, fmt.Errorf("unrecognized architecture %q in triple: %s", triple.Architecture, triple)
+	}
+
+	ws, err := workspace.New(workspace.NoCD)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := archive.FetchTo(ws.Root); err != nil {
+		ws.Cleanup()
+		return nil, err
+	}
+
+	return &armCrosstool{
+		PkgConfig: pkgConfig,
+		CMake:     cmake,
+		Triple:    triple,
+		Workspace: ws,
+	}, nil
+}
+
+var armCrossfileTmpl = template.Must(
+	template.New("arm-crossfile").
+		Funcs(map[string]interface{}{
+			"joinBy": func(delim string, strs []string) string {
+				return strings.Join(strs, delim)
+			},
+		}).
 		Parse(strings.Join([]string{
 			"[binaries]",
-			"c = '{{ .Sysroot }}/bin/aarch64-none-linux-gnu-gcc'",
-			"cpp = '{{ .Sysroot }}/bin/aarch64-none-linux-gnu-g++'",
+			"c = '{{ .Crosstool.Root }}/bin/{{ .Crosstool.Triple }}-gcc'",
+			"cpp = '{{ .Crosstool.Root }}/bin/{{ .Crosstool.Triple }}-g++'",
+			"c_ld = 'gold'",
+			"cpp_ld = 'gold'",
 			// We have to set pkgconfig and cmake explicitly here, otherwise
 			// meson will not be able to find them. We just re-use the
 			// system versions, since we don't need any special arch-specific
 			// handing.
-			"pkgconfig = '{{ .PkgConfig }}'",
-			"cmake = '{{ .CMake }}'",
+			"pkgconfig = '{{ .Crosstool.PkgConfig }}'",
+			"cmake = '{{ .Crosstool.CMake }}'",
 			"",
 			"[properties]",
-			"sys_root = '{{ .Sysroot }}'",
-			"c_args = '-I{{ .Sysroot }}/include'",
-			"c_link_args = '-L{{ .Sysroot }}/lib'",
-			"cpp_args = '-I{{ .Sysroot }}/include'",
-			"cpp_link_args = '-L{{ .Sysroot }}/lib'",
+			"sys_root = '{{ .Crosstool.Root }}'",
+			"c_args = '-mcpu={{ .CPU }} -I{{ .Crosstool.Root }}/include {{ .CFlags | joinBy \" \" }}'",
+			"c_link_args = '-L{{ .Crosstool.Root }}/lib'",
+			"cpp_args = '-mcpu={{ .CPU }} -I{{ .Crosstool.Root }}/include {{ .CFlags | joinBy \" \" }}'",
+			"cpp_link_args = '-L{{ .Crosstool.Root }}/lib'",
 			"",
 			"[host_machine]",
-			"system = 'linux'",
-			"cpu_family = 'aarch64'",
-			"cpu = 'cortex-a53'",
+			"system = '{{ .Crosstool.Triple.System }}'",
+			"cpu_family = '{{ .Crosstool.Triple.Architecture }}'",
+			"cpu = '{{ .CPU }}'",
 			"endian = 'little'",
 		}, "\n")),
 )
 
-func releaseAArch64(ctx *cli.Context, out string) error {
+func crossFile(crosstool *armCrosstool, cpu string) (string, error) {
+
+	cf, err := ioutil.TempFile("", "cross-"+crosstool.Triple.Architecture+"-*.txt")
+	if err != nil {
+		return "", err
+	}
+
+	info := struct {
+		Crosstool *armCrosstool
+		CPU       string
+		// Flags added to all compiler invocations (C or CXX).
+		CFlags []string
+	}{
+		Crosstool: crosstool,
+		CPU:       cpu,
+	}
+
+	if crosstool.Triple.Architecture == "arm" {
+		// When building for arm32, GCC defaults to THUMB output for
+		// some reason. Force it to output ARM instead.
+		info.CFlags = append(info.CFlags, "-marm")
+	}
+
+	if err := armCrossfileTmpl.Execute(cf, info); err != nil {
+		cf.Close()
+		os.Remove(cf.Name())
+		return "", err
+	}
+
+	cf.Close()
+	return cf.Name(), nil
+}
+
+func releaseARM(ctx *cli.Context, out string, triple triple, cpu string) error {
 	src, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	crosstool, err := workspace.New()
+	crosstool, err := newARMCrosstool(triple)
 	if err != nil {
 		return err
 	}
 	defer crosstool.Cleanup()
 
-	if err := fetch.URL(aarch64Crosstool.URL, crosstool.Path("archive.tar.xz")); err != nil {
-		return err
-	}
-
-	if err := fileutil.Verify(crosstool.Path("archive.tar.xz"), aarch64Crosstool.SHA256); err != nil {
-		return fmt.Errorf("fetched crosstool failed to verify: %w", err)
-	}
-
-	untar := exec.Command("tar", "--strip-components=1", "-xJf", crosstool.Path("archive.tar.xz"))
-	if err := untar.Run(); err != nil {
-		return fmt.Errorf("failed to unpack crosstool: %w", err)
-	}
-
-	if err := os.Chdir(src); err != nil {
-		return err
-	}
-
-	crossF, err := ioutil.TempFile("", "cross-aarch64-*.txt")
+	crossF, err := crossFile(crosstool, cpu)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(crossF.Name())
-
-	pkgConfig, err := osexec.LookPath("pkg-config")
-	if err != nil {
-		return fmt.Errorf("unable to find pkg-config: %w", err)
-	}
-	cmake, err := osexec.LookPath("cmake")
-	if err != nil {
-		return fmt.Errorf("unable to find cmake: %w", err)
-	}
-
-	sysroot := struct {
-		Sysroot   string
-		PkgConfig string
-		CMake     string
-	}{
-		Sysroot:   crosstool.Root,
-		PkgConfig: pkgConfig,
-		CMake:     cmake,
-	}
-
-	if err := aarch64Crossfile.Execute(crossF, sysroot); err != nil {
-		fmt.Errorf("failed to write crossfile: %w", err)
-	}
+	defer os.Remove(crossF)
 
 	libmpdclientArgs := []string{
 		"meta", "install", "libmpdclient",
-		fmt.Sprintf("--cross_file=%s", crossF.Name()),
+		fmt.Sprintf("--cross_file=%s", crossF),
+		// Install into the crosstool root, so that our `--sysroot` works
+		// when building ashuffle.
 		fmt.Sprintf("--prefix=%s", crosstool.Root),
 	}
 	if ver := ctx.String("libmpdclient_version"); ver != "" {
@@ -140,7 +252,7 @@ func releaseAArch64(ctx *cli.Context, out string) error {
 	p, err := project.NewMeson(src, project.MesonOptions{
 		BuildType:      project.BuildDebugOptimized,
 		BuildDirectory: build.Root,
-		Extra:          []string{"--cross-file", crossF.Name()},
+		Extra:          []string{"--cross-file", crossF},
 	})
 	if err != nil {
 		return err
@@ -210,11 +322,21 @@ func release(ctx *cli.Context) error {
 		out = o
 	}
 
-	switch ctx.Args().First() {
+	arch := ctx.Args().First()
+	switch arch {
 	case "x86_64":
 		return releasex86(out)
 	case "aarch64":
-		return releaseAArch64(ctx, out)
+		// Processors used on 3B+ support this arch, but RPi OS does not.
+		// These are probably OK defaults for aarch64 though.
+		return releaseARM(ctx, out, aarch64Triple, "cortex-a53")
+	case "armv7h":
+		// Used on Raspberry Pi 2B+. Should also work for newer
+		// chips running 32-bit RPi OS.
+		return releaseARM(ctx, out, armTriple, "cortex-a7")
+	case "armv6h":
+		// Used on Raspberry Pi 0/1.
+		return releaseARM(ctx, out, armTriple, "arm1176jzf-s")
 	}
 
 	return fmt.Errorf("architecture %q not supported", ctx.Args().First())

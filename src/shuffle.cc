@@ -32,7 +32,8 @@ size_t ShuffleChain::LenURIs() {
 /* ensure that our window is as full as it can possibly be. */
 void ShuffleChain::FillWindow() {
     while (_window.size() <= _max_window && _pool.size() > 0) {
-        std::uniform_int_distribution<unsigned long long> rd{0, _pool.size() - 1};
+        std::uniform_int_distribution<unsigned long long> rd{0,
+                                                             _pool.size() - 1};
         /* push a random song from the pool onto the end of the window */
         size_t idx = rd(_rng);
         _window.push_back(_pool[idx]);
