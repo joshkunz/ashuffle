@@ -143,10 +143,31 @@ It's equivalent to `--group-by album date`.
 
 Note that `-g`/`--group-by`/`--by-album` can only be provided once.
 
+### advanced options for specialized preferences, with `--tweak`
+
+Tweaks are infrequently used, specialized, or complicated options that most
+users probably don't want to use. These options are all set via a single
+`--tweak`/`-t` flag to avoid cluttering help pages. All tweaks have the form
+`<key>=<value>`. For example: `--tweak window-size=7`. Here is a table of
+tweaks, and their meanings:
+
+| Name | Values | Default | Description |
+| ---- | ------ | ------- | ----------- |
+| `window-size` | Integer `>=1` | `7` | Sets the size of the "window" used for the shuffle algorithm. See the section on the [shuffle algorithm](#shuffle-algorithm) for more details. In-short: Lower numbers mean more frequent repeats, and higher numbers mean less frequent repeats. |
+| `play-on-startup` | Boolean | `yes` | If set to a true value, ashuffle starts playing music if MPD is paused, stopped, or the queue is empty on startup. If set to false, then ashuffle will not enqueue any music until a song is enqueued for the first time. |
+
+Value types:
+
+| Name | Representation |
+| ---- | -------------- |
+| Integer | An integral number, like `-1`, `0`, or `15`. |
+| Boolean | The strings `on`, `true`, `yes` or `1` mean "true" or "enable", and the strings `off`, `false`, `no`, or `0` mean "false" or "disable". |
+
 ## help text
 
 ```
-usage: ashuffle [-h] [-n] [-e PATTERN ...] [-o NUMBER] [-f FILENAME] [-q NUMBER] [-g TAG ...]
+usage: ashuffle [-h] [-n] [[-e PATTERN ...] ...] [-o NUMBER] [-f FILENAME] [-q NUMBER]
+    [-g TAG ...] [[-t TWEAK] ...]
 
 Optional Arguments:
    -h,-?,--help      Display this help message.
@@ -176,6 +197,8 @@ Optional Arguments:
                      the currently playing song. This is to support MPD
                      features like crossfade that don't work if there
                      are no more songs in the queue.
+   -t,--tweak        Tweak an infrequently used ashuffle option. See
+                     `readme.md` for a list of available options.
 See included `readme.md` file for PATTERN syntax.
 ```
 

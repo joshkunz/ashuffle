@@ -42,6 +42,8 @@ TEST(ParseTest, Empty) {
     EXPECT_EQ(opts.port, 0U);
     EXPECT_FALSE(opts.test.print_all_songs_and_exit);
     EXPECT_TRUE(opts.group_by.empty());
+    EXPECT_EQ(opts.tweak.window_size, 7);
+    EXPECT_EQ(opts.tweak.play_on_startup, true);
 }
 
 TEST(ParseTest, Short) {
@@ -50,7 +52,7 @@ TEST(ParseTest, Short) {
     });
 
     // clang-format off
-    Options opts = std::get<Options>(Options::Parse(tagger, {
+    auto result = Options::Parse(tagger, {
         "-o", "5",
         "-n",
         "-q", "10",
@@ -58,8 +60,14 @@ TEST(ParseTest, Short) {
         "-f", "/dev/zero",
         "-p", "1234",
         "-g", "artist",
-    }));
+        "-t", "window-size=3",
+    });
     // clang-format on
+
+    ASSERT_EQ(std::get_if<ParseError>(&result), nullptr)
+        << std::get<ParseError>(result);
+
+    Options opts = std::move(std::get<Options>(result));
 
     EXPECT_EQ(opts.ruleset.size(), 2U);
     EXPECT_EQ(opts.queue_only, 5U);
@@ -68,6 +76,7 @@ TEST(ParseTest, Short) {
     EXPECT_EQ(opts.queue_buffer, 10U);
     EXPECT_EQ(opts.port, 1234U);
     EXPECT_THAT(opts.group_by, ElementsAre(MPD_TAG_ARTIST));
+    EXPECT_EQ(opts.tweak.window_size, 3);
 }
 
 TEST(ParseTest, Long) {
@@ -76,8 +85,7 @@ TEST(ParseTest, Long) {
     });
 
     // clang-format off
-    Options opts =
-        std::get<Options>(Options::Parse(tagger, {
+    auto result = Options::Parse(tagger, {
             "--only", "5",
             "--no-check",
             "--file", "/dev/zero",
@@ -86,8 +94,14 @@ TEST(ParseTest, Long) {
             "--host", "foo",
             "--port", "1234",
             "--group-by", "artist",
-    }));
+            "--tweak", "window-size=5",
+    });
     // clang-format on
+
+    ASSERT_EQ(std::get_if<ParseError>(&result), nullptr)
+        << std::get<ParseError>(result);
+
+    Options opts = std::move(std::get<Options>(result));
 
     EXPECT_EQ(opts.ruleset.size(), 2U);
     EXPECT_EQ(opts.queue_only, 5U);
@@ -97,6 +111,7 @@ TEST(ParseTest, Long) {
     EXPECT_EQ(opts.host, "foo");
     EXPECT_EQ(opts.port, 1234U);
     EXPECT_THAT(opts.group_by, ElementsAre(MPD_TAG_ARTIST));
+    EXPECT_EQ(opts.tweak.window_size, 5);
 }
 
 TEST(ParseTest, MixedLongShort) {
@@ -165,6 +180,20 @@ TEST(ParseTest, ByAlbum) {
         << "--by-album should be equivalent to --group-by album date";
 }
 
+TEST(ParseTest, TweakPlayOnStartup) {
+    std::vector<std::tuple<std::string, bool>> cases = {
+        {"on", true},   {"true", true}, {"yes", true},    {"1", true},
+        {"True", true}, {"yEs", true},  {"off", false},   {"false", false},
+        {"no", false},  {"0", false},   {"False", false}, {"nO", false},
+    };
+
+    for (auto [val, want] : cases) {
+        Options opts = std::get<Options>(Options::Parse(
+            fake::TagParser(), {"--tweak", "play-on-startup=" + val}));
+        EXPECT_EQ(opts.tweak.play_on_startup, want) << "Case: " << val;
+    }
+}
+
 using ParseFailureParam =
     std::tuple<std::vector<std::string>, Matcher<std::string>>;
 
@@ -226,6 +255,13 @@ std::vector<ParseFailureParam> partial_cases = {
      HasSubstr("'-g' can only be provided once")},
     {{"--by-album", "-g", "artist"},
      HasSubstr("'-g' can only be provided once")},
+    {{"--tweak"}, HasSubstr("no argument supplied for '--tweak'")},
+    {{"--tweak", "window-size", "fail"},
+     HasSubstr("tweak must be of the form <name>=<value>")},
+    {{"--tweak", "window-size="},
+     HasSubstr("tweak must be of the form <name>=<value>")},
+    {{"--tweak", "play-on-startup="},
+     HasSubstr("tweak must be of the form <name>=<value>")},
 };
 
 INSTANTIATE_TEST_SUITE_P(Partials, ParseFailureTest, ValuesIn(partial_cases));
@@ -233,9 +269,23 @@ INSTANTIATE_TEST_SUITE_P(Partials, ParseFailureTest, ValuesIn(partial_cases));
 std::vector<ParseFailureParam> strtou_cases = {
     {{"--only", "0x5.0"}, MatchesRegex("couldn't convert .* '0x5\\.0'")},
     {{"--queue-buffer", "20U"}, MatchesRegex("couldn't convert .* '20U'")},
+    {{"--tweak", "window-size=20=x"},
+     MatchesRegex("couldn't convert .* '20=x'")},
 };
 
 INSTANTIATE_TEST_SUITE_P(BadStrtou, ParseFailureTest, ValuesIn(strtou_cases));
+
+std::vector<ParseFailureParam> constraint_cases = {
+    {{"--tweak", "window-size=0"},
+     HasSubstr("window-size must be >= 1 (0 given)")},
+    {{"--tweak", "window-size=-2"},
+     HasSubstr("window-size must be >= 1 (-2 given)")},
+    {{"--tweak", "play-on-startup=2"},
+     HasSubstr("play-on-startup must be a boolean value ('2' given)")},
+};
+
+INSTANTIATE_TEST_SUITE_P(Constraint, ParseFailureTest,
+                         ValuesIn(constraint_cases));
 
 TEST(ParseTest, TestOption) {
     fake::TagParser tagger;
