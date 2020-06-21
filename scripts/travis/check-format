@@ -31,7 +31,7 @@ function check_c() {
 while read F; do
     if test -z "$F"; then continue; fi
     case "$F" in
-        *.c|*.h)
+        *.c|*.cc|*.h)
             check_c "$F"
             ;;
         *.go)
