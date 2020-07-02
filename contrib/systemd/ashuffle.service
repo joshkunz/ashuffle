@@ -1,0 +1,10 @@
+[Unit]
+Description=Shuffle service for mpd
+Requires=mpd.service
+After=mpd.service
+
+[Service]
+ExecStart=/usr/bin/ashuffle --tweak play-on-startup=no
+
+[Install]
+WantedBy=default.target
