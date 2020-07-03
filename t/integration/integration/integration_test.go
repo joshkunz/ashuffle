@@ -19,11 +19,17 @@ import (
 	"ashuffle/testmpd"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/joshkunz/fakelib/filesystem"
+	"github.com/joshkunz/fakelib/library"
 	"github.com/montanaflynn/stats"
 	"golang.org/x/sync/semaphore"
 )
 
-const ashuffleBin = "/ashuffle/build/ashuffle"
+const (
+	ashuffleBin = "/ashuffle/build/ashuffle"
+
+	goldMP3 = "/music.huge/gold.mp3"
+)
 
 const (
 	// must be less than waitMax
@@ -113,6 +119,15 @@ func run(ctx context.Context, t *testing.T, opts runOptions) (*testashuffle.Ashu
 	return as, mpd, cleanup
 }
 
+func newLibrary() (*library.Library, error) {
+	goldF, err := os.Open(goldMP3)
+	if err != nil {
+		return nil, err
+	}
+
+	return library.New(goldF)
+}
+
 func TestMain(m *testing.M) {
 	// compile ashuffle
 	origDir, err := os.Getwd()
@@ -141,10 +156,28 @@ func TestMain(m *testing.M) {
 	}
 
 	if err := os.Chdir(origDir); err != nil {
-		log.Fatalf("failed to rest workdir: %v", err)
+		log.Fatalf("failed to reset workdir: %v", err)
 	}
 
-	os.Exit(m.Run())
+	lib, err := newLibrary()
+	if err != nil {
+		log.Fatalf("failed to create new library: %v", err)
+	}
+	lib.Tracks = 20_000
+
+	if err := os.Mkdir("/music.20k", os.ModePerm); err != nil {
+		log.Fatalf("failed to create /music.20k: %v", err)
+	}
+
+	srv, err := filesystem.Mount(lib, "/music.20k", nil)
+	if err != nil {
+		log.Fatalf("failed to mount library: %v", err)
+	}
+
+	ret := m.Run()
+
+	srv.Unmount()
+	os.Exit(ret)
 }
 
 // Basic test, just to make sure we can start MPD and ashuffle.
@@ -342,58 +375,54 @@ func TestFromFile(t *testing.T) {
 		},
 		{
 			desc:    "By Album",
-			library: "/music.huge",
+			library: "/music.20k",
 			flags:   []string{"--by-album"},
 			input: []string{
-				"A/A-A/A-A-A.mp3",
-				"A/A-A/A-A-B.mp3",
-				"A/A-A/A-A-C.mp3",
-				"A/A-A/A-A-D.mp3",
-				"A/A-A/A-A-E.mp3",
-				"A/A-A/A-A-F.mp3",
-				"A/A-A/A-A-G.mp3",
-				"A/A-A/A-A-H.mp3",
-				"A/A-A/A-A-I.mp3",
-				"A/A-A/A-A-J.mp3",
-				"A/A-A/A-A-K.mp3",
-				"A/A-B/A-B-A.mp3",
-				"A/A-B/A-B-B.mp3",
-				"A/A-B/A-B-C.mp3",
-				"A/A-B/A-B-D.mp3",
-				"A/A-B/A-B-E.mp3",
-				"A/A-B/A-B-F.mp3",
-				"A/A-B/A-B-G.mp3",
-				"A/A-B/A-B-H.mp3",
-				"A/A-B/A-B-I.mp3",
-				"A/A-B/A-B-J.mp3",
-				"A/A-B/A-B-K.mp3",
+				"A/A/A.mp3",
+				"A/A/B.mp3",
+				"A/A/C.mp3",
+				"A/A/D.mp3",
+				"A/A/E.mp3",
+				"A/A/F.mp3",
+				"A/A/G.mp3",
+				"A/A/H.mp3",
+				"A/A/I.mp3",
+				"A/A/J.mp3",
+				"A/B/A.mp3",
+				"A/B/B.mp3",
+				"A/B/C.mp3",
+				"A/B/D.mp3",
+				"A/B/E.mp3",
+				"A/B/F.mp3",
+				"A/B/G.mp3",
+				"A/B/H.mp3",
+				"A/B/I.mp3",
+				"A/B/J.mp3",
 			},
 			want: Groups{
 				{
-					"A/A-A/A-A-A.mp3",
-					"A/A-A/A-A-B.mp3",
-					"A/A-A/A-A-C.mp3",
-					"A/A-A/A-A-D.mp3",
-					"A/A-A/A-A-E.mp3",
-					"A/A-A/A-A-F.mp3",
-					"A/A-A/A-A-G.mp3",
-					"A/A-A/A-A-H.mp3",
-					"A/A-A/A-A-I.mp3",
-					"A/A-A/A-A-J.mp3",
-					"A/A-A/A-A-K.mp3",
+					"A/A/A.mp3",
+					"A/A/B.mp3",
+					"A/A/C.mp3",
+					"A/A/D.mp3",
+					"A/A/E.mp3",
+					"A/A/F.mp3",
+					"A/A/G.mp3",
+					"A/A/H.mp3",
+					"A/A/I.mp3",
+					"A/A/J.mp3",
 				},
 				{
-					"A/A-B/A-B-A.mp3",
-					"A/A-B/A-B-B.mp3",
-					"A/A-B/A-B-C.mp3",
-					"A/A-B/A-B-D.mp3",
-					"A/A-B/A-B-E.mp3",
-					"A/A-B/A-B-F.mp3",
-					"A/A-B/A-B-G.mp3",
-					"A/A-B/A-B-H.mp3",
-					"A/A-B/A-B-I.mp3",
-					"A/A-B/A-B-J.mp3",
-					"A/A-B/A-B-K.mp3",
+					"A/B/A.mp3",
+					"A/B/B.mp3",
+					"A/B/C.mp3",
+					"A/B/D.mp3",
+					"A/B/E.mp3",
+					"A/B/F.mp3",
+					"A/B/G.mp3",
+					"A/B/H.mp3",
+					"A/B/I.mp3",
+					"A/B/J.mp3",
 				},
 			},
 		},
@@ -533,9 +562,16 @@ func TestFastStartup(t *testing.T) {
 	// to avoid CPU or I/O starvation from other tests.
 	ctx := context.Background()
 
+	max := func(a, b int) int {
+		if a > b {
+			return a
+		}
+		return b
+	}
+
 	// Parallelism controls the number of parallel startup tests that are
 	// allowed to run at once.
-	parallelism := runtime.NumCPU()
+	parallelism := max(1, runtime.NumCPU()/4)
 	// Trials controls the number of startup time samples that will be
 	// collected.
 	trials := 50
@@ -548,7 +584,7 @@ func TestFastStartup(t *testing.T) {
 	// Start up MPD and read out the DB, so we can build a file list for the
 	// "from file" test. We will immediately shut down this instance, because
 	// we only need it to fetch the DB.
-	mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: "/music.huge"})
+	mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: "/music.20k"})
 	if err != nil {
 		t.Fatalf("failed to create new MPD instance: %v", err)
 	}
@@ -594,7 +630,7 @@ func TestFastStartup(t *testing.T) {
 				defer wg.Done()
 				defer sem.Release(1)
 
-				mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: "/music.huge"})
+				mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: "/music.20k"})
 				if err != nil {
 					t.Fatalf("failed to create new MPD instance: %v", err)
 				}

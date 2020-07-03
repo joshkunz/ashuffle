@@ -20,4 +20,4 @@ while test $# -gt 0; do
 done
 
 ./scripts/build-test-image --image-tag "${tagname}" "${extra[@]}" || die "couldn't build test image"
-exec docker run --name "ashuffle_integration_run_${run_id}" --rm $tty -i "${tagname}"
+exec docker run --name "ashuffle_integration_run_${run_id}" --privileged --device /dev/fuse:/dev/fuse --rm $tty -i "${tagname}"
