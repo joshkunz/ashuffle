@@ -1,4 +1,5 @@
-package ashuffle
+// Package testashuffle provides helpers for creating test ashuffle runs.
+package testashuffle
 
 import (
 	"bytes"

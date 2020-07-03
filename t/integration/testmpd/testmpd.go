@@ -1,4 +1,6 @@
-package mpd
+// Package testmpd provides helpers for starting and examining test MPD
+// instances.
+package testmpd
 
 import (
 	"bytes"
@@ -103,9 +105,9 @@ func (m Options) Build(rootDir string) (string, string) {
 	return confFile.String(), filepath.Join(rootDir, "socket")
 }
 
-// Instance is the type of an MPD instance. It can be constructed with mpd.New,
+// MPD is the type of an MPD instance. It can be constructed with New,
 // and controlled with the various member methods.
-type Instance struct {
+type MPD struct {
 	// Addr is the UNIX socket this MPD instance is listening on.
 	Addr string
 
@@ -127,65 +129,65 @@ type Instance struct {
 }
 
 // Address returns `i.Addr` as the host, and an empty port.
-func (i Instance) Address() (string, string) {
-	return i.Addr, ""
+func (m MPD) Address() (string, string) {
+	return m.Addr, ""
 }
 
 // Shutdown shuts down this MPD instance, and cleans up associated data.
-func (i *Instance) Shutdown() error {
-	defer i.root.cleanup()
-	i.cli.Close()
-	i.cancelFunc()
-	return i.cmd.Wait()
+func (m *MPD) Shutdown() error {
+	defer m.root.cleanup()
+	m.cli.Close()
+	m.cancelFunc()
+	return m.cmd.Wait()
 }
 
 // IsOk returns true if there have been no errors on this instance. You can
-// use Instance.Errors to see any errors that have occured.
-func (i *Instance) IsOk() bool {
-	return len(i.Errors) == 0
+// use MPD.Errors to see any errors that have occured.
+func (m *MPD) IsOk() bool {
+	return len(m.Errors) == 0
 }
 
-func (i *Instance) maybeErr(err error) {
+func (m *MPD) maybeErr(err error) {
 	if err != nil {
-		i.Errors = append(i.Errors, err)
+		m.Errors = append(m.Errors, err)
 	}
 }
 
 // Play plays the song in the current position in the MPD queue.
-func (i *Instance) Play() {
-	i.maybeErr(i.cli.Pause(false))
+func (m *MPD) Play() {
+	m.maybeErr(m.cli.Pause(false))
 }
 
 // Pause pauses the currently playing song.
-func (i *Instance) Pause() {
-	i.maybeErr(i.cli.Pause(true))
+func (m *MPD) Pause() {
+	m.maybeErr(m.cli.Pause(true))
 }
 
 // Next skips the current song.
-func (i *Instance) Next() {
-	i.maybeErr(i.cli.Next())
+func (m *MPD) Next() {
+	m.maybeErr(m.cli.Next())
 }
 
 // Prev goes back to the previous song.
-func (i *Instance) Prev() {
-	i.maybeErr(i.cli.Previous())
+func (m *MPD) Prev() {
+	m.maybeErr(m.cli.Previous())
 }
 
 // Db returns a list of all URIs in this MPD instance's database.
-func (i *Instance) Db() []string {
-	res, err := i.cli.GetFiles()
+func (m *MPD) Db() []string {
+	res, err := m.cli.GetFiles()
 	if err != nil {
-		i.Errors = append(i.Errors, err)
+		m.Errors = append(m.Errors, err)
 		return nil
 	}
 	return res
 }
 
 // Queue returns an array of the songs currently in the queue.
-func (i *Instance) Queue() []string {
-	attrs, err := i.cli.PlaylistInfo(-1, -1)
+func (m *MPD) Queue() []string {
+	attrs, err := m.cli.PlaylistInfo(-1, -1)
 	if err != nil {
-		i.Errors = append(i.Errors, err)
+		m.Errors = append(m.Errors, err)
 		return nil
 	}
 	var result []string
@@ -195,15 +197,15 @@ func (i *Instance) Queue() []string {
 	return result
 }
 
-func (i *Instance) QueuePos() int64 {
-	attrs, err := i.cli.Status()
+func (m *MPD) QueuePos() int64 {
+	attrs, err := m.cli.Status()
 	if err != nil {
-		i.Errors = append(i.Errors, err)
+		m.Errors = append(m.Errors, err)
 		return -1
 	}
 	res, err := strconv.ParseInt(attrs["song"], 10, 64)
 	if err != nil {
-		i.Errors = append(i.Errors, err)
+		m.Errors = append(m.Errors, err)
 		return -1
 	}
 	return res
@@ -218,10 +220,10 @@ const (
 	StateStop    = State("stop")
 )
 
-func (i *Instance) PlayState() State {
-	attr, err := i.cli.Status()
+func (m *MPD) PlayState() State {
+	attr, err := m.cli.Status()
 	if err != nil {
-		i.Errors = append(i.Errors, err)
+		m.Errors = append(m.Errors, err)
 		return StateUnknown
 	}
 	switch attr["state"] {
@@ -272,7 +274,7 @@ func buildRoot(opts *Options) (*root, error) {
 // New creates a new MPD instance with the given options. If `opts' is nil,
 // then default options will be used. If a new MPD instance cannot be created,
 // an error is returned.
-func New(ctx context.Context, opts *Options) (*Instance, error) {
+func New(ctx context.Context, opts *Options) (*MPD, error) {
 	root, err := buildRoot(opts)
 	if err != nil {
 		return nil, err
@@ -340,7 +342,7 @@ func New(ctx context.Context, opts *Options) (*Instance, error) {
 		return nil, fmt.Errorf("failed to wait for MPD db to update: %v", err)
 	}
 
-	return &Instance{
+	return &MPD{
 		Addr:   root.socket,
 		Stdout: &stdout,
 		Stderr: &stderr,
