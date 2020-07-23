@@ -15,15 +15,23 @@ import (
 	"testing"
 	"time"
 
-	"ashuffle/ashuffle"
-	"ashuffle/mpd"
+	"ashuffle/testashuffle"
+	"ashuffle/testmpd"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/joshkunz/fakelib/filesystem"
+	"github.com/joshkunz/fakelib/library"
+	"github.com/joshkunz/massif"
+	"github.com/martinlindhe/unit"
 	"github.com/montanaflynn/stats"
 	"golang.org/x/sync/semaphore"
 )
 
-const ashuffleBin = "/ashuffle/build/ashuffle"
+const (
+	ashuffleBin = "/ashuffle/build/ashuffle"
+
+	goldMP3 = "/music.huge/gold.mp3"
+)
 
 const (
 	// must be less than waitMax
@@ -31,10 +39,6 @@ const (
 	// 100ms, because we want ashuffle operations to be imperceptible.
 	waitMax = 100 * time.Millisecond
 )
-
-func panicf(format string, params ...interface{}) {
-	panic(fmt.Sprintf(format, params...))
-}
 
 // Optimistically wait for some condition to be true. Sometimes, we need to
 // wait for ashuffle to perform some action, and since this is a test, it
@@ -86,23 +90,63 @@ func writeLines(lines []string) (linesFile, error) {
 	return linesFile{inputF}, nil
 }
 
+type runOptions struct {
+	Library      string
+	AshuffleArgs []string
+}
+
+func run(ctx context.Context, t *testing.T, opts runOptions) (*testashuffle.Ashuffle, *testmpd.MPD, func()) {
+	t.Helper()
+	if opts.Library == "" {
+		opts.Library = "/music"
+	}
+	mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: opts.Library})
+	if err != nil {
+		t.Fatalf("failed to create new MPD instance: %v", err)
+	}
+	as, err := testashuffle.New(ctx, ashuffleBin, &testashuffle.Options{
+		MPDAddress: mpd,
+		Args:       opts.AshuffleArgs,
+	})
+	if err != nil {
+		t.Fatalf("failed to start ashuffle with args %+v: %v", opts.AshuffleArgs, err)
+	}
+	cleanup := func() {
+		if !mpd.IsOk() {
+			t.Errorf("mpd communication error: %+v", mpd.Errors)
+		}
+
+		mpd.Shutdown()
+	}
+	return as, mpd, cleanup
+}
+
+func newLibrary() (*library.Library, error) {
+	goldF, err := os.Open(goldMP3)
+	if err != nil {
+		return nil, err
+	}
+
+	return library.New(goldF)
+}
+
 func TestMain(m *testing.M) {
 	// compile ashuffle
 	origDir, err := os.Getwd()
 	if err != nil {
-		panicf("failed to getcwd: %v", err)
+		log.Fatalf("failed to getcwd: %v", err)
 	}
 
 	if err := os.Chdir("/ashuffle"); err != nil {
-		panicf("failed to chdir to /ashuffle: %v", err)
+		log.Fatalf("failed to chdir to /ashuffle: %v", err)
 	}
 
 	fmt.Println("===> Running MESON")
-	mesonCmd := exec.Command("meson", "build")
+	mesonCmd := exec.Command("meson", "--buildtype=debugoptimized", "build")
 	mesonCmd.Stdout = os.Stdout
 	mesonCmd.Stderr = os.Stderr
 	if err := mesonCmd.Run(); err != nil {
-		panicf("failed to run meson for ashuffle: %v", err)
+		log.Fatalf("failed to run meson for ashuffle: %v", err)
 	}
 
 	fmt.Println("===> Building ashuffle")
@@ -110,26 +154,44 @@ func TestMain(m *testing.M) {
 	ninjaCmd.Stdout = os.Stdout
 	ninjaCmd.Stderr = os.Stderr
 	if err := ninjaCmd.Run(); err != nil {
-		panicf("failed to build ashuffle: %v", err)
+		log.Fatalf("failed to build ashuffle: %v", err)
 	}
 
 	if err := os.Chdir(origDir); err != nil {
-		panicf("failed to rest workdir: %v", err)
+		log.Fatalf("failed to reset workdir: %v", err)
 	}
 
-	os.Exit(m.Run())
+	lib, err := newLibrary()
+	if err != nil {
+		log.Fatalf("failed to create new library: %v", err)
+	}
+	lib.Tracks = 20_000
+
+	if err := os.Mkdir("/music.20k", os.ModePerm); err != nil {
+		log.Fatalf("failed to create /music.20k: %v", err)
+	}
+
+	srv, err := filesystem.Mount(lib, "/music.20k", nil)
+	if err != nil {
+		log.Fatalf("failed to mount library: %v", err)
+	}
+
+	ret := m.Run()
+
+	srv.Unmount()
+	os.Exit(ret)
 }
 
 // Basic test, just to make sure we can start MPD and ashuffle.
 func TestStartup(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music"})
+	mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: "/music"})
 	if err != nil {
 		t.Fatalf("Failed to create new MPD instance: %v", err)
 	}
-	ashuffle, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
-		MPDAddress: mpdi,
+	ashuffle, err := testashuffle.New(ctx, ashuffleBin, &testashuffle.Options{
+		MPDAddress: mpd,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create new ashuffle instance")
@@ -138,7 +200,7 @@ func TestStartup(t *testing.T) {
 	if err := ashuffle.Shutdown(); err != nil {
 		t.Errorf("ashuffle did not shut down cleanly: %v", err)
 	}
-	mpdi.Shutdown()
+	mpd.Shutdown()
 }
 
 func TestStartupFail(t *testing.T) {
@@ -147,7 +209,7 @@ func TestStartupFail(t *testing.T) {
 
 	tests := []struct {
 		desc               string
-		options            *ashuffle.Options
+		options            *testashuffle.Options
 		wantStderrContains string
 	}{
 		{
@@ -156,18 +218,18 @@ func TestStartupFail(t *testing.T) {
 		},
 		{
 			desc:               "Group by and no-check",
-			options:            &ashuffle.Options{Args: []string{"-g", "album", "--no-check"}},
+			options:            &testashuffle.Options{Args: []string{"-g", "album", "--no-check"}},
 			wantStderrContains: "group-by not supported with no-check",
 		},
 	}
 
 	for _, test := range tests {
-		as, err := ashuffle.New(ctx, ashuffleBin, test.options)
+		as, err := testashuffle.New(ctx, ashuffleBin, test.options)
 		if err != nil {
 			t.Errorf("failed to start ashuffle: %v", err)
 			continue
 		}
-		if err := as.Shutdown(ashuffle.ShutdownSoft); err == nil {
+		if err := as.Shutdown(testashuffle.ShutdownSoft); err == nil {
 			t.Errorf("ashuffle shutdown cleanly, but we wanted an error: %v", err)
 		}
 		if stderr := as.Stderr.String(); !strings.Contains(stderr, test.wantStderrContains) {
@@ -180,36 +242,22 @@ func TestStartupFail(t *testing.T) {
 func TestShuffleOnce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music"})
-	if err != nil {
-		t.Fatalf("failed to create new MPD instance: %v", err)
-	}
-	as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
-		MPDAddress: mpdi,
-		Args:       []string{"-o", "3"},
-	})
-	if err != nil {
-		t.Fatalf("failed to create new ashuffle instance")
-	}
+
+	as, mpd, cleanup := run(ctx, t, runOptions{AshuffleArgs: []string{"-o", "3"}})
+	defer cleanup()
 
 	// Wait for ashuffle to exit.
-	if err := as.Shutdown(ashuffle.ShutdownSoft); err != nil {
+	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
 		t.Errorf("ashuffle did not shut down cleanly: %v", err)
 	}
 
-	if state := mpdi.PlayState(); state != mpd.StateStop {
+	if state := mpd.PlayState(); state != testmpd.StateStop {
 		t.Errorf("want mpd state stop, got: %v", state)
 	}
 
-	if queueLen := len(mpdi.Queue()); queueLen != 3 {
-		t.Errorf("want mpd queue len 3, got %d", queueLen)
+	if queueLen := len(mpd.Queue()); queueLen != 3 {
+		t.Errorf("len(mpd.Queue()) = %d, want 3", queueLen)
 	}
-
-	if !mpdi.IsOk() {
-		t.Errorf("mpd communication error: %v", mpdi.Errors)
-	}
-
-	mpdi.Shutdown()
 }
 
 // Starting up ashuffle in a clean MPD instance. The "default" workflow. Then
@@ -217,50 +265,42 @@ func TestShuffleOnce(t *testing.T) {
 func TestBasic(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music"})
-	if err != nil {
-		t.Fatalf("failed to create mpd instance: %v", err)
-	}
-	ashuffle, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
-		MPDAddress: mpdi,
-	})
+
+	as, mpd, cleanup := run(ctx, t, runOptions{})
+	defer cleanup()
 
 	// Wait for ashuffle to startup, and start playing a song.
-	tryWaitFor(func() bool { return mpdi.PlayState() == mpd.StatePlay })
+	tryWaitFor(func() bool { return mpd.PlayState() == testmpd.StatePlay })
 
-	if state := mpdi.PlayState(); state != mpd.StatePlay {
-		t.Errorf("[before skip] want mpd state play, got %v", state)
+	if state := mpd.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[before skip] mpd.PlayState() = %v, want play", state)
 	}
-	if queueLen := len(mpdi.Queue()); queueLen != 1 {
-		t.Errorf("[before skip] want mpd queue len == 1, got len %d", queueLen)
+	if queueLen := len(mpd.Queue()); queueLen != 1 {
+		t.Errorf("[before skip] len(mpd.Queue()) = %d, want 1", queueLen)
 	}
-	if pos := mpdi.QueuePos(); pos != 0 {
-		t.Errorf("[before skip] want mpd queue pos == 0, got %d", pos)
+	if pos := mpd.QueuePos(); pos != 0 {
+		t.Errorf("[before skip] mpd.QueuePos() = %d, want 0", pos)
 	}
 
 	// Skip a track, ashuffle should enqueue another song, and keep playing.
-	mpdi.Next()
+	mpd.Next()
 	// Give ashuffle some time to try and react, otherwise the test always
 	// fails.
-	tryWaitFor(func() bool { return mpdi.PlayState() == mpd.StatePlay })
+	tryWaitFor(func() bool { return mpd.PlayState() == testmpd.StatePlay })
 
-	if state := mpdi.PlayState(); state != mpd.StatePlay {
-		t.Errorf("[after skip] want mpd state play, got %v", state)
+	if state := mpd.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[after skip] mpd.PlayState() = %v, want play", state)
 	}
-	if queueLen := len(mpdi.Queue()); queueLen != 2 {
-		t.Errorf("[after skip] want mpd queue len == 2, got len %d", queueLen)
+	if queueLen := len(mpd.Queue()); queueLen != 2 {
+		t.Errorf("[after skip] len(mpd.Queue()) = %d, want 2", queueLen)
 	}
-	if pos := mpdi.QueuePos(); pos != 1 {
-		t.Errorf("[after skip] want mpd queue pos == 1, got %d", pos)
+	if pos := mpd.QueuePos(); pos != 1 {
+		t.Errorf("[after skip] mpd.QueuePos() = %d, want 1", pos)
 	}
 
-	if !mpdi.IsOk() {
-		t.Errorf("mpd communication error: %v", mpdi.Errors)
-	}
-	if err := ashuffle.Shutdown(); err != nil {
+	if err := as.Shutdown(); err != nil {
 		t.Errorf("ashuffle did not shut down cleanly: %v", err)
 	}
-	mpdi.Shutdown()
 }
 
 type Groups [][]string
@@ -337,58 +377,54 @@ func TestFromFile(t *testing.T) {
 		},
 		{
 			desc:    "By Album",
-			library: "/music.huge",
+			library: "/music.20k",
 			flags:   []string{"--by-album"},
 			input: []string{
-				"A/A-A/A-A-A.mp3",
-				"A/A-A/A-A-B.mp3",
-				"A/A-A/A-A-C.mp3",
-				"A/A-A/A-A-D.mp3",
-				"A/A-A/A-A-E.mp3",
-				"A/A-A/A-A-F.mp3",
-				"A/A-A/A-A-G.mp3",
-				"A/A-A/A-A-H.mp3",
-				"A/A-A/A-A-I.mp3",
-				"A/A-A/A-A-J.mp3",
-				"A/A-A/A-A-K.mp3",
-				"A/A-B/A-B-A.mp3",
-				"A/A-B/A-B-B.mp3",
-				"A/A-B/A-B-C.mp3",
-				"A/A-B/A-B-D.mp3",
-				"A/A-B/A-B-E.mp3",
-				"A/A-B/A-B-F.mp3",
-				"A/A-B/A-B-G.mp3",
-				"A/A-B/A-B-H.mp3",
-				"A/A-B/A-B-I.mp3",
-				"A/A-B/A-B-J.mp3",
-				"A/A-B/A-B-K.mp3",
+				"A/A/A.mp3",
+				"A/A/B.mp3",
+				"A/A/C.mp3",
+				"A/A/D.mp3",
+				"A/A/E.mp3",
+				"A/A/F.mp3",
+				"A/A/G.mp3",
+				"A/A/H.mp3",
+				"A/A/I.mp3",
+				"A/A/J.mp3",
+				"A/B/A.mp3",
+				"A/B/B.mp3",
+				"A/B/C.mp3",
+				"A/B/D.mp3",
+				"A/B/E.mp3",
+				"A/B/F.mp3",
+				"A/B/G.mp3",
+				"A/B/H.mp3",
+				"A/B/I.mp3",
+				"A/B/J.mp3",
 			},
 			want: Groups{
 				{
-					"A/A-A/A-A-A.mp3",
-					"A/A-A/A-A-B.mp3",
-					"A/A-A/A-A-C.mp3",
-					"A/A-A/A-A-D.mp3",
-					"A/A-A/A-A-E.mp3",
-					"A/A-A/A-A-F.mp3",
-					"A/A-A/A-A-G.mp3",
-					"A/A-A/A-A-H.mp3",
-					"A/A-A/A-A-I.mp3",
-					"A/A-A/A-A-J.mp3",
-					"A/A-A/A-A-K.mp3",
+					"A/A/A.mp3",
+					"A/A/B.mp3",
+					"A/A/C.mp3",
+					"A/A/D.mp3",
+					"A/A/E.mp3",
+					"A/A/F.mp3",
+					"A/A/G.mp3",
+					"A/A/H.mp3",
+					"A/A/I.mp3",
+					"A/A/J.mp3",
 				},
 				{
-					"A/A-B/A-B-A.mp3",
-					"A/A-B/A-B-B.mp3",
-					"A/A-B/A-B-C.mp3",
-					"A/A-B/A-B-D.mp3",
-					"A/A-B/A-B-E.mp3",
-					"A/A-B/A-B-F.mp3",
-					"A/A-B/A-B-G.mp3",
-					"A/A-B/A-B-H.mp3",
-					"A/A-B/A-B-I.mp3",
-					"A/A-B/A-B-J.mp3",
-					"A/A-B/A-B-K.mp3",
+					"A/B/A.mp3",
+					"A/B/B.mp3",
+					"A/B/C.mp3",
+					"A/B/D.mp3",
+					"A/B/E.mp3",
+					"A/B/F.mp3",
+					"A/B/G.mp3",
+					"A/B/H.mp3",
+					"A/B/I.mp3",
+					"A/B/J.mp3",
 				},
 			},
 		},
@@ -399,26 +435,24 @@ func TestFromFile(t *testing.T) {
 		t.Run(test.desc, func(t *testing.T) {
 			test := test
 			t.Parallel()
-			mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: test.library})
-			if err != nil {
-				t.Fatalf("failed to create mpd instance: %v", err)
-			}
-			defer mpdi.Shutdown()
 
 			linesF, err := writeLines(test.input)
 			if err != nil {
 				t.Fatalf("couldn't write db lines to file: %v", err)
 			}
 			defer linesF.Cleanup()
-			as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
-				MPDAddress: mpdi,
-				Args: append(test.flags,
+
+			as, _, cleanup := run(ctx, t, runOptions{
+				Library: test.library,
+				AshuffleArgs: append([]string{
 					"-f", linesF.Path(),
 					"--test_enable_option_do_not_use", "print_all_songs_and_exit",
-				),
+				}, test.flags...),
 			})
+			defer cleanup()
+
 			// Wait for ashuffle to exit.
-			if err := as.Shutdown(ashuffle.ShutdownSoft); err != nil {
+			if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
 				t.Errorf("ashuffle did not shut down cleanly: %v", err)
 			}
 
@@ -428,7 +462,7 @@ func TestFromFile(t *testing.T) {
 			sort.Sort(test.want)
 
 			if diff := cmp.Diff(test.want, got); diff != "" {
-				t.Errorf("shuffle songs differ, diff want got:\n%s", diff)
+				t.Errorf("shuffle songs differ (want -> got):\n%s", diff)
 			}
 		})
 	}
@@ -437,7 +471,7 @@ func TestFromFile(t *testing.T) {
 // Implements MPDAddress, wrapping the given MPDAddress with the appropriate
 // password.
 type mpdPasswordAddressWrapper struct {
-	wrap     ashuffle.MPDAddress
+	wrap     testashuffle.MPDAddress
 	password string
 }
 
@@ -450,10 +484,10 @@ func (m mpdPasswordAddressWrapper) Address() (string, string) {
 func TestPassword(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	mpdi, err := mpd.New(ctx, &mpd.Options{
+	mpd, err := testmpd.New(ctx, &testmpd.Options{
 		LibraryRoot:        "/music",
 		DefaultPermissions: []string{"read"},
-		Passwords: []mpd.Password{
+		Passwords: []testmpd.Password{
 			{
 				Password:    "super_secret_mpd_password",
 				Permissions: []string{"read", "add", "control", "admin"},
@@ -470,9 +504,9 @@ func TestPassword(t *testing.T) {
 
 	// Step 1. Create an ashuffle client with the wrong password, it should
 	// fail gracefully.
-	as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
+	as, err := testashuffle.New(ctx, ashuffleBin, &testashuffle.Options{
 		MPDAddress: mpdPasswordAddressWrapper{
-			wrap:     mpdi,
+			wrap:     mpd,
 			password: "anybody_can_see",
 		},
 	})
@@ -480,7 +514,7 @@ func TestPassword(t *testing.T) {
 		t.Fatalf("[step 1] failed to create ashuffle: %v", err)
 	}
 
-	err = as.Shutdown(ashuffle.ShutdownSoft)
+	err = as.Shutdown(testashuffle.ShutdownSoft)
 	if err == nil {
 		t.Errorf("[step 1] ashuffle shutdown cleanly, wanted error")
 	} else if eErr, ok := err.(*exec.ExitError); ok {
@@ -493,9 +527,9 @@ func TestPassword(t *testing.T) {
 
 	// Step 2. Create an ashuffle client with the correct password. It should
 	// work like the Basic test case.
-	as, err = ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
+	as, err = testashuffle.New(ctx, ashuffleBin, &testashuffle.Options{
 		MPDAddress: mpdPasswordAddressWrapper{
-			wrap:     mpdi,
+			wrap:     mpd,
 			password: "super_secret_mpd_password",
 		},
 	})
@@ -503,16 +537,21 @@ func TestPassword(t *testing.T) {
 		t.Fatalf("failed to create ashuffle instance: %v", err)
 	}
 
-	tryWaitFor(func() bool { return mpdi.PlayState() == mpd.StatePlay })
+	tryWaitFor(func() bool { return mpd.PlayState() == testmpd.StatePlay })
 
-	if state := mpdi.PlayState(); state != mpd.StatePlay {
-		t.Errorf("[step 2] want mpd state play, got %v", state)
+	if state := mpd.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[step 2] mpd.PlayState = %v, want play", state)
 	}
 
 	if err := as.Shutdown(); err != nil {
 		t.Errorf("failed to shutdown ashuffle cleanly")
 	}
-	mpdi.Shutdown()
+
+	if !mpd.IsOk() {
+		t.Errorf("mpd communication error: %+v", mpd.Errors)
+	}
+
+	mpd.Shutdown()
 }
 
 // TestFastStartup verifies that ashuffle can load the "huge" music
@@ -525,9 +564,16 @@ func TestFastStartup(t *testing.T) {
 	// to avoid CPU or I/O starvation from other tests.
 	ctx := context.Background()
 
+	max := func(a, b int) int {
+		if a > b {
+			return a
+		}
+		return b
+	}
+
 	// Parallelism controls the number of parallel startup tests that are
 	// allowed to run at once.
-	parallelism := runtime.NumCPU()
+	parallelism := max(1, runtime.NumCPU()/4)
 	// Trials controls the number of startup time samples that will be
 	// collected.
 	trials := 50
@@ -540,16 +586,16 @@ func TestFastStartup(t *testing.T) {
 	// Start up MPD and read out the DB, so we can build a file list for the
 	// "from file" test. We will immediately shut down this instance, because
 	// we only need it to fetch the DB.
-	mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music.huge"})
+	mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: "/music.20k"})
 	if err != nil {
 		t.Fatalf("failed to create new MPD instance: %v", err)
 	}
-	dbF, err := writeLines(mpdi.Db())
+	dbF, err := writeLines(mpd.Db())
 	if err != nil {
 		t.Fatalf("failed to build db file: %v", err)
 	}
 	defer dbF.Cleanup()
-	mpdi.Shutdown()
+	mpd.Shutdown()
 
 	tests := []struct {
 		name string
@@ -576,6 +622,7 @@ func TestFastStartup(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			test := test
 			sem := semaphore.NewWeighted(int64(parallelism))
 			wg := new(sync.WaitGroup)
 			ch := make(chan time.Duration)
@@ -585,28 +632,28 @@ func TestFastStartup(t *testing.T) {
 				defer wg.Done()
 				defer sem.Release(1)
 
-				mpdi, err := mpd.New(ctx, &mpd.Options{LibraryRoot: "/music.huge"})
+				mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: "/music.20k"})
 				if err != nil {
 					t.Fatalf("failed to create new MPD instance: %v", err)
 				}
-				defer mpdi.Shutdown()
+				defer mpd.Shutdown()
 
 				start := time.Now()
-				as, err := ashuffle.New(ctx, ashuffleBin, &ashuffle.Options{
-					MPDAddress: mpdi,
+				as, err := testashuffle.New(ctx, ashuffleBin, &testashuffle.Options{
+					MPDAddress: mpd,
 					Args:       test.args,
 				})
 				if err != nil {
 					t.Fatalf("failed to create new ashuffle instance")
 				}
 
-				if err := as.Shutdown(ashuffle.ShutdownSoft); err != nil {
+				if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
 					t.Fatalf("ashuffle did not shut down cleanly: %v", err)
 				}
 				ch <- time.Since(start)
 
-				if !mpdi.IsOk() {
-					t.Fatalf("mpd communication error: %v", mpdi.Errors)
+				if !mpd.IsOk() {
+					t.Fatalf("mpd communication error: %v", mpd.Errors)
 				}
 			}
 
@@ -632,6 +679,150 @@ func TestFastStartup(t *testing.T) {
 
 			if d95 := time.Duration(pct95) * time.Millisecond; d95 > threshold {
 				t.Errorf("ashuffle took %v to startup, want %v or less.", d95, threshold)
+			}
+		})
+	}
+}
+
+func peakUsage(m *massif.Massif) unit.Datasize {
+	var max unit.Datasize
+	for _, snapshot := range m.Snapshots {
+		// MemoryHeapExtra is the "overhead", any heap bytes used for tracking
+		// allocations, but not part of the allocations themselves.
+		total := snapshot.MemoryHeap + snapshot.MemoryHeapExtra
+		if total > max {
+			max = total
+		}
+	}
+	return max
+}
+
+// Tests peak memory usage when enqueuing 1k songs with libraries of different
+// sizes. Memory usage is measured by running `ashuffle` under `massif`, part
+// of the Valgrind suite of tools. The most significant contributor to
+// ashuffle's memory usage by far is the in-memory list of tracks that need
+// to be shuffled. The measured memory should be roughly equivalent to the
+// maximum memory ashuffle will use over its runtime.
+//
+// Each ashuffle instance is run against a real MPD instance. `fakelib` is used
+// to generate extremely large libraries.
+func TestMaxMemoryUsage(t *testing.T) {
+	// No t.Parallel(), this is a performance test.
+	ctx := context.Background()
+
+	// The mean URI length in my personal music library.
+	observedPathLength := 71
+
+	cases := []struct {
+		name          string
+		librarySetup  func(*library.Library)
+		wantMaxMemory unit.Datasize
+		// Larger MPD buffers, and longer timeouts are needed when working with
+		// very large libraries.
+		mpdMaxOutputBufferSize  unit.Datasize
+		mpdUpdateDBTimeout      time.Duration
+		ashuffleShutdownTimeout time.Duration
+	}{
+		{
+			name: "realistic (30k tracks with realistic path length)",
+			librarySetup: func(lib *library.Library) {
+				lib.Tracks = 30_000
+				lib.MinPathLength = observedPathLength * 2
+			},
+			wantMaxMemory:           25 * unit.Mebibyte,
+			mpdMaxOutputBufferSize:  30 * unit.Mebibyte,
+			mpdUpdateDBTimeout:      20 * time.Second,
+			ashuffleShutdownTimeout: 15 * time.Second,
+		},
+		{
+			name: "massive (500k tracks with realistic path length)",
+			librarySetup: func(lib *library.Library) {
+				lib.Tracks = 500_000
+				lib.MinPathLength = observedPathLength * 2
+			},
+			wantMaxMemory:           250 * unit.Mebibyte,
+			mpdMaxOutputBufferSize:  500 * unit.Mebibyte,
+			mpdUpdateDBTimeout:      10 * time.Minute,
+			ashuffleShutdownTimeout: 2 * time.Minute,
+		},
+		{
+			name: "worst case (500k tracks with long paths)",
+			librarySetup: func(lib *library.Library) {
+				lib.Tracks = 500_000
+				lib.MinPathLength = 500
+			},
+			wantMaxMemory:           512 * unit.Mebibyte,
+			mpdMaxOutputBufferSize:  6 * unit.Gibibyte,
+			mpdUpdateDBTimeout:      10 * time.Minute,
+			ashuffleShutdownTimeout: 2 * time.Minute,
+		},
+	}
+
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			lib, err := newLibrary()
+			if err != nil {
+				t.Fatalf("failed to create new library: %v", err)
+			}
+			test.librarySetup(lib)
+
+			libDir, err := ioutil.TempDir("", "ashuffle.max-memory-usage")
+			if err != nil {
+				t.Fatalf("failed to create library dir: %v", err)
+			}
+
+			srv, err := filesystem.Mount(lib, libDir, nil)
+			if err != nil {
+				t.Fatalf("failed to mount fake library: %v", err)
+			}
+			defer func() {
+				srv.Unmount()
+				os.Remove(libDir)
+			}()
+
+			mpdOpts := &testmpd.Options{LibraryRoot: libDir}
+			if test.mpdMaxOutputBufferSize != 0.0 {
+				mpdOpts.MaxOutputBufferSize = test.mpdMaxOutputBufferSize
+			}
+			if test.mpdUpdateDBTimeout != 0 {
+				mpdOpts.UpdateDBTimeout = test.mpdUpdateDBTimeout
+			}
+			mpd, err := testmpd.New(ctx, mpdOpts)
+			if err != nil {
+				t.Fatalf("failed to create new MPD instance: %v", err)
+			}
+
+			asOpts := &testashuffle.Options{
+				MPDAddress:        mpd,
+				Args:              []string{"--only", "1000"},
+				EnableHeapProfile: true,
+			}
+			if test.ashuffleShutdownTimeout != 0 {
+				asOpts.ShutdownTimeout = test.ashuffleShutdownTimeout
+			}
+
+			as, err := testashuffle.New(ctx, ashuffleBin, asOpts)
+			if err != nil {
+				t.Fatalf("failed to create new ashuffle instance")
+			}
+
+			if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
+				t.Logf("stderr:\n%s", as.Stderr)
+				t.Logf("MPD stderr:\n%s", mpd.Stderr)
+				t.Logf("MPD stdout:\n%s", mpd.Stdout)
+				t.Fatalf("ashuffle did not shut down cleanly: %v", err)
+			}
+
+			profile, err := as.HeapProfile()
+			if err != nil {
+				t.Fatalf("failed to read heap profile: %v", err)
+			}
+
+			memPeak := peakUsage(profile)
+
+			t.Logf("Max memory usage: %.2f MiBs", memPeak.Mebibytes())
+			if memPeak > test.wantMaxMemory {
+				t.Errorf("ashuffle max memory usage %.2f MiB, want <= %.2f MiBs", memPeak.Mebibytes(), test.wantMaxMemory.Mebibytes())
 			}
 		})
 	}

@@ -2,9 +2,7 @@
 
 . "scripts/travis/common.sh"
 
-sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y && \
-    sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y clang-format-9 \
-    || die "failed to update clang-format-9"
+setup
 
 CLANG_FORMAT=clang-format-9
 
@@ -27,6 +25,7 @@ function check_c() {
 }
 
 "${CLANG_FORMAT}" --version
+go version
 
 while read F; do
     if test -z "$F"; then continue; fi
