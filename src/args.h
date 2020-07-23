@@ -48,6 +48,8 @@ class Options {
         // Otherwise, ashuffle will wait for an MPD event before playing
         // music.
         bool play_on_startup = true;
+        // Number of milliseconds to wait before suspend/resume.
+        int suspend_timeout = 0;
     } tweak = {};
     std::vector<enum mpd_tag_type> group_by = {};
 
