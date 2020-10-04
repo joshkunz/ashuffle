@@ -113,13 +113,14 @@ int main(int argc, const char* argv[]) {
     if (options.queue_only) {
         size_t number_of_songs{};
         for (unsigned i = 0; i < options.queue_only; i++) {
-            auto &picked_songs = songs.Pick();
+            auto& picked_songs = songs.Pick();
             number_of_songs += picked_songs.size();
             mpd->Add(picked_songs);
         }
 
         /* print number of songs or groups (and songs) added */
-        std::cout << absl::StrFormat("Added %u %s%s", options.queue_only,
+        std::cout << absl::StrFormat(
+            "Added %u %s%s", options.queue_only,
             options.group_by.empty() ? "song" : "group",
             options.queue_only > 1 ? "s" : "");
         if (!options.group_by.empty()) {
