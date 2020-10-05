@@ -111,7 +111,7 @@ int main(int argc, const char* argv[]) {
 
     /* do the main action */
     if (options.queue_only) {
-        size_t number_of_songs{};
+        size_t number_of_songs;
         for (unsigned i = 0; i < options.queue_only; i++) {
             auto& picked_songs = songs.Pick();
             number_of_songs += picked_songs.size();
@@ -127,7 +127,6 @@ int main(int argc, const char* argv[]) {
             std::cout << absl::StrFormat(" (%u songs)", number_of_songs);
         }
         std::cout << "." << std::endl;
-
     } else {
         Loop(mpd.get(), &songs, options);
     }
