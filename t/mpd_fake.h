@@ -156,12 +156,6 @@ class MPD : public mpd::MPD {
 
     std::unique_ptr<mpd::SongReader> ListAll() override;
 
-    // state: Play, Pause, PlayAt, GetStatus
-    // DB: ListAll, Search, Add
-    // ?? idle, maybe a callback?
-    // Queue: Add, GetStatus
-    // password/auth: CheckCommandsAllowed, ApplyPassword
-
     void Pause() override {
         dbg() << "call:Play" << std::endl;
         state.playing = false;

@@ -172,7 +172,7 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
             if (options.tweak.suspend_timeout != absl::ZeroDuration()) {
                 std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
                 if (status->QueueLength() == 0) {
-                    absl::SleepFor(options.tweak.suspend_timeout);
+                    test_d.sleep_f(options.tweak.suspend_timeout);
                     status = mpd->CurrentStatus();
                     active = status->QueueLength() == 0;
                 }

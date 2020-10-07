@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <absl/time/clock.h>
+#include <absl/time/time.h>
 #include <mpd/client.h>
 
 #include "args.h"
@@ -24,6 +26,7 @@ std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer& d, const Options& options,
 
 struct TestDelegate {
     bool (*until_f)() = nullptr;
+    std::function<void(absl::Duration)> sleep_f = absl::SleepFor;
 };
 
 // Use the MPD `idle` command to queue songs random songs when the current
