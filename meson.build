@@ -20,6 +20,11 @@ absl_libs = [
   # Via Hash:
   'absl_hash',
   'absl_city',
+
+  # Via Time:
+  'absl_time',
+  'absl_base',
+  'absl_spinlock_wait',
 ]
 
 absl_deps = []

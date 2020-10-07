@@ -8,6 +8,8 @@
 #include <variant>
 #include <vector>
 
+#include <absl/time/time.h>
+
 #include "mpd.h"
 #include "rule.h"
 
@@ -48,8 +50,8 @@ class Options {
         // Otherwise, ashuffle will wait for an MPD event before playing
         // music.
         bool play_on_startup = true;
-        // Number of milliseconds to wait before suspend/resume.
-        int suspend_timeout = 0;
+        // Duration to wait before checking queue length for suspend/resume.
+        absl::Duration suspend_timeout = absl::ZeroDuration();
     } tweak = {};
     std::vector<enum mpd_tag_type> group_by = {};
 

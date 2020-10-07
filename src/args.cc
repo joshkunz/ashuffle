@@ -243,13 +243,16 @@ std::variant<Parser::State, ParseError> Parser::ParseTweak(
     }
 
     if (key == "suspend-timeout") {
-        if (!absl::SimpleAtoi(value, &opts_.tweak.suspend_timeout)) {
-            return ParseError(absl::StrFormat(
-                "couldn't convert suspend-timeout value '%s'", value));
+        if (!absl::ParseDuration(value, &opts_.tweak.suspend_timeout)) {
+            return ParseError(
+                absl::StrFormat("suspend-timeout must be a duration with units "
+                                "e.g., 250ms ('%s' given)",
+                                value));
         }
-        if (opts_.tweak.suspend_timeout < 1 || 5000 < opts_.tweak.suspend_timeout) {
+        if (opts_.tweak.suspend_timeout < absl::ZeroDuration()) {
             return ParseError(absl::StrFormat(
-                "tweak suspend-timeout must be between 1 and 5000 (%s given)", value));
+                "suspend-timeout must be a positive duration ('%s' given)",
+                value));
         }
         return kNone;
     }
