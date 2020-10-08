@@ -155,6 +155,7 @@ tweaks, and their meanings:
 | ---- | ------ | ------- | ----------- |
 | `window-size` | Integer `>=1` | `7` | Sets the size of the "window" used for the shuffle algorithm. See the section on the [shuffle algorithm](#shuffle-algorithm) for more details. In-short: Lower numbers mean more frequent repeats, and higher numbers mean less frequent repeats. |
 | `play-on-startup` | Boolean | `yes` | If set to a true value, ashuffle starts playing music if MPD is paused, stopped, or the queue is empty on startup. If set to false, then ashuffle will not enqueue any music until a song is enqueued for the first time. |
+| `suspend-timeout` | Duration `> 0` | `0ms` | Enables "suspend" mode, which may be useful to users that use ashuffe in a workflow where they clear their queue. In this mode, if the queue is cleared while ashuffle is running, ashuffle will wait for `suspend-timeout`. If songs were added to the queue during that period of time (i.e., the queue is no longer empty), then ashuffle suspends itself, and will not add any songs to the queue (even if the queue runs out) until the queue is cleared again, at which point normal operations resume. This was add to support use-cases like the one given in issue #13, where a music player had a "play album" mode that would clear the queue, and then play an album. See below for the duration format. |
 
 Value types:
 
@@ -162,6 +163,7 @@ Value types:
 | ---- | -------------- |
 | Integer | An integral number, like `-1`, `0`, or `15`. |
 | Boolean | The strings `on`, `true`, `yes` or `1` mean "true" or "enable", and the strings `off`, `false`, `no`, or `0` mean "false" or "disable". |
+| Duration | A duration of time that can be parsed by [Abseil's `ParseDuration`](https://github.com/abseil/abseil-cpp/blob/c678d6c6bf70d47b4aa5bc3576a3a769775bc162/absl/time/time.h#L548). The general format is `<number><unit>`. `<number>` can be floating point, and negative. `<unit>` is whatever time units Abseil supports, but the expected ones like `ms`, `s`, and `m` should work. Example: `250ms` would represent 250 milliseconds. |
 
 ## help text
 
