@@ -242,6 +242,21 @@ std::variant<Parser::State, ParseError> Parser::ParseTweak(
         return kNone;
     }
 
+    if (key == "suspend-timeout") {
+        if (!absl::ParseDuration(value, &opts_.tweak.suspend_timeout)) {
+            return ParseError(
+                absl::StrFormat("suspend-timeout must be a duration with units "
+                                "e.g., 250ms ('%s' given)",
+                                value));
+        }
+        if (opts_.tweak.suspend_timeout < absl::ZeroDuration()) {
+            return ParseError(absl::StrFormat(
+                "suspend-timeout must be a positive duration ('%s' given)",
+                value));
+        }
+        return kNone;
+    }
+
     return ParseError(absl::StrFormat("unrecognized tweak '%s'", arg));
 }
 

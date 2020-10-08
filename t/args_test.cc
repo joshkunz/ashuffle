@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 
+#include <absl/time/time.h>
 #include <mpd/tag.h>
 
 #include "args.h"
@@ -44,6 +45,7 @@ TEST(ParseTest, Empty) {
     EXPECT_TRUE(opts.group_by.empty());
     EXPECT_EQ(opts.tweak.window_size, 7);
     EXPECT_EQ(opts.tweak.play_on_startup, true);
+    EXPECT_EQ(opts.tweak.suspend_timeout, absl::ZeroDuration());
 }
 
 TEST(ParseTest, Short) {
@@ -194,6 +196,21 @@ TEST(ParseTest, TweakPlayOnStartup) {
     }
 }
 
+TEST(ParseTest, TweakSuspendTimeout) {
+    std::vector<std::tuple<std::string, absl::Duration>> cases = {
+        {"1s", absl::Seconds(1)},
+        {"1m", absl::Minutes(1)},
+        {"3h", absl::Hours(3)},
+        {"250ms", absl::Milliseconds(250)},
+    };
+
+    for (auto [val, want] : cases) {
+        Options opts = std::get<Options>(Options::Parse(
+            fake::TagParser(), {"--tweak", "suspend-timeout=" + val}));
+        EXPECT_EQ(opts.tweak.suspend_timeout, want) << "Case: " << val;
+    }
+}
+
 using ParseFailureParam =
     std::tuple<std::vector<std::string>, Matcher<std::string>>;
 
@@ -282,6 +299,11 @@ std::vector<ParseFailureParam> constraint_cases = {
      HasSubstr("window-size must be >= 1 (-2 given)")},
     {{"--tweak", "play-on-startup=2"},
      HasSubstr("play-on-startup must be a boolean value ('2' given)")},
+    {{"--tweak", "suspend-timeout=2"},
+     HasSubstr("suspend-timeout must be a duration with units e.g., 250ms ('2' "
+               "given)")},
+    {{"--tweak", "suspend-timeout=-1ms"},
+     HasSubstr("suspend-timeout must be a positive duration ('-1ms' given)")},
 };
 
 INSTANTIATE_TEST_SUITE_P(Constraint, ParseFailureTest,

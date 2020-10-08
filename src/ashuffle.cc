@@ -2,14 +2,18 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 
 #include <absl/strings/str_format.h>
+#include <absl/time/clock.h>
+#include <absl/time/time.h>
 #include <mpd/idle.h>
 
 #include "args.h"
@@ -149,6 +153,9 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
         TryEnqueue(mpd, songs, options);
     }
 
+    // Tracks if we should be enqueuing new songs.
+    bool active = true;
+
     // Loop forever if test delegates are not set.
     while (test_d.until_f == nullptr || test_d.until_f()) {
         /* wait till the player state changes */
@@ -162,6 +169,17 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
             std::cout << "Picking random songs out of a pool of "
                       << songs->Len() << "." << std::endl;
         } else if (events.Has(MPD_IDLE_QUEUE) || events.Has(MPD_IDLE_PLAYER)) {
+            if (options.tweak.suspend_timeout != absl::ZeroDuration()) {
+                std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
+                if (status->QueueLength() == 0) {
+                    test_d.sleep_f(options.tweak.suspend_timeout);
+                    status = mpd->CurrentStatus();
+                    active = status->QueueLength() == 0;
+                }
+            }
+            if (!active) {
+                continue;
+            }
             TryEnqueue(mpd, songs, options);
         }
     }

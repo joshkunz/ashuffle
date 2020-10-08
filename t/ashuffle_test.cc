@@ -13,6 +13,8 @@
 #include <variant>
 #include <vector>
 
+#include <absl/strings/str_join.h>
+#include <absl/time/time.h>
 #include <mpd/error.h>
 #include <mpd/idle.h>
 #include <mpd/pair.h>
@@ -29,8 +31,6 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-
-#include <absl/strings/str_join.h>
 
 using namespace ashuffle;
 
@@ -65,7 +65,7 @@ TestDelegate init_only_d = {
 
 // This delegate *only* runs the core loop logic, and it only runs the
 // logic once.
-TestDelegate loop_once_d{
+TestDelegate loop_once_d = {
     .until_f =
         [] {
             static unsigned count;
@@ -249,6 +249,48 @@ TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilledAndGrouping) {
     EXPECT_TRUE(mpd.state.playing);
     EXPECT_EQ(mpd.state.song_position, 1);
     EXPECT_THAT(mpd.Playing(), Optional(song_b));
+}
+
+TEST_F(LoopTest, Suspend) {
+    // Disable play on startup, so we can test loop behavior.
+    opts.tweak.play_on_startup = false;
+    // Doesn't matter what this is, just has to be > 0 to trigger the suspend
+    // functionality.
+    opts.tweak.suspend_timeout = absl::Milliseconds(1);
+
+    // We start with the queue empy. Normally, that would trigger us to enqueue
+    // more songs. Instead, suspend_timeout is non-zero, so we sleep
+    // (call sleep_f in the delegate), and then re-check the queue length. If
+    // the length has changed (say the user enqueued some new songs), then we
+    // want to "suspend". No songs other than the one we enqueue in sleep_f
+    // should be enqueued.
+
+    TestDelegate delegate = {
+        // Run the loop twice. That will let us verify that we're truly
+        // "deactivated".
+        .until_f =
+            [] {
+                static unsigned calls;
+                return calls++ < 2;
+            },
+        .sleep_f = [this](absl::Duration) { mpd.queue.push_back(song_b); },
+    };
+
+    Loop(&mpd, &chain, opts, delegate);
+
+    EXPECT_THAT(mpd.queue, ElementsAre(song_b));
+    EXPECT_FALSE(mpd.state.playing);
+    EXPECT_EQ(mpd.state.song_position, std::nullopt);
+
+    // Now to verify un-suspend, we clear the queue, and re-loop. That should
+    // unfreeze ashuffle, and it should enqueue another song.
+    mpd.queue.clear();
+
+    Loop(&mpd, &chain, opts, loop_once_d);
+
+    EXPECT_THAT(mpd.queue, ElementsAre(song_a));
+    EXPECT_TRUE(mpd.state.playing);
+    EXPECT_THAT(mpd.Playing(), Optional(song_a));
 }
 
 struct ConnectTestCase {
