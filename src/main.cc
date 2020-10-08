@@ -109,9 +109,8 @@ int main(int argc, const char* argv[]) {
                   << "." << std::endl;
     }
 
-    /* do the main action */
     if (options.queue_only) {
-        size_t number_of_songs;
+        size_t number_of_songs = 0;
         for (unsigned i = 0; i < options.queue_only; i++) {
             auto& picked_songs = songs.Pick();
             number_of_songs += picked_songs.size();
