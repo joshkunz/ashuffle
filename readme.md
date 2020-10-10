@@ -300,7 +300,6 @@ available for the following platforms:
 | `ashuffle.x86_64-linux-gnu` | `x86_64` |||
 | `ashuffle.aarch64-linux-gnu` | `aarch64` | `cortex-a53` | Raspberry Pi 3B+ running 64-bit OS (not RPi OS) |
 | `ashuffle.armv7h-linux-gnueabihf` | `armv7hl` | `cortex-a7` | Raspberry Pi 2B+ Running RPi OS (f.k.a. Raspbian) |
-| `ashuffle.armv6h-linux-gnueabihf` | `armv6hl` | `arm1176jzf-s` | Raspberry Pi 0/1 |
 
 Once you've downloaded the binary, it should "just work" when run
 (e.g. `$ ./ashuffle.x86_64-linux-gnu`). If they do not, please [file an
