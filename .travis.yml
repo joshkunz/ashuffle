@@ -56,12 +56,15 @@ jobs:
         - MPD_VERSION=0.20.18
         - LIBMPDCLIENT_VERSION=2.11
     - script: scripts/run-integration
-      # Based on Ubuntu 19.04 (disco)
+      # Based on Ubuntu 20.04 LTS (focal)
       env:
-        # Actual version is 0.21.4, but that does not compile with gcc-9,
-        # so we bump a minor patch.
-        - MPD_VERSION=0.21.8
-        - LIBMPDCLIENT_VERSION=2.16
+        - MPD_VERSION=0.21.20
+        - LIBMPDCLIENT_VERSION=2.18
+    - script: scripts/run-integration
+      # Based on Ubuntu 20.10 (groovy)
+      env:
+        - MPD_VERSION=0.21.22
+        - LIBMPDCLIENT_VERSION=2.19
     - stage: Release Build
       script: scripts/travis/release
     # Identical to the "Release Build" phase, but also has a deploy step.
