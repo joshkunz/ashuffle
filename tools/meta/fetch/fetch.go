@@ -8,10 +8,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	"meta/exec"
+	"meta/fileutil"
 	"meta/semver"
 	"meta/workspace"
 )
@@ -107,4 +109,66 @@ func GitLatest(url string) (semver.Version, error) {
 	})
 
 	return versions[len(versions)-1], nil
+}
+
+type ArchiveFormat int
+
+const (
+	TarGz ArchiveFormat = iota
+	TarXz
+)
+
+type RemoteArchive struct {
+	URL          string
+	SHA256       string
+	Format       ArchiveFormat
+	ExtraOptions []string
+}
+
+func (r RemoteArchive) FetchTo(dest string) error {
+	d, err := filepath.Abs(dest)
+	if err != nil {
+		return err
+	}
+
+	ws, err := workspace.New()
+	if err != nil {
+		return err
+	}
+	defer ws.Cleanup()
+
+	if err := URL(r.URL, ws.Path("archive")); err != nil {
+		return err
+	}
+
+	if err := fileutil.Verify(ws.Path("archive"), r.SHA256); err != nil {
+		return fmt.Errorf("failed to verify: %w", err)
+	}
+
+	tar := func(decompressOpt string) *exec.Cmd {
+		args := []string{
+			"-C", d,
+			decompressOpt,
+			"-xf",
+			ws.Path("archive"),
+		}
+		args = append(args, r.ExtraOptions...)
+		return exec.Command("tar", args...)
+	}
+
+	var decompress *exec.Cmd
+	switch r.Format {
+	case TarGz:
+		decompress = tar("-z")
+	case TarXz:
+		decompress = tar("-J")
+	default:
+		return fmt.Errorf("unrecognized format: %+v", r.Format)
+	}
+
+	if err := decompress.Run(); err != nil {
+		return fmt.Errorf("failed to unpack: %w", err)
+	}
+
+	return nil
 }
