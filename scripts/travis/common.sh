@@ -24,10 +24,11 @@ setup() {
     sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y && \
         sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
             clang-9 \
-            clang-tidy-9 \
             clang-format-9 \
+            clang-tidy-9 \
             cmake \
             libmpdclient-dev \
+            lld-9 \
             ninja-build \
             patchelf \
             python3 python3-pip python3-setuptools python3-wheel \

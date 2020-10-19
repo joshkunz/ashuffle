@@ -4,8 +4,11 @@
 package project
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"path"
+	"strings"
 
 	"meta/exec"
 )
@@ -189,4 +192,96 @@ func NewAutomake(dir string) (*Automake, error) {
 	return &Automake{
 		Root: dir,
 	}, nil
+}
+
+// CMakeVariables represents a collection of variables to be passed to
+// CMake (these are typically passed via -D<VAR>=<VALUE>).
+type CMakeVariables map[string]string
+
+// CMakeOptions represents CMake options for a build.
+type CMakeOptions struct {
+	// BuildDirectory is the directory where the build is run from. If unset
+	// then a "build" directory within the project root is used.
+	BuildDirectory string
+	// CCompiler and CXXCompiler are the C and C++ compiler binaries
+	// respectively.
+	CCompiler, CXXCompiler string
+	// CFlags and CXXFlags are extra C and C++ that will be passed to the
+	// C and C++ compilers respectively.
+	CFlags, CXXFlags []string
+	// Extra contains additional CMake variables that will be passed to CMake.
+	Extra CMakeVariables
+}
+
+// CMake represents a project that uses the CMake build system.
+type CMake struct {
+	Root string
+
+	opts CMakeOptions
+}
+
+// Make sure CMake implements the project interface.
+var _ Project = (*CMake)(nil)
+
+// Configure implements Project.Configure for CMake.
+func (c *CMake) Configure(prefix string) error {
+	cleanup := cd(c.opts.BuildDirectory)
+	defer cleanup()
+	cmd := exec.Command("cmake", "-GNinja")
+	if prefix != "" {
+		cmd.Args = append(cmd.Args, "-DCMAKE_INSTALL_PREFIX="+prefix)
+	}
+	if c.opts.CCompiler != "" {
+		cmd.Args = append(cmd.Args, "-DCMAKE_C_COMPILER="+c.opts.CCompiler)
+	}
+	if c.opts.CXXCompiler != "" {
+		cmd.Args = append(cmd.Args, "-DCMAKE_CXX_COMPILER="+c.opts.CXXCompiler)
+	}
+	if len(c.opts.CFlags) > 0 {
+		cmd.Args = append(cmd.Args, "-DCMAKE_C_FLAGS="+strings.Join(c.opts.CFlags, " "))
+	}
+	if len(c.opts.CXXFlags) > 0 {
+		cmd.Args = append(cmd.Args, "-DCMAKE_CXX_FLAGS="+strings.Join(c.opts.CXXFlags, " "))
+	}
+	for varname, value := range c.opts.Extra {
+		cmd.Args = append(cmd.Args, fmt.Sprintf("-D%s=%s", varname, value))
+	}
+	cmd.Args = append(cmd.Args, c.Root)
+	return cmd.Run()
+}
+
+// Build implements Project.Build for CMake.
+func (c *CMake) Build(target string) error {
+	cleanup := cd(c.opts.BuildDirectory)
+	defer cleanup()
+	cmd := exec.Command("ninja")
+	if target != "" {
+		cmd.Args = append(cmd.Args, target)
+	}
+	return cmd.Run()
+}
+
+// Install implements Project.Install for CMake.
+func (c *CMake) Install() error {
+	cleanup := cd(c.opts.BuildDirectory)
+	defer cleanup()
+	return exec.Command("ninja", "install").Run()
+}
+
+// NewCMake creates a new CMake object representing the CMake project at the
+// given directory `dir`. The optional `opts` argument can be used to control
+// the configuration of the project's build.
+func NewCMake(dir string, opts ...CMakeOptions) (*CMake, error) {
+	cmake := CMake{Root: dir}
+	if len(opts) > 0 {
+		cmake.opts = opts[0]
+	}
+	if cmake.opts.BuildDirectory == "" {
+		buildDir := path.Join(dir, "build")
+		if err := os.Mkdir(buildDir, os.ModePerm); err != nil {
+			return nil, err
+		}
+		cmake.opts.BuildDirectory = buildDir
+	}
+	return &cmake, nil
 }
