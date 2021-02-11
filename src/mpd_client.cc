@@ -207,6 +207,14 @@ void SongReaderImpl::FetchNext() {
             << "consider setting max_output_buffer_size to a higher value\n"
             << "(e.g. 32768) in your MPD config." << std::endl;
     }
+    if (err == MPD_ERROR_MALFORMED) {
+        std::cerr
+            << "libmpdclient received a malformed response from the server.\n"
+            << "This may be because a song's metadata attribute (for example,\n"
+            << "a comment) was longer than 4KiB.\n"
+            << "See https://github.com/joshkunz/ashuffle/issues/89 for\n"
+            << "details or updates." << std::endl;
+    }
     mpd_.CheckFail();
     if (raw_song == nullptr) {
         song_ = std::nullopt;
