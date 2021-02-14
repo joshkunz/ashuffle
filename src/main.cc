@@ -38,6 +38,11 @@ int main(int argc, const char* argv[]) {
         Options::ParseFromC(*mpd::client::Parser(), argv, argc);
     if (ParseError* err = std::get_if<ParseError>(&parse); err != nullptr) {
         switch (err->type) {
+            case ParseError::Type::kVersion:
+                // Don't print help in this case, since the user specifically
+                // requested we print the version.
+                std::cout << "version: Unknown" << std::endl;
+                exit(EXIT_FAILURE);
             case ParseError::Type::kUnknown:
                 std::cerr << "unknown option parsing error. Please file a bug "
                           << "at https://github.com/joshkunz/ashuffle"
@@ -49,8 +54,6 @@ int main(int argc, const char* argv[]) {
             case ParseError::Type::kGeneric:
                 std::cerr << "error: " << err->msg << std::endl;
                 break;
-            default:
-                assert(false && "unreachable");
         }
         std::cerr << DisplayHelp;
         exit(EXIT_FAILURE);
