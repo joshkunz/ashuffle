@@ -1,0 +1,8 @@
+#include "version.h"
+
+namespace ashuffle {
+
+// Filled in by Meson.
+const char* kVersion = "@VERSION@";
+
+}  // namespace ashuffle

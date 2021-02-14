@@ -15,6 +15,7 @@
 #include "load.h"
 #include "mpd_client.h"
 #include "shuffle.h"
+#include "version.h"
 
 using namespace ashuffle;
 
@@ -41,8 +42,8 @@ int main(int argc, const char* argv[]) {
             case ParseError::Type::kVersion:
                 // Don't print help in this case, since the user specifically
                 // requested we print the version.
-                std::cout << "version: Unknown" << std::endl;
-                exit(EXIT_FAILURE);
+                std::cout << "ashuffle version: " << kVersion << std::endl;
+                exit(EXIT_SUCCESS);
             case ParseError::Type::kUnknown:
                 std::cerr << "unknown option parsing error. Please file a bug "
                           << "at https://github.com/joshkunz/ashuffle"
