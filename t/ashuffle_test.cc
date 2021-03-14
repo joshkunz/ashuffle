@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -291,6 +292,63 @@ TEST_F(LoopTest, Suspend) {
     EXPECT_THAT(mpd.queue, ElementsAre(song_a));
     EXPECT_TRUE(mpd.state.playing);
     EXPECT_THAT(mpd.Playing(), Optional(song_a));
+}
+
+TEST(MPDUpdateTest, GroupByPersistsAcrossUpdate) {
+    std::vector<fake::Song> songs = {
+        fake::Song("first", {{MPD_TAG_ALBUM, "album_a"}}),
+        fake::Song("second", {{MPD_TAG_ALBUM, "album_a"}}),
+    };
+
+    fake::MPD mpd;
+    for (auto &song : songs) {
+        mpd.db.push_back(song);
+    }
+
+    // Assuming we are shuffling by group, so shuffle items are grouped by
+    // album.
+    ShuffleChain chain;
+    {
+        std::vector<std::string> group = {songs[0].URI(), songs[1].URI()};
+        chain.Add(group);
+    }
+
+    // Group by album.
+    Options opts;
+    opts.group_by = {MPD_TAG_ALBUM};
+
+    // Do an initialization.
+    Loop(&mpd, &chain, opts, init_only_d);
+
+    // Make sure that ashuffle starts by enquing the first two songs, and then
+    // playing the first song.
+    ASSERT_THAT(mpd.queue, ElementsAre(songs[0], songs[1]));
+    ASSERT_THAT(mpd.Playing(), Optional(songs[0]));
+
+    // Only run the inner loop for the rest of the test.
+    opts.tweak.play_on_startup = false;
+
+    // Trigger a database update.
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_DATABASE); };
+    Loop(&mpd, &chain, opts, loop_once_d);
+
+    // No queue modifications should take place, just a database reload.
+    ASSERT_THAT(mpd.queue, ElementsAre(songs[0], songs[1]));
+    ASSERT_THAT(mpd.Playing(), Optional(songs[0]));
+
+    // Simulate that we've finished the queue.
+    mpd.state.playing = false;
+    mpd.state.song_position = std::nullopt;
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
+
+    Loop(&mpd, &chain, opts, loop_once_d);
+
+    // Finally assert that we've re-grouped correctly, and re-enqueued the full
+    // item. This may fail if we did not re-group when we received the
+    // MPD_IDLE_DATABASE event.
+    EXPECT_THAT(mpd.queue, ElementsAre(songs[0], songs[1], songs[0], songs[1]));
+    EXPECT_THAT(mpd.Playing(), Optional(songs[0]));
+    EXPECT_THAT(mpd.state.song_position, Optional(2));
 }
 
 struct ConnectTestCase {
@@ -593,4 +651,34 @@ TEST(ConnectDeathTest, BadPermsBadPrompt) {
 
     EXPECT_EXIT((void)Connect(dialer, Options(), pass_f), ExitedWithCode(1),
                 HasSubstr("required command still not allowed"));
+}
+
+TEST(PrintChainLengthTest, Empty) {
+    ShuffleChain chain;
+    std::stringstream out;
+
+    PrintChainLength(out, chain);
+    EXPECT_THAT(out.str(), HasSubstr("empty"));
+}
+
+TEST(PrintChainLengthTest, SingleURINoGroups) {
+    ShuffleChain chain;
+    chain.Add("first");
+
+    std::stringstream out;
+
+    PrintChainLength(out, chain);
+    EXPECT_THAT(out.str(), HasSubstr("pool of 1."));
+}
+
+TEST(PrintChainLengthTest, Groups) {
+    ShuffleChain chain;
+    chain.Add("first");
+    std::vector<std::string> group = {"second", "third"};
+    chain.Add(group);
+
+    std::stringstream out;
+
+    PrintChainLength(out, chain);
+    EXPECT_THAT(out.str(), HasSubstr("2 groups (3 songs)"));
 }

@@ -20,8 +20,8 @@ void ShuffleChain::Add(ShuffleItem item) {
     _pool.push_back(_items.size() - 1);
 }
 
-size_t ShuffleChain::Len() { return _items.size(); }
-size_t ShuffleChain::LenURIs() {
+size_t ShuffleChain::Len() const { return _items.size(); }
+size_t ShuffleChain::LenURIs() const {
     size_t sum = 0;
     for (auto& group : _items) {
         sum += group._uris.size();

@@ -1,6 +1,13 @@
 MESON_VERSION="0.54.0"
-GO_VERSION="1.14.6"
+GO_VERSION="1.16.2"
+LLVM_RELEASE="10"
 GIMMIE_URL="https://raw.githubusercontent.com/travis-ci/gimme/master/gimme"
+
+CLANG_CC="clang-${LLVM_RELEASE}"
+CLANG_CXX="clang++-${LLVM_RELEASE}"
+CLANG_FORMAT="clang-format-${LLVM_RELEASE}"
+CLANG_TIDY="clang-tidy-${LLVM_RELEASE}"
+LLD="lld-${LLVM_RELEASE}"
 
 die() {
     echo "$@" >&2
@@ -23,12 +30,12 @@ setup() {
     fi
     sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y && \
         sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            clang-9 \
-            clang-format-9 \
-            clang-tidy-9 \
+            "${CLANG_CC}" \
+            "${CLANG_FORMAT}" \
+            "${CLANG_TIDY}" \
             cmake \
             libmpdclient-dev \
-            lld-9 \
+            "${LLD}" \
             ninja-build \
             patchelf \
             python3 python3-pip python3-setuptools python3-wheel \

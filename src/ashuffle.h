@@ -36,6 +36,9 @@ struct TestDelegate {
 void Loop(mpd::MPD* mpd, ShuffleChain* songs, const Options& options,
           TestDelegate d = TestDelegate());
 
+// Print the size of the database to the given stream, accounting for grouping.
+void PrintChainLength(std::ostream& stream, const ShuffleChain& chain);
+
 }  // namespace ashuffle
 
 #endif
