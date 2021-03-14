@@ -1,26 +1,51 @@
 #!/usr/bin/env bash
 
 declare -a BAD_FORMAT
+declare DIFFS
 
 function staged_modified_files() {
     git status --porcelain=2 \
         | egrep '^1 M' | awk '{ print $9 }'
 }
 
-function check_go() {
-    F=$1
-    cmp "$F" <(gofmt "$F") >/dev/null
-    if test $? -ne 0; then
-        BAD_FORMAT+=( "$F" )
+function die() {
+    echo $1 >&2
+    exit 1
+}
+
+function mktemp_or_die() {
+    mktemp || die "failed to create temporary file" 
+}
+
+function check_diff() {
+    actual="$1"
+    expected="$2"
+
+    diff_out="$(diff --unified "${actual}" "${expected}")"
+    if [[ $? -eq 0 ]]; then
+        return
     fi
+
+    BAD_FORMAT+=( "$actual" )
+
+    # otherwise, a diff occured.
+    if [[ -n "${DIFFS}" ]]; then
+        DIFFS+=$'\n'
+    fi
+    DIFFS+="-- Diff in ${actual}:"
+    DIFFS+=$'\n'
+    # Use tail to hide the file name header.
+    DIFFS+="$(echo "${diff_out}" | tail -n +3)"
+}
+
+function check_go() {
+    F="$1"
+    check_diff "$F" <(gofmt "$F") 
 }
 
 function check_c() {
-    F=$1
-    cmp "$F" <(clang-format "$F") >/dev/null
-    if test $? -ne 0; then
-        BAD_FORMAT+=( "$F" )
-    fi
+    F="$1"
+    check_diff "$F" <(clang-format "$F")
 }
 
 while read F; do
@@ -43,6 +68,12 @@ if test "${#BAD_FORMAT[@]}" -gt 0; then
     echo "  scripts/format \\"
     echo "    " "${BAD_FORMAT[@]}"
     echo
+    echo "Diffs:"
+    echo
+    echo "${DIFFS}"
+    echo
+    echo "clang-format version: $(clang-format --version)"
+    echo "go version: $(go version)"
     exit 1
 fi
 
