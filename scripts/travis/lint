@@ -4,4 +4,4 @@
 
 setup
 env meson build || die "couldn't run meson"
-exec env CLANG_TIDY=clang-tidy-9 ninja -C build ashuffle-clang-tidy
+exec env CLANG_TIDY="${CLANG_TIDY}" ninja -C build ashuffle-clang-tidy

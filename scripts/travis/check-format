@@ -5,6 +5,6 @@
 setup
 
 exec env \
-    CLANG_FORMAT=clang-format-9 \
+    CLANG_FORMAT="${CLANG_FORMAT}" \
     TO_CHECK=all \
 scripts/check-format

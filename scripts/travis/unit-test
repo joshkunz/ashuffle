@@ -25,16 +25,16 @@ setup
 echo "Running with sanitizer ${SANITIZER}"
 case "${SANITIZER}" in
     none)
-        env CC=clang-9 CXX="clang++-9" meson -Dtests=enabled "${BUILD_ROOT}" \
+        env CC="${CLANG_CC}" CXX="${CLANG_CXX}" meson -Dtests=enabled "${BUILD_ROOT}" \
         || die "couldn't run meson with sanitizer ${SANITIZER}"
         ;;
     asan)
-        env CC=clang CXX="clang++-9" LDFLAGS="-fsanitize=address" \
+        env CC="${CLANG_CC}" CXX="${CLANG_CXX}" LDFLAGS="-fsanitize=address" \
             meson -Dtests=enabled -Db_sanitize=address -Db_lundef=false "${BUILD_ROOT}" \
             || die "couldn't run meson with sanitizer ${SANITIZER}"
         ;;
     msan)
-        env CC=clang CXX="clang++-9" LDFLAGS="-fsanitize=memory" \
+        env CC="${CLANG_CC}" CXX="${CLANG_CXX}" LDFLAGS="-fsanitize=memory" \
             meson -Dtests=enabled -Db_sanitize=memory -Db_lundef=false "${BUILD_ROOT}" \
             || die "couldn't run meson with sanitizer ${SANITIZER}"
         ;;
