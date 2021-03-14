@@ -4,50 +4,7 @@
 
 setup
 
-CLANG_FORMAT=clang-format-9
-
-declare -a BAD_FORMAT
-
-function check_go() {
-    F=$1
-    cmp "$F" <(gofmt "$F") >/dev/null
-    if test $? -ne 0; then
-        BAD_FORMAT+=( "$F" )
-    fi
-}
-
-function check_c() {
-    F=$1
-    cmp "$F" <("${CLANG_FORMAT}" "$F") >/dev/null
-    if test $? -ne 0; then
-        BAD_FORMAT+=( "$F" )
-    fi
-}
-
-"${CLANG_FORMAT}" --version
-go version
-
-while read F; do
-    if test -z "$F"; then continue; fi
-    case "$F" in
-        *.c|*.cc|*.h)
-            check_c "$F"
-            ;;
-        *.go)
-            check_go "$F"
-            ;;
-    esac
-done <<<$( git ls-files )
-
-if test "${#BAD_FORMAT[@]}" -gt 0; then
-    echo "Unformatted files found:"
-    printf "  %s\n" "${BAD_FORMAT[@]}"
-    echo
-    echo "Fix by running:"
-    echo "  scripts/format \\"
-    echo "    " "${BAD_FORMAT[@]}"
-    echo
-    exit 1
-fi
-
-exit 0
+exec env \
+    CLANG_FORMAT=clang-format-9 \
+    TO_CHECK=all \
+scripts/check-format

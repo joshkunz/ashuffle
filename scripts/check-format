@@ -1,20 +1,18 @@
 #!/usr/bin/env bash
 
+# The clang-format binary to use.
+CLANG_FORMAT="${CLANG_FORMAT:-clang-format}"
+# The set of files to check, either 'only-staged-modified', or 'all'.
+# 'only-staged-modified' is useful in a git presubmit checks because it only
+# checks files that are about to be commited.
+TO_CHECK="${TO_CHECK:-only-staged-modified}"
+
 declare -a BAD_FORMAT
 declare DIFFS
 
 function staged_modified_files() {
     git status --porcelain=2 \
         | egrep '^1 M' | awk '{ print $9 }'
-}
-
-function die() {
-    echo $1 >&2
-    exit 1
-}
-
-function mktemp_or_die() {
-    mktemp || die "failed to create temporary file" 
 }
 
 function check_diff() {
@@ -45,7 +43,22 @@ function check_go() {
 
 function check_c() {
     F="$1"
-    check_diff "$F" <(clang-format "$F")
+    check_diff "$F" <("${CLANG_FORMAT}" "$F")
+}
+
+function files_to_check() {
+    case "${TO_CHECK}" in
+        only-staged-modified)
+            staged_modified_files
+            ;;
+        all)
+            git ls-files
+            ;;
+        *)
+            echo "Unrecognized TO_CHECK option \"${TO_CHECK}\"" >&2
+            exit 1
+            ;;
+    esac
 }
 
 while read F; do
@@ -58,7 +71,7 @@ while read F; do
             check_go "$F"
             ;;
     esac
-done <<<$( staged_modified_files )
+done <<<$( files_to_check )
 
 if test "${#BAD_FORMAT[@]}" -gt 0; then
     echo "Unformatted files found:"
@@ -72,7 +85,7 @@ if test "${#BAD_FORMAT[@]}" -gt 0; then
     echo
     echo "${DIFFS}"
     echo
-    echo "clang-format version: $(clang-format --version)"
+    echo "clang-format version: $("${CLANG_FORMAT}" --version)"
     echo "go version: $(go version)"
     exit 1
 fi
