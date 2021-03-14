@@ -9,15 +9,34 @@ run_id="$(head -c 100 /dev/urandom | sha256sum | head -c 30)"
 tagname="test/ashuffle:run_${run_id}"
 
 tty="-t"
-extra=()
+build_extra=()
+run_extra=()
 
 while test $# -gt 0; do
     case "$1" in
-        --no_tty) tty="" ;;
-        *) extra+=( "$1" ) ;;
+        --no_tty)
+            tty=""
+            ;;
+        --build.*)
+            build_extra+=( "--${1#"--build."}" )
+            ;;
+        *)
+            run_extra+=( "$1" )
+            ;;
     esac
     shift
 done
 
-./scripts/build-test-image --image-tag "${tagname}" "${extra[@]}" || die "couldn't build test image"
-exec docker run --name "ashuffle_integration_run_${run_id}" --privileged --device /dev/fuse:/dev/fuse --rm $tty -i "${tagname}"
+./scripts/build-test-image \
+    --image-tag "${tagname}" \
+    "${build_extra[@]}" || die "couldn't build test image"
+
+exec docker run \
+    --name "ashuffle_integration_run_${run_id}" \
+    --privileged \
+    --device /dev/fuse:/dev/fuse \
+    --rm \
+    $tty \
+    -i \
+    "${tagname}" \
+    "${run_extra[@]}"
