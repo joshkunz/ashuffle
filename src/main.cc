@@ -100,18 +100,11 @@ int main(int argc, const char* argv[]) {
     }
 
     if (songs.Len() == 0) {
-        std::cerr << "Song pool is empty." << std::endl;
+        PrintChainLength(std::cerr, songs);
         exit(EXIT_FAILURE);
     }
 
-    if (!options.group_by.empty()) {
-        std::cout << absl::StrFormat("Picking from %u groups (%u songs).",
-                                     songs.Len(), songs.LenURIs())
-                  << std::endl;
-    } else {
-        std::cout << "Picking random songs out of a pool of " << songs.Len()
-                  << "." << std::endl;
-    }
+    PrintChainLength(std::cout, songs);
 
     if (options.queue_only) {
         size_t number_of_songs = 0;

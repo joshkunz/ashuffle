@@ -46,10 +46,10 @@ class ShuffleChain {
     void Add(ShuffleItem i);
 
     // Return the total number of Items (groups) in this chain.
-    size_t Len();
+    size_t Len() const;
 
     // Return the total number of URIs in this chain, in all items.
-    size_t LenURIs();
+    size_t LenURIs() const;
 
     // Pick a group of songs out of this chain.
     const std::vector<std::string>& Pick();

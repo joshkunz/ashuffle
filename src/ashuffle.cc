@@ -137,6 +137,16 @@ struct MPDHost {
     }
 };
 
+std::optional<std::unique_ptr<Loader>> Reloader(mpd::MPD *mpd,
+                                                const Options &options) {
+    // Nothing we can do when `--file` is provided. The user is just stuck
+    // with whatever URIs we parsed the first time.
+    if (options.file_in != nullptr) {
+        return std::nullopt;
+    }
+    return std::make_unique<MPDLoader>(mpd, options.ruleset, options.group_by);
+}
+
 }  // namespace
 
 /* Keep adding songs when the queue runs out */
@@ -163,11 +173,13 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
         /* Only update the database if our original list was built from
          * MPD. */
         if (events.Has(MPD_IDLE_DATABASE) && options.file_in == nullptr) {
-            songs->Clear();
-            MPDLoader loader(mpd, options.ruleset);
-            loader.Load(songs);
-            std::cout << "Picking random songs out of a pool of "
-                      << songs->Len() << "." << std::endl;
+            std::optional<std::unique_ptr<Loader>> reloader =
+                Reloader(mpd, options);
+            if (reloader.has_value()) {
+                songs->Clear();
+                (*reloader)->Load(songs);
+                PrintChainLength(std::cout, *songs);
+            }
         } else if (events.Has(MPD_IDLE_QUEUE) || events.Has(MPD_IDLE_PLAYER)) {
             if (options.tweak.suspend_timeout != absl::ZeroDuration()) {
                 std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
@@ -189,10 +201,10 @@ std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer &d, const Options &options,
                                   std::function<std::string()> &getpass_f) {
     /* Attempt to get host from command line if available. Otherwise use
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
+    const char *env_host =
+        getenv("MPD_HOST") != nullptr ? getenv("MPD_HOST") : "localhost";
     std::string mpd_host_raw =
-        options.host.has_value()
-            ? *options.host
-            : getenv("MPD_HOST") ? getenv("MPD_HOST") : "localhost";
+        options.host.has_value() ? *options.host : env_host;
     MPDHost mpd_host(mpd_host_raw);
 
     /* Same thing for the port, use the command line defined port, environment
@@ -250,6 +262,24 @@ std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer &d, const Options &options,
         Die("password applied, but required command still not allowed.");
     }
     return mpd;
+}
+
+// Print the size of the database to the given stream, accounting for grouping.
+void PrintChainLength(std::ostream &stream, const ShuffleChain &songs) {
+    if (songs.Len() == 0) {
+        stream << "Song pool is empty." << std::endl;
+        return;
+    }
+
+    // If we're grouping.
+    if (songs.Len() != songs.LenURIs()) {
+        stream << absl::StrFormat("Picking from %u groups (%u songs).",
+                                  songs.Len(), songs.LenURIs())
+               << std::endl;
+    } else {
+        stream << "Picking random songs out of a pool of " << songs.Len() << "."
+               << std::endl;
+    }
 }
 
 }  // namespace ashuffle
