@@ -168,8 +168,8 @@ Value types:
 ## help text
 
 ```
-usage: ashuffle [-h] [-n] [[-e PATTERN ...] ...] [-o NUMBER] [-f FILENAME] [-q NUMBER]
-    [-g TAG ...] [[-t TWEAK] ...]
+usage: ashuffle [-h] [-n] [-v] [[-e PATTERN ...] ...] [-o NUMBER]
+    [-f FILENAME] [-q NUMBER] [-g TAG ...] [[-t TWEAK] ...]
 
 Optional Arguments:
    -h,-?,--help      Display this help message.
@@ -201,6 +201,7 @@ Optional Arguments:
                      are no more songs in the queue.
    -t,--tweak        Tweak an infrequently used ashuffle option. See
                      `readme.md` for a list of available options.
+   -v,--version      Print the version of ashuffle, and then exit.
 See included `readme.md` file for PATTERN syntax.
 ```
 

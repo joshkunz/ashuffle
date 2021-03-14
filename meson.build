@@ -1,7 +1,18 @@
 # vim: set sw=2 ts=2:
-project('ashuffle', ['c', 'cpp'], default_options: ['cpp_std=c++17', 'warning_level=2'])
+project(
+  'ashuffle',
+  ['c', 'cpp'],
+  version: 'v3.10.1',
+  default_options: ['cpp_std=c++17', 'warning_level=2']
+)
 
-add_global_arguments('-fno-omit-frame-pointer', language : ['c', 'cpp'])
+add_global_arguments(
+  [
+    '-Werror=switch',
+    '-fno-omit-frame-pointer',
+  ],
+  language : ['c', 'cpp'],
+)
 
 # absl dependencies need to be explicited...
 # It might be possible to use cmake dependencies (e.g. "absl:string"
@@ -65,6 +76,22 @@ else
 endif
 libmpdclient = dependency('libmpdclient')
 
+src_inc = include_directories('src')
+
+version_cc = configure_file(
+  configuration: {
+    'VERSION': meson.project_version(),
+  },
+  input: 'src/version.cc.in',
+  output: 'version.cc',
+)
+
+libversion = static_library(
+  'version',
+  [version_cc],
+  include_directories: src_inc,
+)
+
 sources = files(
   'src/ashuffle.cc',
   'src/load.cc',
@@ -76,14 +103,12 @@ sources = files(
 
 executable_sources = sources + files('src/mpd_client.cc', 'src/main.cc')
 
-src_inc = include_directories('src')
-root_inc = include_directories('.')
-
 ashuffle = executable(
   'ashuffle',
   executable_sources,
   dependencies: absl_deps + [libmpdclient],
-  install: true
+  link_with: libversion,
+  install: true,
 )
 
 clang_tidy = run_target('ashuffle-clang-tidy',

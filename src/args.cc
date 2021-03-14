@@ -18,9 +18,8 @@ namespace ashuffle {
 namespace {
 
 constexpr char kHelpMessage[] =
-    "usage: ashuffle [-h] [-n] [[-e PATTERN ...] ...] [-o NUMBER] "
-    "[-f FILENAME] [-q NUMBER]\n"
-    "    [-g TAG ...] [[-t TWEAK] ...]\n"
+    "usage: ashuffle [-h] [-n] [-v] [[-e PATTERN ...] ...] [-o NUMBER]\n"
+    "    [-f FILENAME] [-q NUMBER] [-g TAG ...] [[-t TWEAK] ...]\n"
     "\n"
     "Optional Arguments:\n"
     "   -h,-?,--help      Display this help message.\n"
@@ -52,6 +51,7 @@ constexpr char kHelpMessage[] =
     "                     are no more songs in the queue.\n"
     "   -t,--tweak        Tweak an infrequently used ashuffle option. See\n"
     "                     `readme.md` for a list of available options.\n"
+    "   -v,--version      Print the version of ashuffle, and then exit.\n"
     "See included `readme.md` file for PATTERN syntax.\n";
 
 // Parse the given string as a boolean. Produces an empty option if no value
@@ -267,6 +267,10 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
                           "the user requested help to be displayed");
     }
     if (InGenericState()) {
+        if (arg == "--version" || arg == "-v") {
+            return ParseError(ParseError::Type::kVersion,
+                              "the user requested the version to be displayed");
+        }
         if (arg == "--exclude" || arg == "-e") {
             return kRuleBegin;
         }
@@ -414,9 +418,9 @@ std::ostream& operator<<(std::ostream& out, const ParseError& e) {
         case ParseError::Type::kUnknown:
             type = "unknown";
             break;
-        default:
-            assert(false && "unreachable");
-            __builtin_unreachable();
+        case ParseError::Type::kVersion:
+            type = "version";
+            break;
     }
     out << "ParseError(" << type << ", \"" << e.msg << "\")" << std::endl;
     return out;

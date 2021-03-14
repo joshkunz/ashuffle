@@ -328,3 +328,35 @@ TEST(ParseTest, ParseFromC) {
     ASSERT_NE(opts, nullptr) << "Options failed to parse from C";
     EXPECT_EQ(opts->queue_only, 33U);
 }
+
+TEST(ParseTest, VersionShort) {
+    fake::TagParser tagger;
+
+    std::variant<Options, ParseError> res = Options::Parse(tagger, {"-v"});
+    ASSERT_TRUE(std::holds_alternative<ParseError>(res));
+
+    ParseError e = std::get<ParseError>(res);
+    EXPECT_EQ(e.type, ParseError::Type::kVersion);
+}
+
+TEST(ParseTest, VersionLong) {
+    fake::TagParser tagger;
+
+    std::variant<Options, ParseError> res =
+        Options::Parse(tagger, {"--version"});
+    ASSERT_TRUE(std::holds_alternative<ParseError>(res));
+
+    ParseError e = std::get<ParseError>(res);
+    EXPECT_EQ(e.type, ParseError::Type::kVersion);
+}
+
+TEST(ParseTest, VersionExtraOptions) {
+    fake::TagParser tagger;
+
+    std::variant<Options, ParseError> res =
+        Options::Parse(tagger, {"-o", "1", "-v"});
+    ASSERT_TRUE(std::holds_alternative<ParseError>(res));
+
+    ParseError e = std::get<ParseError>(res);
+    EXPECT_EQ(e.type, ParseError::Type::kVersion);
+}

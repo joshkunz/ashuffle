@@ -20,6 +20,7 @@ struct ParseError {
         kUnknown,  // Initial error type, unknown error.
         kGeneric,  // Generic failure. Described by 'msg'.
         kHelp,     // The user requested the help to be printed.
+        kVersion,  // The user requested the version to be printed.
     };
     Type type;
     std::string msg;
