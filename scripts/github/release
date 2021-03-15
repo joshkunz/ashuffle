@@ -1,6 +1,6 @@
 #!/bin/sh
 
-. "scripts/travis/common.sh"
+. "scripts/github/common.sh"
 
 setup
 mkdir -p release

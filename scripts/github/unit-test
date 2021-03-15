@@ -2,7 +2,7 @@
 
 BUILD_ROOT=build
 
-. "scripts/travis/common.sh"
+. "scripts/github/common.sh"
 
 # Set the mode to the environment variable SANITIZER if set, otherwise,
 # use "default"

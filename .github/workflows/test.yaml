@@ -13,7 +13,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v2
       - name: Check
-        run: scripts/travis/check-format
+        run: scripts/github/check-format
   check-lint:
     name: Check Lint
     runs-on: ubuntu-latest
@@ -21,7 +21,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v2
       - name: Lint
-        run: scripts/travis/lint
+        run: scripts/github/lint
   unit-test:
     strategy:
       matrix:
@@ -40,7 +40,7 @@ jobs:
       - name: Unit Test
         env:
           SANITIZER: ${{ matrix.sanitizer }}
-        run: scripts/travis/unit-test
+        run: scripts/github/unit-test
   integration-test:
     strategy:
       matrix:
@@ -96,7 +96,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v2
       - name: Release Build
-        run: scripts/travis/release
+        run: scripts/github/release
       - name: Deploy
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
