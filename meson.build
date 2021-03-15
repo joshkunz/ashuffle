@@ -101,18 +101,25 @@ sources = files(
   'src/shuffle.cc',
 )
 
-executable_sources = sources + files('src/mpd_client.cc', 'src/main.cc')
+executable_sources = files('src/mpd_client.cc', 'src/main.cc')
+
+libashuffle = static_library(
+  'ashuffle',
+  sources,
+  include_directories: src_inc,
+  dependencies: absl_deps,
+)
 
 ashuffle = executable(
   'ashuffle',
   executable_sources,
   dependencies: absl_deps + [libmpdclient],
-  link_with: libversion,
+  link_with: [libashuffle, libversion],
   install: true,
 )
 
 clang_tidy = run_target('ashuffle-clang-tidy',
-  command : files('scripts/run-clang-tidy') + executable_sources
+  command : files('scripts/run-clang-tidy') + sources + executable_sources
 )
 
 if get_option('tests').enabled()
@@ -157,8 +164,8 @@ if get_option('tests').enabled()
   foreach test_name, test_sources : tests
     test_exe = executable(
       test_name + '_test',
-      sources + test_sources,
       include_directories : src_inc,
+      link_with: libashuffle,
       dependencies : absl_deps + gtest_deps + [mpdfake_dep],
       override_options : test_options,
     )
