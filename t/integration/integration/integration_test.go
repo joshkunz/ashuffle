@@ -581,8 +581,8 @@ func TestFastStartup(t *testing.T) {
 	// allowed to run at once.
 	parallelism := max(1, runtime.NumCPU()/4)
 	// Trials controls the number of startup time samples that will be
-	// collected.
-	trials := 50
+	// collected. 20 allows for one value exceeding spec at the 95th percentile.
+	trials := 20
 	// Threshold is the level at which the 95th percentile startup time is
 	// considered a "failure" for the purposes of this test. Note: making this
 	// threshold less than 1ms may not work, since the 95th percentile is
