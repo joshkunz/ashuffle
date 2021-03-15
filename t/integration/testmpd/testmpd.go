@@ -22,9 +22,9 @@ import (
 
 const (
 	mpdConnectBackoff  = 500 * time.Millisecond
-	mpdConnectMax      = 10 * time.Second
+	mpdConnectMax      = 30 * time.Second
 	mpdUpdateDBBackoff = 100 * time.Millisecond
-	mpdUpdateDBMax     = 10 * time.Second
+	mpdUpdateDBMax     = 30 * time.Second
 )
 
 // Password is the type of an MPD password. A literal password, a collection

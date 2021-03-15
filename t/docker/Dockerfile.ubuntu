@@ -38,4 +38,4 @@ ENV STAGE_DIR ${STAGE_DIR:-./}
 # is automatically extracted by this rule.
 ADD ${STAGE_DIR}/ashuffle-archive.tar /ashuffle/
 
-CMD ["/exec/run_integration.sh"]
+ENTRYPOINT ["/exec/run_integration.sh"]

@@ -1,0 +1,114 @@
+name: Test
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  check-format:
+    name: Check Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+      - name: Check
+        run: scripts/github/check-format
+  check-lint:
+    name: Check Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+      - name: Lint
+        run: scripts/github/lint
+  unit-test:
+    strategy:
+      matrix:
+        sanitizer: ["none", "asan", "msan"]
+        include:
+          - sanitizer: asan
+            name_suffix: " (ASAN)"
+          - sanitizer: msan
+            name_suffix: " (MSAN)"
+    name: Unit Test${{ matrix.name_suffix }}
+    runs-on: ubuntu-latest
+    needs: [check-format, check-lint]
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+      - name: Unit Test
+        env:
+          SANITIZER: ${{ matrix.sanitizer }}
+        run: scripts/github/unit-test
+  integration-test:
+    strategy:
+      matrix:
+        target:
+          - name: "Latest"
+            libmpdclient_version: "latest"
+            mpd_version: "latest"
+          - name: "Xenial"
+            libmpdclient_version: "2.9"
+            mpd_version: "0.19.12"
+          - name: "Bionic"
+            libmpdclient_version: "2.11"
+            mpd_version: "0.20.18"
+          - name: "Focal"
+            libmpdclient_version: "2.18"
+            mpd_version: "0.21.20"
+          - name: "Groovy"
+            libmpdclient_version: "2.19"
+            mpd_version: "0.21.22"
+        test_group:
+          - name: "Short"
+            args: "-short"
+          - name: "Memory (Massive)"
+            args: "-run 'TestMaxMemoryUsage/massive'"
+          - name: "Memory (Worst Case)"
+            args: "-run 'TestMaxMemoryUsage/worst.case'"
+          - name: "Startup (From MPD)"
+            args: "-run 'TestFastStartup/from.mpd'"
+          - name: "Startup (From File)"
+            args: "-run 'TestFastStartup/from.file'"
+          - name: "Startup (From File, With Filter)"
+            args: "-run 'TestFastStartup/from.file,.with.filter'"
+          - name: "Startup (From MPD, Group By)"
+            args: "-run 'TestFastStartup/from.mpd,.group-by'"
+    name: "Integration Test (${{ matrix.target.name }}): ${{ matrix.test_group.name }}"
+    runs-on: ubuntu-latest
+    needs: [unit-test]
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+      - name: Integration Test
+        env:
+          MPD_VERSION: ${{ matrix.target.mpd_version }}
+          LIBMPDCLIENT_VERSION: ${{ matrix.target.libmpdclient_version }}
+        run: |
+          git submodule update --init --recursive
+          scripts/run-integration --no_tty ${{ matrix.test_group.args }}
+  release-build:
+    name: Release Build
+    runs-on: ubuntu-latest
+    needs: [integration-test]
+    steps:
+      - name: Clone
+        uses: actions/checkout@v2
+      - name: Release Build
+        run: scripts/github/release
+      - name: Deploy
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.ref }}"
+          # Cut off the "refs/tags" prefix.
+          tag="${tag#"refs/tags/"}"
+          hub release create \
+            --prerelease \
+            --attach release/ashuffle.x86_64-linux-gnu \
+            --attach release/ashuffle.aarch64-linux-gnu \
+            --attach release/ashuffle.armv7h-linux-gnueabihf \
+            --attach release/ashuffle.armv6h-linux-gnueabihf \
+            "${tag}"

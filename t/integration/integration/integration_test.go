@@ -564,6 +564,12 @@ func TestFastStartup(t *testing.T) {
 	// to avoid CPU or I/O starvation from other tests.
 	ctx := context.Background()
 
+	// Don't run fast startup tests when `-short` is provided, they are much
+	// slower than other tests.
+	if testing.Short() {
+		t.Skip()
+	}
+
 	max := func(a, b int) int {
 		if a > b {
 			return a
@@ -575,8 +581,8 @@ func TestFastStartup(t *testing.T) {
 	// allowed to run at once.
 	parallelism := max(1, runtime.NumCPU()/4)
 	// Trials controls the number of startup time samples that will be
-	// collected.
-	trials := 50
+	// collected. 20 allows for one value exceeding spec at the 95th percentile.
+	trials := 20
 	// Threshold is the level at which the 95th percentile startup time is
 	// considered a "failure" for the purposes of this test. Note: making this
 	// threshold less than 1ms may not work, since the 95th percentile is
@@ -715,6 +721,7 @@ func TestMaxMemoryUsage(t *testing.T) {
 
 	cases := []struct {
 		name          string
+		short         bool
 		librarySetup  func(*library.Library)
 		wantMaxMemory unit.Datasize
 		// Larger MPD buffers, and longer timeouts are needed when working with
@@ -724,7 +731,8 @@ func TestMaxMemoryUsage(t *testing.T) {
 		ashuffleShutdownTimeout time.Duration
 	}{
 		{
-			name: "realistic (30k tracks with realistic path length)",
+			name:  "realistic (30k tracks with realistic path length)",
+			short: true,
 			librarySetup: func(lib *library.Library) {
 				lib.Tracks = 30_000
 				lib.MinPathLength = observedPathLength * 2
@@ -759,7 +767,11 @@ func TestMaxMemoryUsage(t *testing.T) {
 	}
 
 	for _, test := range cases {
+		// Skip non-short tests when `-short` is supplied.
 		t.Run(test.name, func(t *testing.T) {
+			if testing.Short() != test.short {
+				t.Skip()
+			}
 			lib, err := newLibrary()
 			if err != nil {
 				t.Fatalf("failed to create new library: %v", err)
