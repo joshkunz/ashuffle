@@ -1,7 +1,7 @@
 ashuffle
 ========
 
-[![Build Status](https://travis-ci.org/joshkunz/ashuffle.svg?branch=master)](https://travis-ci.org/joshkunz/ashuffle)
+[![Test](https://github.com/joshkunz/ashuffle/actions/workflows/test.yaml/badge.svg?branch=master)](https://github.com/joshkunz/ashuffle/actions/workflows/test.yaml)
 [![GitHub](https://img.shields.io/github/license/joshkunz/ashuffle?color=informational)](LICENSE)
 
 Table of Contents:
