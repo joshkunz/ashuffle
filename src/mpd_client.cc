@@ -389,11 +389,13 @@ class DialerImpl : public Dialer {
     // a human-readable description of the error.
     Dialer::result Dial(
         const Address&,
-        unsigned timeout_ms = Dialer::kDefaultTimeout) const override;
+        absl::Duration timeout = Dialer::kDefaultTimeout) const override;
 };
 
 Dialer::result DialerImpl::Dial(const Address& addr,
-                                unsigned timeout_ms) const {
+                                absl::Duration timeout) const {
+    unsigned timeout_ms =
+        static_cast<unsigned>(absl::ToInt64Milliseconds(timeout));
     /* Create a new connection to mpd */
     struct mpd_connection* mpd =
         mpd_connection_new(addr.host.data(), addr.port, timeout_ms);

@@ -343,7 +343,7 @@ class Dialer : public mpd::Dialer {
     mpd::Address check;
 
     mpd::Dialer::result Dial(const mpd::Address& addr,
-                             __attribute__((unused)) unsigned timeout_ms =
+                             __attribute__((unused)) absl::Duration timeout =
                                  mpd::Dialer::kDefaultTimeout) const override {
         std::string got = absl::StrFormat("%s:%d", addr.host, addr.port);
         std::string want = absl::StrFormat("%s:%d", check.host, check.port);

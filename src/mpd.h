@@ -8,6 +8,8 @@
 #include <variant>
 #include <vector>
 
+#include "absl/time/time.h"
+
 #include <mpd/idle.h>
 #include <mpd/status.h>
 #include <mpd/tag.h>
@@ -182,16 +184,16 @@ class Dialer {
    public:
     virtual ~Dialer(){};
 
-    constexpr static unsigned kDefaultTimeout = 25000;  // 25 seconds.
+    constexpr static absl::Duration kDefaultTimeout = absl::Seconds(25);
 
-    typedef std::variant<std::unique_ptr<MPD>, std::string> result;
+    using result = std::variant<std::unique_ptr<MPD>, std::string>;
 
     // Dial connects to the MPD instance at the given Address, optionally,
     // with the given timeout. On success a variant with a unique_ptr to
     // an MPD instance is returned. On failure, a string is returned with
     // a human-readable description of the error.
     virtual result Dial(const Address&,
-                        unsigned timeout_ms = kDefaultTimeout) const = 0;
+                        absl::Duration timeout = kDefaultTimeout) const = 0;
 };
 
 }  // namespace mpd
