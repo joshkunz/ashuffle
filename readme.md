@@ -392,6 +392,7 @@ These repositores are not maintained by ashuffle. I cannot vouch for any of
 them, your mileage may vary.
 
   * AUR (Arch linux): [ashuffle-git](https://aur.archlinux.org/packages/ashuffle-git/)
+  * Fedora COPR: [`tokariew/ashuffle`](https://copr.fedorainfracloud.org/coprs/tokariew/ashuffle/)
 
 # contact
 
