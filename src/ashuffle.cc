@@ -19,6 +19,7 @@
 #include "args.h"
 #include "ashuffle.h"
 #include "load.h"
+#include "log.h"
 #include "mpd.h"
 #include "mpd_client.h"
 #include "rule.h"
@@ -34,21 +35,41 @@ constexpr std::array<std::string_view, 5> kRequiredCommands = {
     "add", "status", "play", "pause", "idle",
 };
 
-void TryFirst(mpd::MPD *mpd, ShuffleChain *songs) {
-    std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
+absl::Status TryFirst(mpd::MPD *mpd, ShuffleChain *songs) {
+    absl::StatusOr<std::unique_ptr<mpd::Status>> status = mpd->CurrentStatus();
+    if (!status.ok()) {
+        Log().Error("Failed to query current MPD Status: %s",
+                    status.status().ToString());
+        return status.status();
+    }
+
     // No need to do anything if the player is already going.
-    if (status->IsPlaying()) {
-        return;
+    if ((*status)->IsPlaying()) {
+        return absl::OkStatus();
     }
 
     // If we're not playing, then add a song, and start playing it.
-    mpd->Add(songs->Pick());
+    if (auto s = mpd->Add(songs->Pick()); !s.ok()) {
+        Log().Error("Failed to add song to MPD: %s", s.ToString());
+        return s;
+    }
     // Passing the former queue length, because PlayAt is zero-indexed.
-    mpd->PlayAt(status->QueueLength());
+    if (auto s = mpd->PlayAt((*status)->QueueLength()); !s.ok()) {
+        Log().Error("Failed to play newly added song: %s", s.ToString());
+        return s;
+    }
+    return absl::OkStatus();
 }
 
-void TryEnqueue(mpd::MPD *mpd, ShuffleChain *songs, const Options &options) {
-    std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
+absl::Status TryEnqueue(mpd::MPD *mpd, ShuffleChain *songs,
+                        const Options &options) {
+    absl::StatusOr<std::unique_ptr<mpd::Status>> status_or =
+        mpd->CurrentStatus();
+    if (!status_or.ok()) {
+        Log().Error("Failed to fetch MPD status");
+        return status_or.status();
+    }
+    std::unique_ptr<mpd::Status> status = std::move(*status_or);
 
     // We're "past" the last song, if there is no current song position.
     bool past_last = !status->SongPosition().has_value();
@@ -89,10 +110,17 @@ void TryEnqueue(mpd::MPD *mpd, ShuffleChain *songs, const Options &options) {
             while (needed > 0) {
                 std::vector<std::string> picked = songs->Pick();
                 needed -= static_cast<int>(picked.size());
-                mpd->Add(picked);
+                if (auto status = mpd->Add(picked); !status.ok()) {
+                    Log().Error("Failed to add picked song: %s",
+                                status.ToString());
+                    return status;
+                }
             }
         } else {
-            mpd->Add(songs->Pick());
+            if (auto status = mpd->Add(songs->Pick()); !status.ok()) {
+                Log().Error("Failed to add picked song: %s", status.ToString());
+                return status;
+            }
         }
     }
 
@@ -102,12 +130,21 @@ void TryEnqueue(mpd::MPD *mpd, ShuffleChain *songs, const Options &options) {
         /* Since the 'status' was before we added our song, and the queue
          * is zero-indexed, the length will be the position of the song we
          * just added. Play that song */
-        mpd->PlayAt(status->QueueLength());
+        if (auto s = mpd->PlayAt(status->QueueLength()); !s.ok()) {
+            Log().Error("Failed to start newly enqueued song: %s",
+                        s.ToString());
+            return s;
+        }
         /* Immediately pause playback if mpd single mode is on */
         if (status->Single()) {
-            mpd->Pause();
+            if (auto status = mpd->Pause(); !status.ok()) {
+                Log().Error("Failed to stop playback in single mode: %s",
+                            status.ToString());
+                return status;
+            }
         }
     }
+    return absl::OkStatus();
 }
 
 void PromptPassword(mpd::MPD *mpd, std::function<std::string()> &getpass_f) {
@@ -115,7 +152,13 @@ void PromptPassword(mpd::MPD *mpd, std::function<std::string()> &getpass_f) {
     while (true) {
         using status = mpd::MPD::PasswordStatus;
         std::string pass = getpass_f();
-        if (mpd->ApplyPassword(pass) == status::kAccepted) {
+        absl::StatusOr<status> result = mpd->ApplyPassword(pass);
+        if (!result.ok()) {
+            std::cerr << "Failed to apply password:" << result.status()
+                      << std::endl;
+            continue;
+        }
+        if (*result == status::kAccepted) {
             return;
         }
         fputs("incorrect password.\n", stderr);
@@ -150,8 +193,8 @@ std::optional<std::unique_ptr<Loader>> Reloader(mpd::MPD *mpd,
 }  // namespace
 
 /* Keep adding songs when the queue runs out */
-void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
-          TestDelegate test_d) {
+absl::Status Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
+                  TestDelegate test_d) {
     static_assert(MPD_IDLE_QUEUE == MPD_IDLE_PLAYLIST,
                   "QUEUE Now different signal.");
     mpd::IdleEventSet set(MPD_IDLE_DATABASE, MPD_IDLE_QUEUE, MPD_IDLE_PLAYER);
@@ -159,8 +202,12 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
     // If the test delegate's `skip_init` is set to true, then skip the
     // initializer.
     if (options.tweak.play_on_startup) {
-        TryFirst(mpd, songs);
-        TryEnqueue(mpd, songs, options);
+        if (auto status = TryFirst(mpd, songs); !status.ok()) {
+            return status;
+        }
+        if (auto status = TryEnqueue(mpd, songs, options); !status.ok()) {
+            return status;
+        }
     }
 
     // Tracks if we should be enqueuing new songs.
@@ -169,16 +216,21 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
     // Loop forever if test delegates are not set.
     while (test_d.until_f == nullptr || test_d.until_f()) {
         /* wait till the player state changes */
-        mpd::IdleEventSet events = mpd->Idle(set);
+        absl::StatusOr<mpd::IdleEventSet> events = mpd->Idle(set);
+        if (!events.ok()) {
+            Log().Error("Failed to idle for MPD events: %s",
+                        events.status().ToString());
+            return events.status();
+        }
 
-        if (events.Has(MPD_IDLE_DATABASE) && options.tweak.exit_on_db_update) {
+        if (events->Has(MPD_IDLE_DATABASE) && options.tweak.exit_on_db_update) {
             std::cout << "Database updated, exiting." << std::endl;
             std::exit(0);
         }
 
         /* Only update the database if our original list was built from
          * MPD. */
-        if (events.Has(MPD_IDLE_DATABASE) && options.file_in == nullptr) {
+        if (events->Has(MPD_IDLE_DATABASE) && options.file_in == nullptr) {
             std::optional<std::unique_ptr<Loader>> reloader =
                 Reloader(mpd, options);
             if (reloader.has_value()) {
@@ -186,25 +238,42 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
                 (*reloader)->Load(songs);
                 PrintChainLength(std::cout, *songs);
             }
-        } else if (events.Has(MPD_IDLE_QUEUE) || events.Has(MPD_IDLE_PLAYER)) {
+        } else if (events->Has(MPD_IDLE_QUEUE) ||
+                   events->Has(MPD_IDLE_PLAYER)) {
             if (options.tweak.suspend_timeout != absl::ZeroDuration()) {
-                std::unique_ptr<mpd::Status> status = mpd->CurrentStatus();
+                auto status_or = mpd->CurrentStatus();
+                if (!status_or.ok()) {
+                    Log().Error("Failed to fetch status in suspend handler");
+                    return status_or.status();
+                }
+                std::unique_ptr<mpd::Status> status = std::move(*status_or);
                 if (status->QueueLength() == 0) {
                     test_d.sleep_f(options.tweak.suspend_timeout);
-                    status = mpd->CurrentStatus();
+                    auto status_or = mpd->CurrentStatus();
+                    if (!status_or.ok()) {
+                        Log().Error(
+                            "Failed to fetch status in suspend handler");
+                        return status_or.status();
+                    }
+                    status = std::move(*status_or);
                     active = status->QueueLength() == 0;
                 }
             }
             if (!active) {
                 continue;
             }
-            TryEnqueue(mpd, songs, options);
+            if (auto status = TryEnqueue(mpd, songs, options); !status.ok()) {
+                Log().Error("Failed regular enqueue");
+                return status;
+            }
         }
     }
+    return absl::OkStatus();
 }
 
-std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer &d, const Options &options,
-                                  std::function<std::string()> &getpass_f) {
+absl::StatusOr<std::unique_ptr<mpd::MPD>> Connect(
+    const mpd::Dialer &d, const Options &options,
+    std::function<std::string()> &getpass_f) {
     /* Attempt to get host from command line if available. Otherwise use
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
     const char *env_host =
@@ -225,13 +294,12 @@ std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer &d, const Options &options,
         .port = mpd_port,
     };
 
-    mpd::Dialer::result r = d.Dial(addr);
-
-    if (std::string *err = std::get_if<std::string>(&r); err != nullptr) {
-        Die("Failed to connect to mpd: %s", *err);
+    absl::StatusOr<std::unique_ptr<mpd::MPD>> r = d.Dial(addr);
+    if (!r.ok()) {
+        Log().Error("Failed to connect to mpd: %s", r.status().ToString());
+        return r.status();
     }
-    std::unique_ptr<mpd::MPD> mpd =
-        std::move(std::get<std::unique_ptr<mpd::MPD>>(r));
+    std::unique_ptr<mpd::MPD> mpd = std::move(*r);
 
     /* Password Workflow:
      * 1. If the user supplied a password, then apply it. No matter what.
@@ -250,19 +318,29 @@ std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer &d, const Options &options,
     // Need a vector for the types to match up.
     const std::vector<std::string_view> required(kRequiredCommands.begin(),
                                                  kRequiredCommands.end());
-    mpd::MPD::Authorization auth = mpd->CheckCommands(required);
-    if (!mpd_host.password && !auth.authorized) {
+    absl::StatusOr<mpd::MPD::Authorization> auth = mpd->CheckCommands(required);
+    if (!auth.ok()) {
+        Log().Error("Failed to check required commands: %s",
+                    auth.status().ToString());
+        return auth.status();
+    }
+    if (!mpd_host.password && !auth->authorized) {
         // If the user did *not* supply a password, and we are missing a
         // required command, then try to prompt the user to provide a password.
         // Once we get/apply a password, try the required commands again...
         PromptPassword(mpd.get(), getpass_f);
         auth = mpd->CheckCommands(required);
+        if (!auth.ok()) {
+            Log().Error("Failed to check required commands: %s",
+                        auth.status().ToString());
+            return auth.status();
+        }
     }
     // If we still can't connect, inform the user which commands are missing,
     // and exit.
-    if (!auth.authorized) {
+    if (!auth->authorized) {
         std::cerr << "Missing MPD Commands:" << std::endl;
-        for (std::string &cmd : auth.missing) {
+        for (std::string &cmd : auth->missing) {
             std::cerr << "  " << cmd << std::endl;
         }
         Die("password applied, but required command still not allowed.");

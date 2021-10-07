@@ -65,6 +65,26 @@ absl_libs = [
   'absl_time',
   'absl_base',
   'absl_spinlock_wait',
+
+  # Via Status & Time:
+  'absl_cord',
+  'absl_cord_internal',
+  'absl_cordz_functions',
+  'absl_cordz_handle',
+  'absl_cordz_info',
+  'absl_cordz_update_tracker',
+  'absl_debugging_internal',
+  'absl_exponential_biased',
+  'absl_graphcycles_internal',
+  'absl_malloc_internal',
+  'absl_stacktrace',
+  'absl_status',
+  'absl_statusor',
+  'absl_symbolize',
+  'absl_synchronization',
+  'absl_throw_delegate',
+  'absl_time_zone',
+  'absl_demangle_internal',
 ]
 
 absl_deps = []
@@ -131,10 +151,10 @@ libversion = static_library(
 )
 
 sources = files(
-  'src/ashuffle.cc',
-  'src/load.cc',
   'src/args.cc',
+  'src/ashuffle.cc',
   'src/getpass.cc',
+  'src/load.cc',
   'src/log.cc',
   'src/rule.cc',
   'src/shuffle.cc',
@@ -193,13 +213,13 @@ if get_option('tests').enabled()
   ]
 
   tests = {
-    'rule': ['t/rule_test.cc'],
-    'shuffle': ['t/shuffle_test.cc'],
-    'load': ['t/load_test.cc'],
     'args': ['t/args_test.cc'],
     'ashuffle': ['t/ashuffle_test.cc'],
+    'load': ['t/load_test.cc'],
     'log': ['t/log_test.cc'],
     'mpd_fake': ['t/mpd_fake_test.cc'],
+    'rule': ['t/rule_test.cc'],
+    'shuffle': ['t/shuffle_test.cc'],
   }
 
   foreach test_name, test_sources : tests

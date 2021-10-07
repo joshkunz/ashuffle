@@ -156,50 +156,54 @@ class MPD : public mpd::MPD {
 
     // Alias the option here so it's easier to refer to in tests.
     using mpd::MPD::MetadataOption;
-    std::unique_ptr<mpd::SongReader> ListAll(
+    absl::StatusOr<std::unique_ptr<mpd::SongReader>> ListAll(
         MetadataOption metadata = MetadataOption::kInclude) override;
 
-    void Pause() override {
+    absl::Status Pause() override {
         dbg() << "call:Play" << std::endl;
         state.playing = false;
+        return absl::OkStatus();
     };
-    void Play() override {
+    absl::Status Play() override {
         dbg() << "call:Pause" << std::endl;
         state.playing = true;
+        return absl::OkStatus();
     };
-    void PlayAt(unsigned position) override {
+    absl::Status PlayAt(unsigned position) override {
         dbg() << "call:PlayAt(" << position << ")" << std::endl;
         assert(position < queue.size() && "can't play song outside of queue");
         state.song_position = position;
         state.playing = true;
+        return absl::OkStatus();
     };
-    std::unique_ptr<mpd::Status> CurrentStatus() override {
+    absl::StatusOr<std::unique_ptr<mpd::Status>> CurrentStatus() override {
         dbg() << "call:Status" << std::endl;
         State snapshot(state);
         snapshot.queue_length = queue.size();
         return std::unique_ptr<mpd::Status>(new Status(snapshot));
     };
-    std::optional<std::unique_ptr<mpd::Song>> Search(
+    absl::StatusOr<std::unique_ptr<mpd::Song>> Search(
         std::string_view uri) override {
         dbg() << "call:Search(" << uri << ")" << std::endl;
         std::optional<Song> found = SearchInternal(uri);
         if (!found) {
-            return std::nullopt;
+            return absl::NotFoundError(absl::StrFormat("%s not found", uri));
         }
         return std::unique_ptr<mpd::Song>(new Song(*found));
     };
-    mpd::IdleEventSet Idle(__attribute__((unused))
-                           const mpd::IdleEventSet&) override {
+    absl::StatusOr<mpd::IdleEventSet> Idle(__attribute__((unused))
+                                           const mpd::IdleEventSet&) override {
         dbg() << "call:Idle" << std::endl;
         return idle_f();
     };
-    void Add(const std::string& uri) override {
+    absl::Status Add(const std::string& uri) override {
         dbg() << "call:Add(" << uri << ")" << std::endl;
         std::optional<Song> found = SearchInternal(uri);
         assert(found && "cannot add URI not in DB");
         queue.push_back(*found);
+        return absl::OkStatus();
     };
-    mpd::MPD::PasswordStatus ApplyPassword(
+    absl::StatusOr<mpd::MPD::PasswordStatus> ApplyPassword(
         const std::string& password) override {
         dbg() << "call:Password(" << password << ")" << std::endl;
         using status = mpd::MPD::PasswordStatus;
@@ -209,7 +213,7 @@ class MPD : public mpd::MPD {
         active_user = password;
         return status::kAccepted;
     };
-    mpd::MPD::Authorization CheckCommands(
+    absl::StatusOr<mpd::MPD::Authorization> CheckCommands(
         const std::vector<std::string_view>& cmds) override {
         dbg() << "call:CheckCommandsAllowed(" << absl::StrJoin(cmds, ", ")
               << ")" << std::endl;
@@ -303,9 +307,9 @@ class SongReader : public mpd::SongReader {
     SongReader(const MPD& mpd, MPD::MetadataOption metadata)
         : cur_(mpd.db.begin()), end_(mpd.db.end()), metadata_(metadata) {}
 
-    std::optional<std::unique_ptr<mpd::Song>> Next() override {
+    absl::StatusOr<std::unique_ptr<mpd::Song>> Next() override {
         if (Done()) {
-            return std::nullopt;
+            return absl::OutOfRangeError("no more songs to read");
         }
 
         Song* s = new Song(*cur_++);
@@ -328,7 +332,8 @@ class SongReader : public mpd::SongReader {
     MPD::MetadataOption metadata_;
 };
 
-std::unique_ptr<mpd::SongReader> MPD::ListAll(MPD::MetadataOption metadata) {
+absl::StatusOr<std::unique_ptr<mpd::SongReader>> MPD::ListAll(
+    MPD::MetadataOption metadata) {
     dbg() << absl::StrFormat("call:ListAll(%d)", metadata) << std::endl;
     return std::unique_ptr<mpd::SongReader>(new SongReader(*this, metadata));
 }
@@ -342,14 +347,15 @@ class Dialer : public mpd::Dialer {
     // Check is the address to check the dialed address against.
     mpd::Address check;
 
-    mpd::Dialer::result Dial(const mpd::Address& addr,
-                             __attribute__((unused)) absl::Duration timeout =
-                                 mpd::Dialer::kDefaultTimeout) const override {
+    absl::StatusOr<std::unique_ptr<mpd::MPD>> Dial(
+        const mpd::Address& addr,
+        __attribute__((unused))
+        absl::Duration timeout = mpd::Dialer::kDefaultTimeout) const override {
         std::string got = absl::StrFormat("%s:%d", addr.host, addr.port);
         std::string want = absl::StrFormat("%s:%d", check.host, check.port);
         if (got != want) {
-            return absl::StrFormat("host '%s' does not match check host '%s'",
-                                   got, want);
+            return absl::FailedPreconditionError(absl::StrFormat(
+                "host '%s' does not match check host '%s'", got, want));
         }
         return std::unique_ptr<mpd::MPD>(new MPD(mpd_));
     }

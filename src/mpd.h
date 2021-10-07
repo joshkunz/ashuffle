@@ -8,6 +8,8 @@
 #include <variant>
 #include <vector>
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/time/time.h"
 
 #include <mpd/idle.h>
@@ -62,9 +64,9 @@ class SongReader {
    public:
     virtual ~SongReader(){};
 
-    // Next returns the next song from the iterator, or an empty option if
-    // all songs have been consumed.
-    virtual std::optional<std::unique_ptr<Song>> Next() = 0;
+    // Next returns the next song from the iterator, or a NOT_FOUND error
+    // if there are no more songs to iterate.
+    virtual absl::StatusOr<std::unique_ptr<Song>> Next() = 0;
 
     // Done returns true when there are no more songs to get. After Done
     // returns true, future calls to `Next` will return an empty option.
@@ -95,24 +97,22 @@ struct IdleEventSet {
     enum mpd_idle Enum() const { return static_cast<enum mpd_idle>(events); }
 };
 
-// Address represents the dial address of a given MPD instance.
-
 // MPD represents a connection to an MPD instance.
 class MPD {
    public:
     virtual ~MPD(){};
 
     // Pauses the player.
-    virtual void Pause() = 0;
+    virtual absl::Status Pause() = 0;
 
     // Resumes playing.
-    virtual void Play() = 0;
+    virtual absl::Status Play() = 0;
 
     // Play the song at the given queue position.
-    virtual void PlayAt(unsigned position) = 0;
+    virtual absl::Status PlayAt(unsigned position) = 0;
 
     // Gets the current player/MPD status.
-    virtual std::unique_ptr<Status> CurrentStatus() = 0;
+    virtual absl::StatusOr<std::unique_ptr<Status>> CurrentStatus() = 0;
 
     // Options for controlling whether or not song metadata is included in
     // a ListAll call.
@@ -125,28 +125,32 @@ class MPD {
 
     // Returns a song reader that can be used to list all songs stored in MPD's
     // database.
-    virtual std::unique_ptr<SongReader> ListAll(
+    virtual absl::StatusOr<std::unique_ptr<SongReader>> ListAll(
         MetadataOption metadata = MetadataOption::kInclude) = 0;
 
     // Searches MPD's DB for a particular song URI, and returns that song.
-    // Returns an empty optional if the song could not be found.
-    virtual std::optional<std::unique_ptr<Song>> Search(
+    // Returns a NOT_FOUND status if the song could not be found.
+    virtual absl::StatusOr<std::unique_ptr<Song>> Search(
         std::string_view uri) = 0;
 
     // Blocks until one of the enum mpd_idle events in the event set happens.
     // A new event set is returned, containing all events that occured during
     // the idle period.
-    virtual IdleEventSet Idle(const IdleEventSet&) = 0;
+    virtual absl::StatusOr<IdleEventSet> Idle(const IdleEventSet&) = 0;
 
     // Add, adds the song wit the given URI to the MPD queue.
-    virtual void Add(const std::string& uri) = 0;
+    virtual absl::Status Add(const std::string& uri) = 0;
 
     // Add also works on vectors of URIs, by repeatedly invoking Add for each
     // element.
-    void Add(const std::vector<std::string>& uris) {
+    absl::Status Add(const std::vector<std::string>& uris) {
         for (auto& u : uris) {
-            Add(u);
+            absl::Status status = Add(u);
+            if (!status.ok()) {
+                return status;
+            }
         }
+        return absl::OkStatus();
     };
 
     enum PasswordStatus {
@@ -156,7 +160,8 @@ class MPD {
     // ApplyPassword applies the given password to the MPD connection. If
     // the password was received by MPD successfully, a PasswordStatus is
     // returned.
-    virtual PasswordStatus ApplyPassword(const std::string& password) = 0;
+    virtual absl::StatusOr<PasswordStatus> ApplyPassword(
+        const std::string& password) = 0;
 
     struct Authorization {
         // Set to true if this connection is authorized to execute all
@@ -169,10 +174,11 @@ class MPD {
 
     // CheckCommandsAllowed checks that the given commands are allowed on
     // the MPD connection.
-    virtual Authorization CheckCommands(
+    virtual absl::StatusOr<Authorization> CheckCommands(
         const std::vector<std::string_view>& cmds) = 0;
 };
 
+// Address represents the dial address of a given MPD instance.
 struct Address {
     // host is the hostname of the MPD instance.
     std::string host = "";
@@ -186,14 +192,12 @@ class Dialer {
 
     constexpr static absl::Duration kDefaultTimeout = absl::Seconds(25);
 
-    using result = std::variant<std::unique_ptr<MPD>, std::string>;
-
     // Dial connects to the MPD instance at the given Address, optionally,
     // with the given timeout. On success a variant with a unique_ptr to
     // an MPD instance is returned. On failure, a string is returned with
     // a human-readable description of the error.
-    virtual result Dial(const Address&,
-                        absl::Duration timeout = kDefaultTimeout) const = 0;
+    virtual absl::StatusOr<std::unique_ptr<MPD>> Dial(
+        const Address&, absl::Duration timeout = kDefaultTimeout) const = 0;
 };
 
 }  // namespace mpd

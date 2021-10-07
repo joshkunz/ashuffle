@@ -2,8 +2,8 @@
 #define __ASHUFFLE_LOG_INTERNAL_H__
 
 #include <cassert>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 #include <absl/strings/str_format.h>
 
@@ -26,30 +26,27 @@ std::ostream& operator<<(std::ostream&, const SourceLocation&);
 // Logger is an object that owns the output file and standard formatting
 // for logs.
 class Logger final {
- public:
-     Logger(){};
+   public:
+    Logger(){};
 
-     void SetOutput(std::ostream& output) {
-         output_ = &output;
-     }
+    void SetOutput(std::ostream& output) { output_ = &output; }
 
-     std::ostream& Stream() {
+    std::ostream& Stream() {
         static std::ofstream devnull("/dev/null");
-         if (output_ != nullptr) {
-             return *output_;
-         }
-         return devnull;
-     }
+        if (output_ != nullptr) {
+            return *output_;
+        }
+        return devnull;
+    }
 
- private:
-     std::ostream* output_;
+   private:
+    std::ostream* output_;
 };
 
 // Fetch the default logger.
 Logger& DefaultLogger();
 
-} // namespace log
-} // namespace ashuffle
+}  // namespace log
+}  // namespace ashuffle
 
-
-#endif // __ASHUFFLE_LOG_INTERNAL_H__
+#endif  // __ASHUFFLE_LOG_INTERNAL_H__

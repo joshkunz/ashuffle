@@ -34,7 +34,12 @@ void MPDLoader::Load(ShuffleChain *songs) {
         metadata = mpd::MPD::MetadataOption::kOmit;
     }
 
-    std::unique_ptr<mpd::SongReader> reader = mpd_->ListAll(metadata);
+    auto reader_or = mpd_->ListAll(metadata);
+    if (!reader_or.ok()) {
+        Die("Failed to get reader: %s", reader_or.status().ToString());
+    }
+    std::unique_ptr<mpd::SongReader> reader = std::move(*reader_or);
+
     while (!reader->Done()) {
         std::unique_ptr<mpd::Song> song = *reader->Next();
         if (!Verify(*song)) {

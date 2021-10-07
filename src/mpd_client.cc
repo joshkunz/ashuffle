@@ -142,16 +142,18 @@ class MPDImpl : public MPD {
     MPDImpl& operator=(MPDImpl&&) = default;
 
     ~MPDImpl() override;
-    void Pause() override;
-    void Play() override;
-    void PlayAt(unsigned position) override;
-    std::unique_ptr<Status> CurrentStatus() override;
-    std::unique_ptr<SongReader> ListAll(MetadataOption metadata) override;
-    std::optional<std::unique_ptr<Song>> Search(std::string_view uri) override;
-    IdleEventSet Idle(const IdleEventSet&) override;
-    void Add(const std::string& uri) override;
-    MPD::PasswordStatus ApplyPassword(const std::string& password) override;
-    Authorization CheckCommands(
+    absl::Status Pause() override;
+    absl::Status Play() override;
+    absl::Status PlayAt(unsigned position) override;
+    absl::StatusOr<std::unique_ptr<Status>> CurrentStatus() override;
+    absl::StatusOr<std::unique_ptr<SongReader>> ListAll(
+        MetadataOption metadata) override;
+    absl::StatusOr<std::unique_ptr<Song>> Search(std::string_view uri) override;
+    absl::StatusOr<IdleEventSet> Idle(const IdleEventSet&) override;
+    absl::Status Add(const std::string& uri) override;
+    absl::StatusOr<MPD::PasswordStatus> ApplyPassword(
+        const std::string& password) override;
+    absl::StatusOr<Authorization> CheckCommands(
         const std::vector<std::string_view>& cmds) override;
 
    private:
@@ -182,7 +184,7 @@ class SongReaderImpl : public SongReader {
     // that type correctly.
     ~SongReaderImpl() override = default;
 
-    std::optional<std::unique_ptr<Song>> Next() override;
+    absl::StatusOr<std::unique_ptr<Song>> Next() override;
     bool Done() override;
 
    private:
@@ -223,9 +225,13 @@ void SongReaderImpl::FetchNext() {
     song_ = std::unique_ptr<Song>(new SongImpl(raw_song));
 }
 
-std::optional<std::unique_ptr<Song>> SongReaderImpl::Next() {
+absl::StatusOr<std::unique_ptr<Song>> SongReaderImpl::Next() {
     FetchNext();
-    return std::exchange(song_, std::nullopt);
+    if (!song_.has_value()) {
+        return absl::OutOfRangeError("song reader done");
+    }
+    // Moving out of an optional will re-set it to null.
+    return std::move(song_.value());
 }
 
 bool SongReaderImpl::Done() {
@@ -247,25 +253,29 @@ void MPDImpl::CheckFail() {
     }
 }
 
-void MPDImpl::Pause() {
+absl::Status MPDImpl::Pause() {
     if (!mpd_run_pause(mpd_, true)) {
         Fail();
     }
+    return absl::OkStatus();
 }
 
-void MPDImpl::Play() {
+absl::Status MPDImpl::Play() {
     if (!mpd_run_pause(mpd_, false)) {
         Fail();
     }
+    return absl::OkStatus();
 }
 
-void MPDImpl::PlayAt(unsigned position) {
+absl::Status MPDImpl::PlayAt(unsigned position) {
     if (!mpd_run_play_pos(mpd_, position)) {
         Fail();
     }
+    return absl::OkStatus();
 }
 
-std::unique_ptr<SongReader> MPDImpl::ListAll(MPD::MetadataOption metadata) {
+absl::StatusOr<std::unique_ptr<SongReader>> MPDImpl::ListAll(
+    MPD::MetadataOption metadata) {
     switch (metadata) {
         case MPD::MetadataOption::kInclude:
             if (!mpd_send_list_all_meta(mpd_, NULL)) {
@@ -281,7 +291,7 @@ std::unique_ptr<SongReader> MPDImpl::ListAll(MPD::MetadataOption metadata) {
     return std::unique_ptr<SongReader>(new SongReaderImpl(*this));
 }
 
-std::optional<std::unique_ptr<Song>> MPDImpl::Search(std::string_view uri) {
+absl::StatusOr<std::unique_ptr<Song>> MPDImpl::Search(std::string_view uri) {
     // Copy to ensure URI buffer is null-terminated.
     std::string uri_copy(uri);
     mpd_search_db_songs(mpd_, true);
@@ -293,7 +303,7 @@ std::optional<std::unique_ptr<Song>> MPDImpl::Search(std::string_view uri) {
     struct mpd_song* raw_song = mpd_recv_song(mpd_);
     CheckFail();
     if (raw_song == nullptr) {
-        return std::nullopt;
+        return absl::NotFoundError(absl::StrFormat("uri %s not found", uri));
     }
     std::unique_ptr<Song> song = std::unique_ptr<Song>(new SongImpl(raw_song));
 
@@ -303,22 +313,23 @@ std::optional<std::unique_ptr<Song>> MPDImpl::Search(std::string_view uri) {
     raw_song = mpd_recv_song(mpd_);
     assert(raw_song == nullptr &&
            "search by URI should only ever find  one song");
-    return std::optional<std::unique_ptr<Song>>(std::move(song));
+    return std::unique_ptr<Song>(std::move(song));
 }
 
-IdleEventSet MPDImpl::Idle(const IdleEventSet& events) {
+absl::StatusOr<IdleEventSet> MPDImpl::Idle(const IdleEventSet& events) {
     enum mpd_idle occured = mpd_run_idle_mask(mpd_, events.Enum());
     CheckFail();
     return {static_cast<int>(occured)};
 }
 
-void MPDImpl::Add(const std::string& uri) {
+absl::Status MPDImpl::Add(const std::string& uri) {
     if (!mpd_run_add(mpd_, uri.data())) {
         Fail();
     }
+    return absl::OkStatus();
 }
 
-std::unique_ptr<Status> MPDImpl::CurrentStatus() {
+absl::StatusOr<std::unique_ptr<Status>> MPDImpl::CurrentStatus() {
     struct mpd_status* status = mpd_run_status(mpd_);
     if (status == nullptr) {
         Fail();
@@ -326,7 +337,8 @@ std::unique_ptr<Status> MPDImpl::CurrentStatus() {
     return std::unique_ptr<Status>(new StatusImpl(status));
 }
 
-MPD::PasswordStatus MPDImpl::ApplyPassword(const std::string& password) {
+absl::StatusOr<MPD::PasswordStatus> MPDImpl::ApplyPassword(
+    const std::string& password) {
     mpd_run_password(mpd_, password.data());
     const enum mpd_error err = mpd_connection_get_error(mpd_);
     if (err == MPD_ERROR_SUCCESS) {
@@ -343,7 +355,7 @@ MPD::PasswordStatus MPDImpl::ApplyPassword(const std::string& password) {
     return MPD::PasswordStatus::kRejected;
 }
 
-Authorization MPDImpl::CheckCommands(
+absl::StatusOr<Authorization> MPDImpl::CheckCommands(
     const std::vector<std::string_view>& cmds) {
     Authorization result;
     if (cmds.size() < 1) {
@@ -387,25 +399,25 @@ class DialerImpl : public Dialer {
     // with the given timeout. On success a variant with a unique_ptr to
     // an MPD instance is returned. On failure, a string is returned with
     // a human-readable description of the error.
-    Dialer::result Dial(
+    absl::StatusOr<std::unique_ptr<MPD>> Dial(
         const Address&,
         absl::Duration timeout = Dialer::kDefaultTimeout) const override;
 };
 
-Dialer::result DialerImpl::Dial(const Address& addr,
-                                absl::Duration timeout) const {
+absl::StatusOr<std::unique_ptr<MPD>> DialerImpl::Dial(
+    const Address& addr, absl::Duration timeout) const {
     unsigned timeout_ms =
         static_cast<unsigned>(absl::ToInt64Milliseconds(timeout));
     /* Create a new connection to mpd */
     struct mpd_connection* mpd =
         mpd_connection_new(addr.host.data(), addr.port, timeout_ms);
     if (mpd == nullptr) {
-        return "could not connect to mpd: out of memory";
+        return absl::ResourceExhaustedError("out of memory");
     }
     if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        return absl::StrFormat("could not connect to mpd at %s:%u: %s",
-                               addr.host, addr.port,
-                               mpd_connection_get_error_message(mpd));
+        return absl::UnavailableError(
+            absl::StrFormat("could not connect to mpd at %s:%u: %s", addr.host,
+                            addr.port, mpd_connection_get_error_message(mpd)));
     }
     return std::unique_ptr<MPD>(new MPDImpl(mpd));
 }

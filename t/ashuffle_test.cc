@@ -29,6 +29,7 @@
 #include "shuffle.h"
 
 #include "t/mpd_fake.h"
+#include "t/test_asserts.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -102,7 +103,7 @@ class LoopTest : public testing::Test {
 };
 
 TEST_F(LoopTest, InitEmptyQueue) {
-    Loop(&mpd, &chain, opts, init_only_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, init_only_d));
 
     // We should have enqueued one song into the empty queue (song_a, the only
     // song in the chain), and started playing it.
@@ -114,9 +115,9 @@ TEST_F(LoopTest, InitEmptyQueue) {
 TEST_F(LoopTest, InitWhilePlaying) {
     // Pretend like we already have a song in our queue, and we're playing.
     mpd.queue.push_back(song_a);
-    mpd.PlayAt(0);
+    (void)mpd.PlayAt(0);
 
-    Loop(&mpd, &chain, opts, init_only_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, init_only_d));
 
     // We shouldn't add anything to the queue if we're already playing,
     // ashuffle should start silently.
@@ -132,7 +133,7 @@ TEST_F(LoopTest, InitWhileStopped) {
     mpd.state.song_position = 0;
     mpd.state.playing = false;
 
-    Loop(&mpd, &chain, opts, init_only_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, init_only_d));
 
     // ashuffle should have picked a song, added it to the queue, then started
     // playing it. The previous song in the queue should still be there.
@@ -152,7 +153,7 @@ TEST_F(LoopTest, Requeue) {
     // signal "past the end of the queue" using an empty song_position.
     mpd.state.song_position = std::nullopt;
 
-    Loop(&mpd, &chain, opts, loop_once_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, loop_once_d));
 
     // We should add a new item to the queue, and start playing.
     EXPECT_THAT(mpd.queue, ElementsAre(song_b, song_a));
@@ -167,7 +168,7 @@ TEST_F(LoopTest, RequeueEmpty) {
 
     // Leaving the MPD queue empty.
 
-    Loop(&mpd, &chain, opts, loop_once_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, loop_once_d));
 
     // We should add a new item to the queue, and start playing.
     EXPECT_THAT(mpd.queue, ElementsAre(song_a));
@@ -180,7 +181,7 @@ TEST_F(LoopTest, RequeueEmptyWithQueueBuffer) {
     opts.tweak.play_on_startup = false;
     opts.queue_buffer = 3;
 
-    Loop(&mpd, &chain, opts, loop_once_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, loop_once_d));
 
     // We should add *4* new items to the queue, and start playing on the first
     // one.
@@ -209,9 +210,9 @@ TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilled) {
     mpd.queue.push_back(song_b);
     mpd.queue.push_back(song_b);
     // Zero indexed, this is the second song.
-    mpd.PlayAt(1);
+    (void)mpd.PlayAt(1);
 
-    Loop(&mpd, &chain, opts, loop_once_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, loop_once_d));
 
     // We had 3 songs in the queue, and we were playing the second song, so
     // we only need to add 2 more songs to fill out the queue buffer.
@@ -234,12 +235,12 @@ TEST_F(LoopTest, RequeueWithQueueBufferPartiallyFilledAndGrouping) {
     mpd.queue.push_back(song_b);
     mpd.queue.push_back(song_b);
     mpd.queue.push_back(song_b);
-    mpd.PlayAt(1);  // Second song.
+    (void)mpd.PlayAt(1);  // Second song.
 
     chain.Clear();
     chain.Add(std::vector<std::string>{song_a.URI(), song_b.URI()});
 
-    Loop(&mpd, &chain, opts, loop_once_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, loop_once_d));
 
     // We start the chain with only one group <song_a, song_b>. The queue buffer
     // is 4, and there's only one song after the current song, so we need to
@@ -277,7 +278,7 @@ TEST_F(LoopTest, Suspend) {
         .sleep_f = [this](absl::Duration) { mpd.queue.push_back(song_b); },
     };
 
-    Loop(&mpd, &chain, opts, delegate);
+    ASSERT_OK(Loop(&mpd, &chain, opts, delegate));
 
     EXPECT_THAT(mpd.queue, ElementsAre(song_b));
     EXPECT_FALSE(mpd.state.playing);
@@ -287,7 +288,7 @@ TEST_F(LoopTest, Suspend) {
     // unfreeze ashuffle, and it should enqueue another song.
     mpd.queue.clear();
 
-    Loop(&mpd, &chain, opts, loop_once_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, loop_once_d));
 
     EXPECT_THAT(mpd.queue, ElementsAre(song_a));
     EXPECT_TRUE(mpd.state.playing);
@@ -318,7 +319,7 @@ TEST(MPDUpdateTest, GroupByPersistsAcrossUpdate) {
     opts.group_by = {MPD_TAG_ALBUM};
 
     // Do an initialization.
-    Loop(&mpd, &chain, opts, init_only_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, init_only_d));
 
     // Make sure that ashuffle starts by enquing the first two songs, and then
     // playing the first song.
@@ -330,7 +331,7 @@ TEST(MPDUpdateTest, GroupByPersistsAcrossUpdate) {
 
     // Trigger a database update.
     mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_DATABASE); };
-    Loop(&mpd, &chain, opts, loop_once_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, loop_once_d));
 
     // No queue modifications should take place, just a database reload.
     ASSERT_THAT(mpd.queue, ElementsAre(songs[0], songs[1]));
@@ -341,7 +342,7 @@ TEST(MPDUpdateTest, GroupByPersistsAcrossUpdate) {
     mpd.state.song_position = std::nullopt;
     mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_QUEUE); };
 
-    Loop(&mpd, &chain, opts, loop_once_d);
+    ASSERT_OK(Loop(&mpd, &chain, opts, loop_once_d));
 
     // Finally assert that we've re-grouped correctly, and re-enqueued the full
     // item. This may fail if we did not re-group when we received the
@@ -367,8 +368,8 @@ TEST(MPDUpdateTest, ExitOnDBUpdateTweak) {
     // Trigger a database update.
     mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_DATABASE); };
 
-    EXPECT_EXIT({ Loop(&mpd, &chain, opts, loop_once_d); }, ExitedWithCode(0),
-                testing::_);
+    EXPECT_EXIT({ (void)Loop(&mpd, &chain, opts, loop_once_d); },
+                ExitedWithCode(0), testing::_);
 }
 
 struct ConnectTestCase {
@@ -448,9 +449,12 @@ TEST_P(ConnectParamTest, ViaEnv) {
     std::function<std::string()> pass_f = FakePasswordProvider();
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
-    std::unique_ptr<mpd::MPD> result = Connect(dialer, Options(), pass_f);
+    absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
+        Connect(dialer, Options(), pass_f);
+    ASSERT_OK(result.status()) << "failed to connect to MPD";
 
-    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
+    EXPECT_THAT(result->get(),
+                WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
     EXPECT_EQ(pp->call_count, 0);
 }
 
@@ -473,9 +477,12 @@ TEST_P(ConnectParamTest, ViaFlag) {
     std::function<std::string()> pass_f = FakePasswordProvider();
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
-    std::unique_ptr<mpd::MPD> result = Connect(dialer, opts, pass_f);
+    absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
+        Connect(dialer, opts, pass_f);
+    ASSERT_OK(result.status()) << "Failed to connect";
 
-    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
+    EXPECT_THAT(result->get(),
+                WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
     EXPECT_EQ(pp->call_count, 0);
 }
 
@@ -534,10 +541,13 @@ TEST(ConnectTest, NoPassword) {
     std::function<std::string()> pass_f = FakePasswordProvider();
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
-    std::unique_ptr<mpd::MPD> result = Connect(dialer, Options(), pass_f);
+    absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
+        Connect(dialer, Options(), pass_f);
+    ASSERT_OK(result.status()) << "Failed to connect";
 
+    EXPECT_THAT(result->get(),
+                WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
     EXPECT_EQ(pp->call_count, 0) << "getpass func should not have been called.";
-    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
 }
 
 TEST(ConnectTest, FlagOverridesEnv) {
@@ -562,10 +572,13 @@ TEST(ConnectTest, FlagOverridesEnv) {
     std::function<std::string()> pass_f = FakePasswordProvider();
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
-    std::unique_ptr<mpd::MPD> result = Connect(dialer, opts, pass_f);
+    absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
+        Connect(dialer, opts, pass_f);
+    ASSERT_OK(result.status()) << "Failed to connect";
 
     EXPECT_EQ(pp->call_count, 0) << "getpass func should not be called";
-    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
+    EXPECT_THAT(result->get(),
+                WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
 }
 
 TEST(ConnectDeathTest, BadEnvPassword) {
@@ -640,10 +653,12 @@ TEST(ConnectTest, BadPermsOKPrompt) {
 
     EXPECT_EQ(pp->call_count, 0);
 
-    std::unique_ptr<mpd::MPD> result = Connect(dialer, Options(), pass_f);
+    absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
+        Connect(dialer, Options(), pass_f);
+    ASSERT_OK(result.status()) << "Failed to connect";
 
-    EXPECT_THAT(result.get(), WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
-
+    EXPECT_THAT(result->get(),
+                WhenDynamicCastTo<fake::MPD *>(Pointee(Eq(mpd))));
     EXPECT_EQ(pp->call_count, 1) << "getpass should have been called";
 }
 

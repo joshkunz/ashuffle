@@ -71,15 +71,18 @@ int main(int argc, const char* argv[]) {
         return GetPass(stdin, stdout, "mpd password: ");
     };
     /* attempt to connect to MPD */
-    std::unique_ptr<mpd::MPD> mpd =
+    absl::StatusOr<std::unique_ptr<mpd::MPD>> mpd =
         Connect(*mpd::client::Dialer(), options, pass_f);
+    if (!mpd.ok()) {
+        Die("Failed to connect to mpd: %s", mpd.status().ToString());
+    }
 
     ShuffleChain songs((size_t)options.tweak.window_size);
 
     {
         // We construct the loader in a new scope, since loaders can
         // consume a lot of memory.
-        std::unique_ptr<Loader> loader = BuildLoader(mpd.get(), options);
+        std::unique_ptr<Loader> loader = BuildLoader(mpd->get(), options);
         loader->Load(&songs);
     }
 
@@ -111,7 +114,9 @@ int main(int argc, const char* argv[]) {
         for (unsigned i = 0; i < options.queue_only; i++) {
             auto& picked_songs = songs.Pick();
             number_of_songs += picked_songs.size();
-            mpd->Add(picked_songs);
+            if (auto status = (*mpd)->Add(picked_songs); !status.ok()) {
+                Die("Failed to enqueue songs: %s", status.ToString());
+            }
         }
 
         /* print number of songs or groups (and songs) added */
@@ -124,7 +129,9 @@ int main(int argc, const char* argv[]) {
         }
         std::cout << "." << std::endl;
     } else {
-        Loop(mpd.get(), &songs, options);
+        if (auto status = Loop(mpd->get(), &songs, options); !status.ok()) {
+            Die("Failed to loop: %s", status.ToString());
+        }
     }
 
     return 0;

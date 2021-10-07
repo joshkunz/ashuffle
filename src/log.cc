@@ -10,9 +10,7 @@ std::ostream& operator<<(std::ostream& out, const SourceLocation& loc) {
     return out;
 }
 
-void SetOutput(std::ostream& output) {
-    DefaultLogger().SetOutput(output);
-}
+void SetOutput(std::ostream& output) { DefaultLogger().SetOutput(output); }
 
 Logger& DefaultLogger() {
     // static-lifetime logger.
@@ -20,6 +18,5 @@ Logger& DefaultLogger() {
     return logger;
 }
 
-} // namespace log
-} // namespace ashuffle
-
+}  // namespace log
+}  // namespace ashuffle

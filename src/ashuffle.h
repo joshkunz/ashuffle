@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include <absl/status/statusor.h>
 #include <absl/time/clock.h>
 #include <absl/time/time.h>
 #include <mpd/client.h>
@@ -21,8 +22,9 @@ namespace ashuffle {
 // be found in MPD_HOST, then `getpass_f' will be used to prompt the user
 // for a password. If `getpass_f' is NULL, the a default password prompt
 // (based on getpass) will be used.
-std::unique_ptr<mpd::MPD> Connect(const mpd::Dialer& d, const Options& options,
-                                  std::function<std::string()>& getpass_f);
+absl::StatusOr<std::unique_ptr<mpd::MPD>> Connect(
+    const mpd::Dialer& d, const Options& options,
+    std::function<std::string()>& getpass_f);
 
 struct TestDelegate {
     bool (*until_f)() = nullptr;
@@ -33,8 +35,8 @@ struct TestDelegate {
 // queue finishes playing. This is the core loop of `ashuffle`. The tests
 // delegate is used during tests to observe loop effects. It should be set to
 // NULL during normal operations.
-void Loop(mpd::MPD* mpd, ShuffleChain* songs, const Options& options,
-          TestDelegate d = TestDelegate());
+absl::Status Loop(mpd::MPD* mpd, ShuffleChain* songs, const Options& options,
+                  TestDelegate d = TestDelegate());
 
 // Print the size of the database to the given stream, accounting for grouping.
 void PrintChainLength(std::ostream& stream, const ShuffleChain& chain);
