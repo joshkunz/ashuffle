@@ -53,6 +53,10 @@ class Options {
         bool play_on_startup = true;
         // Duration to wait before checking queue length for suspend/resume.
         absl::Duration suspend_timeout = absl::ZeroDuration();
+        // If true, exit when MPD produces a database update event. This is
+        // intented to be used in cases where the user is passing in a
+        // list of songs via -f, and they may want to re-generate that list.
+        bool exit_on_db_update = false;
     } tweak = {};
     std::vector<enum mpd_tag_type> group_by = {};
 

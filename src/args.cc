@@ -234,7 +234,7 @@ std::variant<Parser::State, ParseError> Parser::ParseTweak(
 
     if (key == "play-on-startup") {
         auto v = ParseBool(value);
-        if (!v) {
+        if (!v.has_value()) {
             return ParseError(absl::StrFormat(
                 "play-on-startup must be a boolean value ('%s' given)", value));
         }
@@ -254,6 +254,17 @@ std::variant<Parser::State, ParseError> Parser::ParseTweak(
                 "suspend-timeout must be a positive duration ('%s' given)",
                 value));
         }
+        return kNone;
+    }
+
+    if (key == "exit-on-db-update") {
+        auto v = ParseBool(value);
+        if (!v.has_value()) {
+            return ParseError(absl::StrFormat(
+                "exit-on-db-update must be a boolean value ('%s' given)",
+                value));
+        }
+        opts_.tweak.exit_on_db_update = *v;
         return kNone;
     }
 
