@@ -153,9 +153,10 @@ tweaks, and their meanings:
 
 | Name | Values | Default | Description |
 | ---- | ------ | ------- | ----------- |
-| `window-size` | Integer `>=1` | `7` | Sets the size of the "window" used for the shuffle algorithm. See the section on the [shuffle algorithm](#shuffle-algorithm) for more details. In-short: Lower numbers mean more frequent repeats, and higher numbers mean less frequent repeats. |
+| `exit-on-db-update` | Boolean | `no` | If set to a true value, then ashuffle will exit when the MPD database is updated. This can be useful when used in conjunction with the `-f -` option, as it allows you to re-start ashuffle with a new music list. |
 | `play-on-startup` | Boolean | `yes` | If set to a true value, ashuffle starts playing music if MPD is paused, stopped, or the queue is empty on startup. If set to false, then ashuffle will not enqueue any music until a song is enqueued for the first time. |
 | `suspend-timeout` | Duration `> 0` | `0ms` | Enables "suspend" mode, which may be useful to users that use ashuffe in a workflow where they clear their queue. In this mode, if the queue is cleared while ashuffle is running, ashuffle will wait for `suspend-timeout`. If songs were added to the queue during that period of time (i.e., the queue is no longer empty), then ashuffle suspends itself, and will not add any songs to the queue (even if the queue runs out) until the queue is cleared again, at which point normal operations resume. This was add to support use-cases like the one given in issue #13, where a music player had a "play album" mode that would clear the queue, and then play an album. See below for the duration format. |
+| `window-size` | Integer `>=1` | `7` | Sets the size of the "window" used for the shuffle algorithm. See the section on the [shuffle algorithm](#shuffle-algorithm) for more details. In-short: Lower numbers mean more frequent repeats, and higher numbers mean less frequent repeats. |
 
 Value types:
 

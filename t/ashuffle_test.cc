@@ -351,6 +351,26 @@ TEST(MPDUpdateTest, GroupByPersistsAcrossUpdate) {
     EXPECT_THAT(mpd.state.song_position, Optional(2));
 }
 
+TEST(MPDUpdateTest, ExitOnDBUpdateTweak) {
+    fake::MPD mpd;
+
+    // Just use an empty chain here, we don't care about the songs.
+    ShuffleChain chain;
+
+    // Group by album.
+    Options opts;
+    opts.tweak.exit_on_db_update = true;
+
+    // Only run the inner loop for this test.
+    opts.tweak.play_on_startup = false;
+
+    // Trigger a database update.
+    mpd.idle_f = [] { return mpd::IdleEventSet(MPD_IDLE_DATABASE); };
+
+    EXPECT_EXIT({ Loop(&mpd, &chain, opts, loop_once_d); }, ExitedWithCode(0),
+                testing::_);
+}
+
 struct ConnectTestCase {
     // Want is used to set the actual server host/port.
     mpd::Address want;

@@ -46,6 +46,7 @@ TEST(ParseTest, Empty) {
     EXPECT_EQ(opts.tweak.window_size, 7);
     EXPECT_EQ(opts.tweak.play_on_startup, true);
     EXPECT_EQ(opts.tweak.suspend_timeout, absl::ZeroDuration());
+    EXPECT_EQ(opts.tweak.exit_on_db_update, false);
 }
 
 TEST(ParseTest, Short) {
@@ -209,6 +210,12 @@ TEST(ParseTest, TweakSuspendTimeout) {
             fake::TagParser(), {"--tweak", "suspend-timeout=" + val}));
         EXPECT_EQ(opts.tweak.suspend_timeout, want) << "Case: " << val;
     }
+}
+
+TEST(ParseTest, TweakExitOnDBUpdate) {
+    Options opts = std::get<Options>(Options::Parse(
+        fake::TagParser(), {"--tweak", "exit-on-db-update=yes"}));
+    EXPECT_EQ(opts.tweak.exit_on_db_update, true);
 }
 
 using ParseFailureParam =

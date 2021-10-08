@@ -170,6 +170,12 @@ void Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
     while (test_d.until_f == nullptr || test_d.until_f()) {
         /* wait till the player state changes */
         mpd::IdleEventSet events = mpd->Idle(set);
+
+        if (events.Has(MPD_IDLE_DATABASE) && options.tweak.exit_on_db_update) {
+            std::cout << "Database updated, exiting." << std::endl;
+            std::exit(0);
+        }
+
         /* Only update the database if our original list was built from
          * MPD. */
         if (events.Has(MPD_IDLE_DATABASE) && options.file_in == nullptr) {

@@ -164,6 +164,7 @@ if get_option('tests').enabled()
   foreach test_name, test_sources : tests
     test_exe = executable(
       test_name + '_test',
+      test_sources,
       include_directories : src_inc,
       link_with: libashuffle,
       dependencies : absl_deps + gtest_deps + [mpdfake_dep],
