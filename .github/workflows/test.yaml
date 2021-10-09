@@ -1,7 +1,11 @@
 name: Test
 on:
   pull_request:
-    branches: [master]
+    branches:
+      - master
+    tags:
+      - v*
+
   push:
     branches: [master]
   schedule:
