@@ -722,7 +722,8 @@ func TestMaxMemoryUsage(t *testing.T) {
 	cases := []struct {
 		name          string
 		short         bool
-		librarySetup  func(*library.Library)
+		tracks        int
+		tagger        library.TagFunc
 		wantMaxMemory unit.Datasize
 		// Larger MPD buffers, and longer timeouts are needed when working with
 		// very large libraries.
@@ -731,34 +732,45 @@ func TestMaxMemoryUsage(t *testing.T) {
 		ashuffleShutdownTimeout time.Duration
 	}{
 		{
-			name:  "realistic (30k tracks with realistic path length)",
-			short: true,
-			librarySetup: func(lib *library.Library) {
-				lib.Tracks = 30_000
-				lib.MinPathLength = observedPathLength * 2
-			},
+			name:   "realistic (30k tracks with realistic path length)",
+			short:  true,
+			tracks: 30_000,
+			tagger: library.RepeatedLetters{
+				TracksPerAlbum:  10,
+				AlbumsPerArtist: 3,
+				// Divide by 3 because paths are artist / album / title
+				// Multiply by 2 for worst-case behavior.
+				MinComponentLength: (observedPathLength / 3) * 2,
+			}.Tag,
 			wantMaxMemory:           25 * unit.Mebibyte,
 			mpdMaxOutputBufferSize:  30 * unit.Mebibyte,
 			mpdUpdateDBTimeout:      20 * time.Second,
 			ashuffleShutdownTimeout: 15 * time.Second,
 		},
 		{
-			name: "massive (500k tracks with realistic path length)",
-			librarySetup: func(lib *library.Library) {
-				lib.Tracks = 500_000
-				lib.MinPathLength = observedPathLength * 2
-			},
+			name:   "massive (500k tracks with realistic path length)",
+			tracks: 500_000,
+			tagger: library.RepeatedLetters{
+				TracksPerAlbum:  10,
+				AlbumsPerArtist: 3,
+				// Divide by 3 because paths are artist / album / title
+				// Multiply by 2 for worst-case behavior.
+				MinComponentLength: (observedPathLength / 3) * 2,
+			}.Tag,
 			wantMaxMemory:           250 * unit.Mebibyte,
 			mpdMaxOutputBufferSize:  500 * unit.Mebibyte,
 			mpdUpdateDBTimeout:      10 * time.Minute,
 			ashuffleShutdownTimeout: 2 * time.Minute,
 		},
 		{
-			name: "worst case (500k tracks with long paths)",
-			librarySetup: func(lib *library.Library) {
-				lib.Tracks = 500_000
-				lib.MinPathLength = 500
-			},
+			name:   "worst case (500k tracks with long paths)",
+			tracks: 500_000,
+			tagger: library.RepeatedLetters{
+				TracksPerAlbum:  10,
+				AlbumsPerArtist: 3,
+				// Divide by 3 because paths are artist / album / title
+				MinComponentLength: (500 / 3),
+			}.Tag,
 			wantMaxMemory:           512 * unit.Mebibyte,
 			mpdMaxOutputBufferSize:  6 * unit.Gibibyte,
 			mpdUpdateDBTimeout:      10 * time.Minute,
@@ -769,14 +781,17 @@ func TestMaxMemoryUsage(t *testing.T) {
 	for _, test := range cases {
 		// Skip non-short tests when `-short` is supplied.
 		t.Run(test.name, func(t *testing.T) {
-			if testing.Short() != test.short {
+			// Always run short tests, but skip long tests when
+			// asked.
+			if !test.short && testing.Short() != test.short {
 				t.Skip()
 			}
 			lib, err := newLibrary()
 			if err != nil {
 				t.Fatalf("failed to create new library: %v", err)
 			}
-			test.librarySetup(lib)
+			lib.Tracks = test.tracks
+			lib.Tagger = test.tagger
 
 			libDir, err := ioutil.TempDir("", "ashuffle.max-memory-usage")
 			if err != nil {
