@@ -3,11 +3,11 @@ on:
   pull_request:
     branches:
       - master
+  push:
+    branches:
+      - master
     tags:
       - v*
-
-  push:
-    branches: [master]
   schedule:
     - cron: 6 22 * * FRI
 
