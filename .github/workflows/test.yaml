@@ -112,7 +112,8 @@ jobs:
           # Cut off the "refs/tags" prefix.
           tag="${tag#"refs/tags/"}"
           hub release create \
-            --prerelease \
+            --draft \
+            --message "${tag}" \
             --attach release/ashuffle.x86_64-linux-gnu \
             --attach release/ashuffle.aarch64-linux-gnu \
             --attach release/ashuffle.armv7h-linux-gnueabihf \
