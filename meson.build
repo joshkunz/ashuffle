@@ -30,6 +30,7 @@ absl_libs = [
 
   # Via Hash:
   'absl_hash',
+  'absl_wyhash',
   'absl_city',
 
   # Via Time:
