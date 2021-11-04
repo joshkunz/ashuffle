@@ -18,6 +18,7 @@ import (
 	"ashuffle/testashuffle"
 	"ashuffle/testmpd"
 
+	"github.com/bogem/id3v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/joshkunz/fakelib/filesystem"
 	"github.com/joshkunz/fakelib/library"
@@ -840,6 +841,10 @@ func TestMaxMemoryUsage(t *testing.T) {
 				t.Fatalf("ashuffle did not shut down cleanly: %v", err)
 			}
 
+			if err := mpd.Shutdown(); err != nil {
+				t.Errorf("Failed to shutdown MPD cleanly: %v", err)
+			}
+
 			profile, err := as.HeapProfile()
 			if err != nil {
 				t.Fatalf("failed to read heap profile: %v", err)
@@ -852,5 +857,64 @@ func TestMaxMemoryUsage(t *testing.T) {
 				t.Errorf("ashuffle max memory usage %.2f MiB, want <= %.2f MiBs", memPeak.Mebibytes(), test.wantMaxMemory.Mebibytes())
 			}
 		})
+	}
+}
+
+func TestLongMetaLines(t *testing.T) {
+	ctx := context.Background()
+
+	lib, err := newLibrary()
+	if err != nil {
+		t.Fatalf("failed to create new library: %v", err)
+	}
+	lib.Tracks = 1000
+
+	t.Logf(strings.Join([]string{
+		"Installing tagger that adds a Publisher tag with more than 4KiB",
+		"of text on the 500th song in the library. This should trigger an",
+		"MPD server error when extended metadata from that song is read due to",
+		"https://github.com/MusicPlayerDaemon/libmpdclient/issues/69.",
+	}, " "))
+	base := library.RepeatedLetters{
+		TracksPerAlbum:  10,
+		AlbumsPerArtist: 5,
+	}
+	lib.Tagger = func(idx int) *id3v2.Tag {
+		// Start with the base tagger.
+		b := base.Tag(idx)
+		if idx == 500 {
+			// Add a tag that is longer than 4KiB
+			b.AddTextFrame(
+				b.CommonID("Publisher"),
+				id3v2.EncodingUTF8,
+				strings.Repeat("Test", (4*1024)+10),
+			)
+		}
+		return b
+	}
+
+	libDir, err := ioutil.TempDir("", "ashuffle.long-meta-lines")
+	if err != nil {
+		t.Fatalf("failed to create library dir: %v", err)
+	}
+
+	srv, err := filesystem.Mount(lib, libDir, nil)
+	if err != nil {
+		t.Fatalf("failed to mount fake library: %v", err)
+	}
+	defer func() {
+		srv.Unmount()
+		os.Remove(libDir)
+	}()
+
+	as, _, cleanup := run(ctx, t, runOptions{
+		Library:      libDir,
+		AshuffleArgs: []string{"--only", "100"},
+	})
+	defer cleanup()
+
+	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Errorf("ashuffle did not shut down cleanly: %v", err)
 	}
 }
