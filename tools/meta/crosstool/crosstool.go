@@ -35,8 +35,8 @@ var (
 	}
 
 	llvmSource = fetch.RemoteArchive{
-		URL:    "https://github.com/llvm/llvm-project/releases/download/llvmorg-11.0.0/llvm-project-11.0.0.tar.xz",
-		SHA256: "b7b639fc675fa1c86dd6d0bc32267be9eb34451748d2efd03f674b773000e92b",
+		URL:    "https://github.com/llvm/llvm-project/releases/download/llvmorg-13.0.0/llvm-project-13.0.0.src.tar.xz",
+		SHA256: "6075ad30f1ac0e15f07c1bf062c1e1268c241d674f11bd32cdf0e040c71f2bf3",
 		Format: fetch.TarXz,
 		ExtraOptions: []string{
 			"--strip-components=1",
@@ -126,6 +126,15 @@ var crossfileTmpl = template.Must(
 			"",
 			"[properties]",
 			"sys_root = '{{ .Root }}'",
+			"",
+			"[cmake]",
+			"CMAKE_C_COMPILER = '{{ .CC }}'",
+			"CMAKE_C_FLAGS = '-mcpu={{ .CPU }} {{ .CFlags | joinSpace }}'",
+			"CMAKE_CXX_COMPILER = '{{ .CC }}'",
+			"CMAKE_CXX_FLAGS = '-mcpu={{ .CPU }} {{ .CXXFlags | joinSpace }}'",
+			"CMAKE_EXE_LINKER_FLAGS = '-fuse-ld=lld'",
+			"",
+			"[built-in options]",
 			"c_args = '-mcpu={{ .CPU }} {{ .CFlags | joinSpace }}'",
 			"c_link_args = '{{ .LDFlags | joinSpace }}'",
 			"cpp_args = '-mcpu={{ .CPU }} {{ .CXXFlags | joinSpace }}'",
@@ -207,25 +216,6 @@ func installLibCXX(cpu CPU, sysroot string, opts Options, into *workspace.Worksp
 		return err
 	}
 
-	abiBuild, err := workspace.New(workspace.NoCD)
-	if err != nil {
-		return err
-	}
-	defer abiBuild.Cleanup()
-
-	abi := base
-	abi.BuildDirectory = abiBuild.Root
-	abi.Extra["LIBCXXABI_ENABLE_SHARED"] = "NO"
-
-	abiProject, err := project.NewCMake(path.Join(src.Root, "libcxxabi"), abi)
-	if err != nil {
-		return err
-	}
-
-	if err := project.Install(abiProject, into.Root); err != nil {
-		return err
-	}
-
 	libBuild, err := workspace.New(workspace.NoCD)
 	if err != nil {
 		return err
@@ -244,7 +234,29 @@ func installLibCXX(cpu CPU, sysroot string, opts Options, into *workspace.Worksp
 		return err
 	}
 
-	return project.Install(libProject, into.Root)
+	if err := project.Install(libProject, into.Root); err != nil {
+		return err
+	}
+
+	abiBuild, err := workspace.New(workspace.NoCD)
+	if err != nil {
+		return err
+	}
+	defer abiBuild.Cleanup()
+
+	abi := base
+	abi.BuildDirectory = abiBuild.Root
+	abi.Extra["LIBCXXABI_ENABLE_SHARED"] = "NO"
+	// Since we're building standalone, we need to manually set-up the libcxx
+	// includes to the ones we just installed.
+	abi.Extra["LIBCXXABI_LIBCXX_INCLUDES"] = path.Join(into.Root, "include/c++/v1")
+
+	abiProject, err := project.NewCMake(path.Join(src.Root, "libcxxabi"), abi)
+	if err != nil {
+		return err
+	}
+
+	return project.Install(abiProject, into.Root)
 }
 
 func fetchSysroot(cpu CPU) (*workspace.Workspace, error) {
