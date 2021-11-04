@@ -112,9 +112,19 @@ class MPD {
     // Gets the current player/MPD status.
     virtual std::unique_ptr<Status> CurrentStatus() = 0;
 
+    // Options for controlling whether or not song metadata is included in
+    // a ListAll call.
+    enum class MetadataOption {
+        // All metadata sourced from MPD is included and queryable on the songs.
+        kInclude,
+        // No metadata is included on the songs. Only song URI.
+        kOmit,
+    };
+
     // Returns a song reader that can be used to list all songs stored in MPD's
     // database.
-    virtual std::unique_ptr<SongReader> ListAll() = 0;
+    virtual std::unique_ptr<SongReader> ListAll(
+        MetadataOption metadata = MetadataOption::kInclude) = 0;
 
     // Searches MPD's DB for a particular song URI, and returns that song.
     // Returns an empty optional if the song could not be found.

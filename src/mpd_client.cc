@@ -146,7 +146,7 @@ class MPDImpl : public MPD {
     void Play() override;
     void PlayAt(unsigned position) override;
     std::unique_ptr<Status> CurrentStatus() override;
-    std::unique_ptr<SongReader> ListAll() override;
+    std::unique_ptr<SongReader> ListAll(MetadataOption metadata) override;
     std::optional<std::unique_ptr<Song>> Search(std::string_view uri) override;
     IdleEventSet Idle(const IdleEventSet&) override;
     void Add(const std::string& uri) override;
@@ -265,9 +265,18 @@ void MPDImpl::PlayAt(unsigned position) {
     }
 }
 
-std::unique_ptr<SongReader> MPDImpl::ListAll() {
-    if (!mpd_send_list_all_meta(mpd_, NULL)) {
-        Fail();
+std::unique_ptr<SongReader> MPDImpl::ListAll(MPD::MetadataOption metadata) {
+    switch (metadata) {
+        case MPD::MetadataOption::kInclude:
+            if (!mpd_send_list_all_meta(mpd_, NULL)) {
+                Fail();
+            }
+            break;
+        case MPD::MetadataOption::kOmit:
+            if (!mpd_send_list_all(mpd_, NULL)) {
+                Fail();
+            }
+            break;
     }
     return std::unique_ptr<SongReader>(new SongReaderImpl(*this));
 }
