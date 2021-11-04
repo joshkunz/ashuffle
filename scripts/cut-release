@@ -1,0 +1,69 @@
+#!/usr/bin/fish
+
+function usage
+    echo "Usage: "(basename (status filename))" [-p/--push] <tag>" >&2
+end
+
+argparse "p/push" "h/help" -- $argv
+or begin
+    usage >&2
+    exit 1
+end
+
+if set -q _flag_help
+    usage >&2
+    exit
+end
+
+test (count $argv) -eq 1
+or begin
+    usage
+    echo "Invalid args $argv exactly one argument should be supplied" >&2
+    exit 1
+end
+
+set tag $argv[1]
+
+set TAG_RE 'v[0-9]+\.[0-9]+\.[0-9]+'
+set VERSION_RE "(  version: ')($TAG_RE)(',)"
+
+echo $tag | egrep -q '^'$TAG_RE'$'
+or begin
+    echo "Invalid tag format for $tag" >&2
+    exit 1
+end
+
+set root (realpath (dirname (status filename))/..)
+
+set current_tag (sed -n -E "s/$VERSION_RE/\2/p" $root/meson.build)
+
+not test -z "$current_tag"
+or begin
+    echo "Failed to detect current version check meson.build" >&2
+    exit 1
+end
+
+echo "Attempting upgrade from $current_tag -> $tag"
+
+git tag | egrep -q "^$tag\$"
+and begin
+    echo "Tag '$tag' already set, refusing to cut this release" >&2
+    exit
+end
+
+# Set the new tag.
+sed -i -E "s/$VERSION_RE/\1$tag\3/" $root/meson.build
+
+git diff
+
+git commit -a -m "release: $tag"
+or exit 1
+
+git tag $tag
+or exit 1
+
+set -q _flag_push
+or exit 0
+
+git push
+and git push --tags
