@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"syscall"
 	"text/template"
 	"time"
 
@@ -25,6 +27,7 @@ const (
 	mpdConnectMax      = 30 * time.Second
 	mpdUpdateDBBackoff = 100 * time.Millisecond
 	mpdUpdateDBMax     = 30 * time.Second
+	mpdShutdownMaxWait = 5 * time.Second
 )
 
 // Password is the type of an MPD password. A literal password, a collection
@@ -153,8 +156,34 @@ func (m MPD) Address() (string, string) {
 func (m *MPD) Shutdown() error {
 	defer m.root.cleanup()
 	m.cli.Close()
-	m.cancelFunc()
-	return m.cmd.Wait()
+
+	// Shutdown the server, either via SIGTERM, or by cancelling the
+	// command context.
+	if err := m.cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		// If we fail, then shutdown the context to force shutdown of MPD.
+		log.Printf("failed to send SIGTERM to MPD: %s, forcing shutdown", err)
+		m.cancelFunc()
+	}
+
+	// Wait for the cmd to exit. In the background.
+	done := make(chan error, 1)
+	go func() {
+		done <- m.cmd.Wait()
+		close(done)
+	}()
+
+	// Make sure we call cancel no matter what. Cancel is idempotent, so it's
+	// fine if it gets called twice.
+	defer m.cancelFunc()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(mpdShutdownMaxWait):
+		log.Printf("failed to shutdown MPD after %s, forcing shutdown", mpdShutdownMaxWait)
+		m.cancelFunc()
+		return <-done
+	}
 }
 
 // IsOk returns true if there have been no errors on this instance. You can
