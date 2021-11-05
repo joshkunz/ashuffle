@@ -568,7 +568,7 @@ func TestFastStartup(t *testing.T) {
 	// Don't run fast startup tests when `-short` is provided, they are much
 	// slower than other tests.
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	max := func(a, b int) int {
@@ -785,7 +785,7 @@ func TestMaxMemoryUsage(t *testing.T) {
 			// Always run short tests, but skip long tests when
 			// asked.
 			if !test.short && testing.Short() != test.short {
-				t.Skip()
+				t.SkipNow()
 			}
 			lib, err := newLibrary()
 			if err != nil {
@@ -861,6 +861,7 @@ func TestMaxMemoryUsage(t *testing.T) {
 }
 
 func TestLongMetaLines(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 
 	lib, err := newLibrary()
