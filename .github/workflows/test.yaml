@@ -12,44 +12,86 @@ on:
     - cron: 6 22 * * FRI
 
 jobs:
-  check-format:
-    name: Check Format
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone
-        uses: actions/checkout@v2
-      - name: Check
-        run: scripts/github/check-format
-  check-lint:
-    name: Check Lint
-    runs-on: ubuntu-latest
-    steps:
-      - name: Clone
-        uses: actions/checkout@v2
-      - name: Lint
-        run: scripts/github/lint
-  unit-test:
+  #check-format:
+  #  name: Check Format
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - name: Clone
+  #      uses: actions/checkout@v2
+  #    - name: Check
+  #      run: scripts/github/check-format
+  #check-lint:
+  #  name: Check Lint
+  #  runs-on: ubuntu-latest
+  #  steps:
+  #    - name: Clone
+  #      uses: actions/checkout@v2
+  #    - name: Lint
+  #      run: scripts/github/lint
+  #unit-test:
+  #  strategy:
+  #    matrix:
+  #      sanitizer: ["none", "asan", "msan"]
+  #      include:
+  #        - sanitizer: asan
+  #          name_suffix: " (ASAN)"
+  #        - sanitizer: msan
+  #          name_suffix: " (MSAN)"
+  #  name: Unit Test${{ matrix.name_suffix }}
+  #  runs-on: ubuntu-latest
+  #  needs: [check-format, check-lint]
+  #  steps:
+  #    - name: Clone
+  #      uses: actions/checkout@v2
+  #    - name: Unit Test
+  #      env:
+  #        SANITIZER: ${{ matrix.sanitizer }}
+  #      run: scripts/github/unit-test
+  integration-build:
     strategy:
       matrix:
-        sanitizer: ["none", "asan", "msan"]
-        include:
-          - sanitizer: asan
-            name_suffix: " (ASAN)"
-          - sanitizer: msan
-            name_suffix: " (MSAN)"
-    name: Unit Test${{ matrix.name_suffix }}
+        target:
+          - name: "Latest"
+            libmpdclient_version: "latest"
+            mpd_version: "latest"
+          - name: "Xenial"
+            libmpdclient_version: "2.9"
+            mpd_version: "0.19.12"
+          - name: "Bionic"
+            libmpdclient_version: "2.11"
+            mpd_version: "0.20.18"
+          - name: "Focal"
+            libmpdclient_version: "2.18"
+            mpd_version: "0.21.20"
+          - name: "Groovy"
+            libmpdclient_version: "2.19"
+            mpd_version: "0.21.22"
+    name: "Build Integration Container (${{ matrix.target.name }})"
     runs-on: ubuntu-latest
-    needs: [check-format, check-lint]
+    #needs: [unit-test]
     steps:
       - name: Clone
         uses: actions/checkout@v2
-      - name: Unit Test
+        with:
+          submodules: recursive
+      - name: Build
         env:
-          SANITIZER: ${{ matrix.sanitizer }}
-        run: scripts/github/unit-test
+          MPD_VERSION: ${{ matrix.target.mpd_version }}
+          LIBMPDCLIENT_VERSION: ${{ matrix.target.libmpdclient_version }}
+        run: |
+          scripts/build-test-image -t "test/ashuffle-integration"
+          docker save --output image.tar "test/ashuffle-integration"
+          gzip image.tar
+      - name: Upload
+        uses: actions/upload-artifact@v2
+        with:
+          name: image-${{ matrix.target.name }}
+          path: image.tar.gz
   integration-test:
     strategy:
       matrix:
+        # TODO(jkz): Figure out a way to not duplicate this between both
+        # tests.
         target:
           - name: "Latest"
             libmpdclient_version: "latest"
@@ -83,17 +125,29 @@ jobs:
             args: "-run 'TestFastStartup/from.mpd,.group-by'"
     name: "Integration Test (${{ matrix.target.name }}): ${{ matrix.test_group.name }}"
     runs-on: ubuntu-latest
-    needs: [unit-test]
+    needs: [integration-build]
     steps:
       - name: Clone
         uses: actions/checkout@v2
-      - name: Integration Test
-        env:
-          MPD_VERSION: ${{ matrix.target.mpd_version }}
-          LIBMPDCLIENT_VERSION: ${{ matrix.target.libmpdclient_version }}
+        with:
+          submodules: recursive
+      - name: Download Image
+        uses: actions/download-artifact@v2
+        with:
+          name: "image-${{ matrix.target.name }}"
+      - name: Load Image
         run: |
-          git submodule update --init --recursive
-          scripts/run-integration --no_tty ${{ matrix.test_group.args }}
+          gunzip image.tar.gz
+          docker load -i image.tar
+      - name: Test
+        env:
+          MPD_VERSION: "${{ matrix.target.mpd_version }}"
+          LIBMPDCLIENT_VERSION: "${{ matrix.target.libmpdclient_version }}"
+        run: |
+          scripts/run-integration \
+            --skip_build --override_tag="test/ashuffle-integration" \
+            --no_tty \
+            ${{ matrix.test_group.args }}
   release-build:
     name: Release Build
     runs-on: ubuntu-latest

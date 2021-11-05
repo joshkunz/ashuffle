@@ -11,6 +11,8 @@ tagname="test/ashuffle:run_${run_id}"
 tty="-t"
 build_extra=()
 run_extra=()
+skip_build="false"
+override_tag=
 
 while test $# -gt 0; do
     case "$1" in
@@ -20,6 +22,14 @@ while test $# -gt 0; do
         --build.*)
             build_extra+=( "--${1#"--build."}" )
             ;;
+        --skip_build)
+            skip_build="true"
+            ;;
+        --override_tag=*)
+            override_tag="${1#"--override_tag="}"
+            [[ -n "${override_tag}" ]] || die "--override_tag must have a value"
+            tagname="${override_tag}"
+            ;;
         *)
             run_extra+=( "$1" )
             ;;
@@ -27,9 +37,15 @@ while test $# -gt 0; do
     shift
 done
 
-./scripts/build-test-image \
-    --image-tag "${tagname}" \
-    "${build_extra[@]}" || die "couldn't build test image"
+if ${skip_build} && [[ -z "${override_tag}" ]]; then
+    die "--override_tag must be provided when using --skip_build"
+fi
+
+if ! ${skip_build}; then
+    ./scripts/build-test-image \
+        --image-tag "${tagname}" \
+        "${build_extra[@]}" || die "couldn't build test image"
+fi
 
 exec docker run \
     --name "ashuffle_integration_run_${run_id}" \
