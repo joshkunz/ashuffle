@@ -18,6 +18,7 @@ import (
 	"ashuffle/testashuffle"
 	"ashuffle/testmpd"
 
+	"github.com/bogem/id3v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/joshkunz/fakelib/filesystem"
 	"github.com/joshkunz/fakelib/library"
@@ -567,7 +568,7 @@ func TestFastStartup(t *testing.T) {
 	// Don't run fast startup tests when `-short` is provided, they are much
 	// slower than other tests.
 	if testing.Short() {
-		t.Skip()
+		t.SkipNow()
 	}
 
 	max := func(a, b int) int {
@@ -722,7 +723,8 @@ func TestMaxMemoryUsage(t *testing.T) {
 	cases := []struct {
 		name          string
 		short         bool
-		librarySetup  func(*library.Library)
+		tracks        int
+		tagger        library.TagFunc
 		wantMaxMemory unit.Datasize
 		// Larger MPD buffers, and longer timeouts are needed when working with
 		// very large libraries.
@@ -731,34 +733,45 @@ func TestMaxMemoryUsage(t *testing.T) {
 		ashuffleShutdownTimeout time.Duration
 	}{
 		{
-			name:  "realistic (30k tracks with realistic path length)",
-			short: true,
-			librarySetup: func(lib *library.Library) {
-				lib.Tracks = 30_000
-				lib.MinPathLength = observedPathLength * 2
-			},
+			name:   "realistic (30k tracks with realistic path length)",
+			short:  true,
+			tracks: 30_000,
+			tagger: library.RepeatedLetters{
+				TracksPerAlbum:  10,
+				AlbumsPerArtist: 3,
+				// Divide by 3 because paths are artist / album / title
+				// Multiply by 2 for worst-case behavior.
+				MinComponentLength: (observedPathLength / 3) * 2,
+			}.Tag,
 			wantMaxMemory:           25 * unit.Mebibyte,
 			mpdMaxOutputBufferSize:  30 * unit.Mebibyte,
 			mpdUpdateDBTimeout:      20 * time.Second,
 			ashuffleShutdownTimeout: 15 * time.Second,
 		},
 		{
-			name: "massive (500k tracks with realistic path length)",
-			librarySetup: func(lib *library.Library) {
-				lib.Tracks = 500_000
-				lib.MinPathLength = observedPathLength * 2
-			},
+			name:   "massive (500k tracks with realistic path length)",
+			tracks: 500_000,
+			tagger: library.RepeatedLetters{
+				TracksPerAlbum:  10,
+				AlbumsPerArtist: 3,
+				// Divide by 3 because paths are artist / album / title
+				// Multiply by 2 for worst-case behavior.
+				MinComponentLength: (observedPathLength / 3) * 2,
+			}.Tag,
 			wantMaxMemory:           250 * unit.Mebibyte,
 			mpdMaxOutputBufferSize:  500 * unit.Mebibyte,
 			mpdUpdateDBTimeout:      10 * time.Minute,
 			ashuffleShutdownTimeout: 2 * time.Minute,
 		},
 		{
-			name: "worst case (500k tracks with long paths)",
-			librarySetup: func(lib *library.Library) {
-				lib.Tracks = 500_000
-				lib.MinPathLength = 500
-			},
+			name:   "worst case (500k tracks with long paths)",
+			tracks: 500_000,
+			tagger: library.RepeatedLetters{
+				TracksPerAlbum:  10,
+				AlbumsPerArtist: 3,
+				// Divide by 3 because paths are artist / album / title
+				MinComponentLength: (500 / 3),
+			}.Tag,
 			wantMaxMemory:           512 * unit.Mebibyte,
 			mpdMaxOutputBufferSize:  6 * unit.Gibibyte,
 			mpdUpdateDBTimeout:      10 * time.Minute,
@@ -769,14 +782,17 @@ func TestMaxMemoryUsage(t *testing.T) {
 	for _, test := range cases {
 		// Skip non-short tests when `-short` is supplied.
 		t.Run(test.name, func(t *testing.T) {
-			if testing.Short() != test.short {
-				t.Skip()
+			// Always run short tests, but skip long tests when
+			// asked.
+			if !test.short && testing.Short() != test.short {
+				t.SkipNow()
 			}
 			lib, err := newLibrary()
 			if err != nil {
 				t.Fatalf("failed to create new library: %v", err)
 			}
-			test.librarySetup(lib)
+			lib.Tracks = test.tracks
+			lib.Tagger = test.tagger
 
 			libDir, err := ioutil.TempDir("", "ashuffle.max-memory-usage")
 			if err != nil {
@@ -825,6 +841,10 @@ func TestMaxMemoryUsage(t *testing.T) {
 				t.Fatalf("ashuffle did not shut down cleanly: %v", err)
 			}
 
+			if err := mpd.Shutdown(); err != nil {
+				t.Errorf("Failed to shutdown MPD cleanly: %v", err)
+			}
+
 			profile, err := as.HeapProfile()
 			if err != nil {
 				t.Fatalf("failed to read heap profile: %v", err)
@@ -837,5 +857,65 @@ func TestMaxMemoryUsage(t *testing.T) {
 				t.Errorf("ashuffle max memory usage %.2f MiB, want <= %.2f MiBs", memPeak.Mebibytes(), test.wantMaxMemory.Mebibytes())
 			}
 		})
+	}
+}
+
+func TestLongMetaLines(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	lib, err := newLibrary()
+	if err != nil {
+		t.Fatalf("failed to create new library: %v", err)
+	}
+	lib.Tracks = 1000
+
+	t.Logf(strings.Join([]string{
+		"Installing tagger that adds a Publisher tag with more than 4KiB",
+		"of text on the 500th song in the library. This should trigger an",
+		"MPD server error when extended metadata from that song is read due to",
+		"https://github.com/MusicPlayerDaemon/libmpdclient/issues/69.",
+	}, " "))
+	base := library.RepeatedLetters{
+		TracksPerAlbum:  10,
+		AlbumsPerArtist: 5,
+	}
+	lib.Tagger = func(idx int) *id3v2.Tag {
+		// Start with the base tagger.
+		b := base.Tag(idx)
+		if idx == 500 {
+			// Add a tag that is longer than 4KiB
+			b.AddTextFrame(
+				b.CommonID("Publisher"),
+				id3v2.EncodingUTF8,
+				strings.Repeat("Test", (4*1024)+10),
+			)
+		}
+		return b
+	}
+
+	libDir, err := ioutil.TempDir("", "ashuffle.long-meta-lines")
+	if err != nil {
+		t.Fatalf("failed to create library dir: %v", err)
+	}
+
+	srv, err := filesystem.Mount(lib, libDir, nil)
+	if err != nil {
+		t.Fatalf("failed to mount fake library: %v", err)
+	}
+	defer func() {
+		srv.Unmount()
+		os.Remove(libDir)
+	}()
+
+	as, _, cleanup := run(ctx, t, runOptions{
+		Library:      libDir,
+		AshuffleArgs: []string{"--only", "100"},
+	})
+	defer cleanup()
+
+	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Errorf("ashuffle did not shut down cleanly: %v", err)
 	}
 }

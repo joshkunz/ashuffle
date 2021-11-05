@@ -25,7 +25,16 @@ typedef std::unordered_map<Group, std::vector<std::string>, absl::Hash<Group>>
 void MPDLoader::Load(ShuffleChain *songs) {
     GroupMap groups;
 
-    std::unique_ptr<mpd::SongReader> reader = mpd_->ListAll();
+    mpd::MPD::MetadataOption metadata = mpd::MPD::MetadataOption::kInclude;
+    if (rules_.empty() && group_by_.empty()) {
+        // If we don't need to process any rules, or group tracks, then we
+        // can omit metadata from the query. This is an optimization,
+        // mainly to avoid
+        // https://github.com/MusicPlayerDaemon/libmpdclient/issues/69
+        metadata = mpd::MPD::MetadataOption::kOmit;
+    }
+
+    std::unique_ptr<mpd::SongReader> reader = mpd_->ListAll(metadata);
     while (!reader->Done()) {
         std::unique_ptr<mpd::Song> song = *reader->Next();
         if (!Verify(*song)) {

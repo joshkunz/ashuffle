@@ -154,7 +154,10 @@ class MPD : public mpd::MPD {
     std::string active_user;
     user_map users;
 
-    std::unique_ptr<mpd::SongReader> ListAll() override;
+    // Alias the option here so it's easier to refer to in tests.
+    using mpd::MPD::MetadataOption;
+    std::unique_ptr<mpd::SongReader> ListAll(
+        MetadataOption metadata = MetadataOption::kInclude) override;
 
     void Pause() override {
         dbg() << "call:Play" << std::endl;
@@ -295,13 +298,24 @@ class SongReader : public mpd::SongReader {
    public:
     ~SongReader() override = default;
 
-    SongReader(const MPD& mpd) : cur_(mpd.db.begin()), end_(mpd.db.end()){};
+    SongReader(const MPD& mpd)
+        : SongReader(mpd, MPD::MetadataOption::kInclude) {}
+    SongReader(const MPD& mpd, MPD::MetadataOption metadata)
+        : cur_(mpd.db.begin()), end_(mpd.db.end()), metadata_(metadata) {}
 
     std::optional<std::unique_ptr<mpd::Song>> Next() override {
         if (Done()) {
             return std::nullopt;
         }
-        return std::unique_ptr<mpd::Song>(new Song(*cur_++));
+
+        Song* s = new Song(*cur_++);
+        if (MPD::MetadataOption::kOmit == metadata_) {
+            // If we're being asked to omit metadata, then clear out the
+            // tags on our copied song, before sending it.
+            s->tags = {};
+        }
+
+        return std::unique_ptr<mpd::Song>(s);
     };
 
     // Done returns true when there are no more songs to get. After Done
@@ -311,11 +325,12 @@ class SongReader : public mpd::SongReader {
    private:
     std::vector<Song>::const_iterator cur_;
     std::vector<Song>::const_iterator end_;
+    MPD::MetadataOption metadata_;
 };
 
-std::unique_ptr<mpd::SongReader> MPD::ListAll() {
-    dbg() << "call:ListAll" << std::endl;
-    return std::unique_ptr<mpd::SongReader>(new SongReader(*this));
+std::unique_ptr<mpd::SongReader> MPD::ListAll(MPD::MetadataOption metadata) {
+    dbg() << absl::StrFormat("call:ListAll(%d)", metadata) << std::endl;
+    return std::unique_ptr<mpd::SongReader>(new SongReader(*this, metadata));
 }
 
 class Dialer : public mpd::Dialer {
