@@ -1,0 +1,19 @@
+{
+  "extends": [
+    "config:base",
+    ":disableDependencyDashboard",
+    ":timezone(America/Los_Angeles)",
+    "group:allNonMajor"
+  ],
+  "git-submodules": {
+    "enabled": true,
+    "extends": [
+      "schedule:monthly"
+    ]
+  },
+  "golang": {
+    "postUpdateOptions": [
+      "gomodTidy"
+    ]
+  }
+}
