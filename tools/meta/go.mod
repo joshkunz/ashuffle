@@ -1,4 +1,4 @@
-module meta 
+module meta
 
 go 1.14
 
