@@ -15,7 +15,6 @@ RUN /opt/meta/meta install libmpdclient \
 ARG MPD_VERSION
 ENV MPD_VERSION ${MPD_VERSION:-latest}
 COPY /t/docker/patches/ /patches/
-#RUN /opt/helpers/install_mpd.sh ${MPD_VERSION}
 RUN /opt/meta/meta install mpd \
     --version=${MPD_VERSION} --patch_root=/patches --prefix=/usr
 
