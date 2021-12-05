@@ -82,7 +82,22 @@ TEST(Rule, MultiplePatterns) {
 
     EXPECT_FALSE(rule.Accepts(full_match))
         << "song accepted even though some fields match a pattern";
-    EXPECT_FALSE(rule.Accepts(partial_match_artist));
-    EXPECT_FALSE(rule.Accepts(partial_match_album));
+    // If any field doesn't match, the rule should consider the song
+    // as accepted.
+    EXPECT_TRUE(rule.Accepts(partial_match_artist));
+    EXPECT_TRUE(rule.Accepts(partial_match_album));
     EXPECT_TRUE(rule.Accepts(no_match));
+}
+
+TEST(Rule, SongMissingPatternTag) {
+    Rule rule;
+    rule.AddPattern(MPD_TAG_ALBUM, "__album__");
+
+    // This song does not even have an MPD_TAG_ALBUM tag.
+    fake::Song missing_pattern_tag({
+        {MPD_TAG_ARTIST, "__artist__"},
+    });
+
+    EXPECT_TRUE(rule.Accepts(missing_pattern_tag))
+        << "Songs with missing tags should be accepted";
 }
