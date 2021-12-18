@@ -20,9 +20,9 @@ bool Rule::Accepts(const mpd::Song &song) const {
     for (const Pattern &p : patterns_) {
         std::optional<std::string> tag_value = song.Tag(p.tag);
         if (!tag_value) {
-            // If the tag doesn't exist, we can't match on it. Just skip this
-            // pattern.
-            continue;
+            // If the tag doesn't exist, we can't match on it. Accept this
+            // song because it can't possible match this tag.
+            return true;
         }
 
         // Lowercase the tag value, to make sure our comparison is not
@@ -31,12 +31,11 @@ bool Rule::Accepts(const mpd::Song &song) const {
                        [](unsigned char c) { return std::tolower(c); });
         if (tag_value->find(p.value) == std::string::npos) {
             // No substring match, this pattern does not match.
-            continue;
+            return true;
         }
-
-        return false;
     }
-    return true;
+    // All tags existed and matched. Reject this song.
+    return false;
 }
 
 }  // namespace ashuffle
