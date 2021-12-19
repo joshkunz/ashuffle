@@ -172,7 +172,7 @@ Parser::Status Parser::Consume(std::string_view arg) {
     prev_ = arg;
     Parser::State next = std::get<Parser::State>(next_or_err);
     // If we're transitioning out of a rule...
-    if (state_ == kRule && next != kRule) {
+    if (state_ == kRule && (next != kRule && next != kRuleValue)) {
         FlushRule();
     }
     state_ = next;

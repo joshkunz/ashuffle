@@ -40,6 +40,9 @@ class Rule {
     // Empty returns true when this rule matches no patterns.
     inline bool Empty() const { return patterns_.empty(); }
 
+    // Size returns the number of patterns in this rule.
+    inline size_t Size() const { return patterns_.size(); }
+
     // Add the given pattern to this rule.
     void AddPattern(enum mpd_tag_type, std::string value);
 
