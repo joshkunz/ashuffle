@@ -72,7 +72,7 @@ TEST(ParseTest, Short) {
 
     Options opts = std::move(std::get<Options>(result));
 
-    EXPECT_EQ(opts.ruleset.size(), 2U);
+    EXPECT_EQ(opts.ruleset.size(), 1U);
     EXPECT_EQ(opts.queue_only, 5U);
     EXPECT_THAT(opts.file_in, NotNull());
     EXPECT_FALSE(opts.check_uris);
@@ -106,7 +106,7 @@ TEST(ParseTest, Long) {
 
     Options opts = std::move(std::get<Options>(result));
 
-    EXPECT_EQ(opts.ruleset.size(), 2U);
+    EXPECT_EQ(opts.ruleset.size(), 1U);
     EXPECT_EQ(opts.queue_only, 5U);
     EXPECT_THAT(opts.file_in, NotNull());
     EXPECT_FALSE(opts.check_uris);
@@ -133,7 +133,7 @@ TEST(ParseTest, MixedLongShort) {
     }));
     // clang-format on
 
-    EXPECT_EQ(opts.ruleset.size(), 2U);
+    EXPECT_EQ(opts.ruleset.size(), 1U);
     EXPECT_EQ(opts.queue_only, 5U);
     EXPECT_THAT(opts.file_in, NotNull());
     EXPECT_FALSE(opts.check_uris);
@@ -161,6 +161,55 @@ TEST(ParseTest, Rule) {
         << "basic rule arg should exclude match song";
     EXPECT_TRUE(r.Accepts(not_matching))
         << "basic rule arg should not exclude non-matching song";
+}
+
+TEST(ParseTest, RuleWithMultipleTags) {
+    fake::TagParser tagger({
+        {"artist", MPD_TAG_ARTIST},
+        {"album", MPD_TAG_ALBUM},
+    });
+
+    Options opts = std::get<Options>(Options::Parse(
+        tagger, {"-e", "artist", "__artist__", "album", "__album__"}));
+
+    ASSERT_FALSE(opts.ruleset.empty());
+
+    EXPECT_EQ(opts.ruleset.size(), 1);
+
+    Rule &r = opts.ruleset[0];
+
+    EXPECT_EQ(r.Size(), 2) << "Rule should have two matching patterns";
+
+    fake::Song matching({
+        {MPD_TAG_ARTIST, "__artist__"},
+        {MPD_TAG_ALBUM, "__album__"},
+    });
+    fake::Song partial_artist({{MPD_TAG_ARTIST, "__artist__"}});
+    fake::Song partial_album({{MPD_TAG_ALBUM, "__album__"}});
+
+    EXPECT_FALSE(r.Accepts(matching));
+    EXPECT_TRUE(r.Accepts(partial_artist));
+    EXPECT_TRUE(r.Accepts(partial_album));
+}
+
+TEST(ParseTest, MultipleRules) {
+    fake::TagParser tagger({
+        {"artist", MPD_TAG_ARTIST},
+    });
+
+    // clang-format off
+    Options opts = std::get<Options>(
+        Options::Parse(tagger, {
+            "-e", "artist", "__artist__",
+            "-e", "artist", "__another_artist__"
+        }));
+    // clang-format on
+
+    ASSERT_EQ(opts.ruleset.size(), 2) << "Expected two rules";
+
+    constexpr char message[] = "Each ruleset should have exactly one pattern";
+    EXPECT_EQ(opts.ruleset[0].Size(), 1) << message;
+    EXPECT_EQ(opts.ruleset[1].Size(), 1) << message;
 }
 
 TEST(ParseTest, FileInStdin) {

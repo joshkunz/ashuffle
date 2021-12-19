@@ -96,7 +96,7 @@ type runOptions struct {
 	AshuffleArgs []string
 }
 
-func run(ctx context.Context, t *testing.T, opts runOptions) (*testashuffle.Ashuffle, *testmpd.MPD, func()) {
+func run(ctx context.Context, t *testing.T, opts runOptions) (*testashuffle.Ashuffle, *testmpd.MPD) {
 	t.Helper()
 	if opts.Library == "" {
 		opts.Library = "/music"
@@ -112,14 +112,14 @@ func run(ctx context.Context, t *testing.T, opts runOptions) (*testashuffle.Ashu
 	if err != nil {
 		t.Fatalf("failed to start ashuffle with args %+v: %v", opts.AshuffleArgs, err)
 	}
-	cleanup := func() {
+	t.Cleanup(func() {
 		if !mpd.IsOk() {
 			t.Errorf("mpd communication error: %+v", mpd.Errors)
 		}
 
 		mpd.Shutdown()
-	}
-	return as, mpd, cleanup
+	})
+	return as, mpd
 }
 
 func newLibrary() (*library.Library, error) {
@@ -129,6 +129,16 @@ func newLibrary() (*library.Library, error) {
 	}
 
 	return library.New(goldF)
+}
+
+func newLibraryT(t *testing.T) *library.Library {
+	t.Helper()
+
+	l, err := newLibrary()
+	if err != nil {
+		t.Fatalf("failed to create new library: %v", err)
+	}
+	return l
 }
 
 func TestMain(m *testing.M) {
@@ -244,8 +254,7 @@ func TestShuffleOnce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	as, mpd, cleanup := run(ctx, t, runOptions{AshuffleArgs: []string{"-o", "3"}})
-	defer cleanup()
+	as, mpd := run(ctx, t, runOptions{AshuffleArgs: []string{"-o", "3"}})
 
 	// Wait for ashuffle to exit.
 	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
@@ -267,8 +276,7 @@ func TestBasic(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	as, mpd, cleanup := run(ctx, t, runOptions{})
-	defer cleanup()
+	as, mpd := run(ctx, t, runOptions{})
 
 	// Wait for ashuffle to startup, and start playing a song.
 	tryWaitFor(func() bool { return mpd.PlayState() == testmpd.StatePlay })
@@ -443,14 +451,13 @@ func TestFromFile(t *testing.T) {
 			}
 			defer linesF.Cleanup()
 
-			as, _, cleanup := run(ctx, t, runOptions{
+			as, _ := run(ctx, t, runOptions{
 				Library: test.library,
 				AshuffleArgs: append([]string{
 					"-f", linesF.Path(),
 					"--test_enable_option_do_not_use", "print_all_songs_and_exit",
 				}, test.flags...),
 			})
-			defer cleanup()
 
 			// Wait for ashuffle to exit.
 			if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
@@ -787,26 +794,11 @@ func TestMaxMemoryUsage(t *testing.T) {
 			if !test.short && testing.Short() != test.short {
 				t.SkipNow()
 			}
-			lib, err := newLibrary()
-			if err != nil {
-				t.Fatalf("failed to create new library: %v", err)
-			}
+			lib := newLibraryT(t)
 			lib.Tracks = test.tracks
 			lib.Tagger = test.tagger
 
-			libDir, err := ioutil.TempDir("", "ashuffle.max-memory-usage")
-			if err != nil {
-				t.Fatalf("failed to create library dir: %v", err)
-			}
-
-			srv, err := filesystem.Mount(lib, libDir, nil)
-			if err != nil {
-				t.Fatalf("failed to mount fake library: %v", err)
-			}
-			defer func() {
-				srv.Unmount()
-				os.Remove(libDir)
-			}()
+			libDir := mountLibrary(t, lib)
 
 			mpdOpts := &testmpd.Options{LibraryRoot: libDir}
 			if test.mpdMaxOutputBufferSize != 0.0 {
@@ -864,10 +856,7 @@ func TestLongMetaLines(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	lib, err := newLibrary()
-	if err != nil {
-		t.Fatalf("failed to create new library: %v", err)
-	}
+	lib := newLibraryT(t)
 	lib.Tracks = 1000
 
 	t.Logf(strings.Join([]string{
@@ -894,28 +883,111 @@ func TestLongMetaLines(t *testing.T) {
 		return b
 	}
 
-	libDir, err := ioutil.TempDir("", "ashuffle.long-meta-lines")
-	if err != nil {
-		t.Fatalf("failed to create library dir: %v", err)
-	}
+	libDir := mountLibrary(t, lib)
 
-	srv, err := filesystem.Mount(lib, libDir, nil)
-	if err != nil {
-		t.Fatalf("failed to mount fake library: %v", err)
-	}
-	defer func() {
-		srv.Unmount()
-		os.Remove(libDir)
-	}()
-
-	as, _, cleanup := run(ctx, t, runOptions{
+	as, _ := run(ctx, t, runOptions{
 		Library:      libDir,
 		AshuffleArgs: []string{"--only", "100"},
 	})
-	defer cleanup()
 
 	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
 		t.Logf("stderr:\n%s", as.Stderr)
 		t.Errorf("ashuffle did not shut down cleanly: %v", err)
+	}
+}
+
+type songTags struct {
+	Title, Album, Artist string
+}
+
+type literalTagger []songTags
+
+func (l literalTagger) Tag(idx int) *id3v2.Tag {
+	tag := l[idx]
+
+	out := id3v2.NewEmptyTag()
+	if tag.Title != "" {
+		out.SetTitle(tag.Title)
+	}
+	if tag.Album != "" {
+		out.SetAlbum(tag.Album)
+	}
+	if tag.Artist != "" {
+		out.SetArtist(tag.Artist)
+	}
+	return out
+}
+
+func titlePather(_ int, tag *id3v2.Tag) string {
+	return tag.Title() + ".mp3"
+}
+
+// mountLibrary mounts the given library and returns the path to the root
+// of the mounted library.
+func mountLibrary(t *testing.T, l *library.Library) (path string) {
+	t.Helper()
+
+	suffix := "ashuffle." + t.Name()
+	// Replaces slashes in the test name with underscores.
+	suffix = strings.ReplaceAll(suffix, "/", "_")
+
+	dir, err := ioutil.TempDir("", suffix)
+	if err != nil {
+		t.Fatalf("failed to create library dir: %v", err)
+	}
+	t.Cleanup(func() { os.Remove(dir) })
+
+	srv, err := filesystem.Mount(l, dir, nil)
+	if err != nil {
+		t.Fatalf("failed to mount fake library: %v", err)
+	}
+	t.Cleanup(func() { srv.Unmount() })
+
+	return dir
+}
+
+func TestExclude(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	lib := newLibraryT(t)
+	lib.Tracks = 4
+	lib.Tagger = literalTagger{
+		{Title: "full match", Album: "__album__", Artist: "__artist__"},
+		{Title: "partial album", Album: "__album__", Artist: "no match"},
+		{Title: "partial artist", Album: "no match", Artist: "__artist__"},
+		{Title: "no match", Album: "no match", Artist: "no match"},
+	}.Tag
+	lib.Pather = titlePather
+
+	// Should load all songs that do not completely (fully) match the filter.
+	want := Groups{
+		{"partial album.mp3"},
+		{"partial artist.mp3"},
+		{"no match.mp3"},
+	}
+
+	libDir := mountLibrary(t, lib)
+
+	as, _ := run(ctx, t, runOptions{
+		Library: libDir,
+		AshuffleArgs: []string{
+			"-e", "album", "__album__", "artist", "__artist__",
+			"--test_enable_option_do_not_use", "print_all_songs_and_exit",
+		},
+	})
+
+	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Errorf("ashuffle did not shut down cleanly: %v", err)
+	}
+
+	got := splitGroups(as.Stdout.String())
+
+	sort.Sort(got)
+	sort.Sort(want)
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("shuffle songs differ (want -> got):\n%s", diff)
 	}
 }
