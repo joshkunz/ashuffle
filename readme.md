@@ -175,7 +175,11 @@ usage: ashuffle [-h] [-n] [-v] [[-e PATTERN ...] ...] [-o NUMBER]
 Optional Arguments:
    -h,-?,--help      Display this help message.
    -e,--exclude      Specify things to remove from shuffle (think
-                     blacklist).
+                     blacklist). A PATTERN should follow the exclude
+                     flag.
+   --exclude-from    Read exclude rules from the given file. Rules
+                     should be given in the YAML format described in
+                     the included readme.md
    -f,--file         Use MPD URI's found in 'file' instead of using the
                      entire MPD library. You can supply `-` instead of a
                      filename to retrive URI's from standard in. This
@@ -237,6 +241,46 @@ list of Girl Talk songs and then use an `--exclude` statement to filter out the
 Secret Diary album:
 
     $ mpc search artist "Girl Talk" | ashuffle --exclude album "Secret Diary" --file -
+
+### exclude patterns from a file
+
+ashuffle allows exclude patterns to be passed via a YAML formatted file with
+the following structure:
+
+```yaml
+rules:
+- <tag1>: <value1>
+  <tag...>: <value...>
+  <tagN>: <valueN>
+- ...
+```
+
+Where `<tag>` is replaced with the tag to match on (e.g. `artist`) and `<value>`
+is replaced with the value to match (e.g. `arctic`). Tags are matched to values
+based on the rules described in the patterns section above: a case-insensitive
+substring match. All tag values must match their values for a given rule
+(one item of the `rules` list) to match and exclude a track. Rules are not
+updated when the underlying rule file changes. `ashuffle` must be re-started
+for changes to take effect.
+
+For example, if there was an exclusion rules file `excludes.yaml`, with the
+contents:
+
+```yaml
+rules:
+- artist: arctic
+  album: whatever
+- artist: MGMT
+  album: Congratulations
+```
+
+And ashuffle was invoked like:
+
+    $ ashuffle --exclude-from excludes.yaml
+
+Then ashuffle would not include tracks from the album 'Whatever People Say I
+Am, That's What I'm Not' by the 'Arctic Monkeys', or the album 'Congratulations'
+by the artist 'MGMT' in the pool of songs to shuffle.
 
 ## shuffle algorithm
 

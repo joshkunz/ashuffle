@@ -1,0 +1,10 @@
+[wrap-git]
+directory = yaml-cpp
+
+url = https://github.com/jbeder/yaml-cpp.git
+# rennovate: datasource=github-tags depName=jbeder/yaml-cpp versioning=semver-coerced
+revision = yaml-cpp-0.7.0
+depth = 1
+
+[provide]
+dependency_names = yaml-cpp

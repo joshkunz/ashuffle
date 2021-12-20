@@ -64,31 +64,25 @@ func tryWaitFor(cond func() bool) {
 	}
 }
 
-type linesFile struct {
-	f *os.File
-}
+func writeFile(t *testing.T, contents string) (path string) {
+	t.Helper()
 
-func (l linesFile) Path() string {
-	return l.f.Name()
-}
-
-func (l linesFile) Cleanup() error {
-	p := l.Path()
-	l.f.Close()
-	return os.Remove(p)
-}
-
-func writeLines(lines []string) (linesFile, error) {
-	inputF, err := ioutil.TempFile(os.TempDir(), "ashuffle-input")
+	f, err := ioutil.TempFile(os.TempDir(), "ashuffle-input")
 	if err != nil {
-		return linesFile{}, fmt.Errorf("couldn't open tempfile: %w", err)
+		t.Fatalf("couldn't open tempfile: %v", err)
 	}
 
-	if _, err := io.WriteString(inputF, strings.Join(lines, "\n")); err != nil {
-		return linesFile{}, fmt.Errorf("couldn't write lines into tempfile: %w", err)
+	if _, err := io.WriteString(f, contents); err != nil {
+		t.Fatalf("couldn't write lines into tempfile: %v", err)
 	}
 
-	return linesFile{inputF}, nil
+	t.Cleanup(func() {
+		p := f.Name()
+		f.Close()
+		os.Remove(p)
+	})
+
+	return f.Name()
 }
 
 type runOptions struct {
@@ -445,16 +439,12 @@ func TestFromFile(t *testing.T) {
 			test := test
 			t.Parallel()
 
-			linesF, err := writeLines(test.input)
-			if err != nil {
-				t.Fatalf("couldn't write db lines to file: %v", err)
-			}
-			defer linesF.Cleanup()
+			inputPath := writeFile(t, strings.Join(test.input, "\n"))
 
 			as, _ := run(ctx, t, runOptions{
 				Library: test.library,
 				AshuffleArgs: append([]string{
-					"-f", linesF.Path(),
+					"-f", inputPath,
 					"--test_enable_option_do_not_use", "print_all_songs_and_exit",
 				}, test.flags...),
 			})
@@ -604,11 +594,7 @@ func TestFastStartup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create new MPD instance: %v", err)
 	}
-	dbF, err := writeLines(mpd.Db())
-	if err != nil {
-		t.Fatalf("failed to build db file: %v", err)
-	}
-	defer dbF.Cleanup()
+	dbPath := writeFile(t, strings.Join(mpd.Db(), "\n"))
 	mpd.Shutdown()
 
 	tests := []struct {
@@ -622,15 +608,15 @@ func TestFastStartup(t *testing.T) {
 		},
 		{
 			name: "from file",
-			args: []string{"-f", dbF.Path(), "-o", "1"},
+			args: []string{"-f", dbPath, "-o", "1"},
 		},
 		{
 			name: "from file, with filter",
-			args: []string{"-f", dbF.Path(), "-o", "1", "-e", "artist", "AA"},
+			args: []string{"-f", dbPath, "-o", "1", "-e", "artist", "AA"},
 		},
 		{
 			name: "from mpd, group-by artist",
-			args: []string{"-f", dbF.Path(), "-o", "1", "-g", "artist"},
+			args: []string{"-f", dbPath, "-o", "1", "-g", "artist"},
 		},
 	}
 
@@ -969,25 +955,38 @@ func TestExclude(t *testing.T) {
 
 	libDir := mountLibrary(t, lib)
 
-	as, _ := run(ctx, t, runOptions{
-		Library: libDir,
-		AshuffleArgs: []string{
-			"-e", "album", "__album__", "artist", "__artist__",
-			"--test_enable_option_do_not_use", "print_all_songs_and_exit",
-		},
-	})
+	excludePath := writeFile(t, `
+    rules:
+    - album: __album__
+      artist: __artist__
+    `)
 
-	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
-		t.Logf("stderr:\n%s", as.Stderr)
-		t.Errorf("ashuffle did not shut down cleanly: %v", err)
+	tests := map[string][]string{
+		"via arguments": {"-e", "album", "__album__", "artist", "__artist__"},
+		"via file":      {"--exclude-from", excludePath},
 	}
 
-	got := splitGroups(as.Stdout.String())
+	for name, args := range tests {
+		t.Run(name, func(t *testing.T) {
+			as, _ := run(ctx, t, runOptions{
+				Library: libDir,
+				AshuffleArgs: append(args,
+					"--test_enable_option_do_not_use", "print_all_songs_and_exit"),
+			})
 
-	sort.Sort(got)
-	sort.Sort(want)
+			if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
+				t.Logf("stderr:\n%s", as.Stderr)
+				t.Errorf("ashuffle did not shut down cleanly: %v", err)
+			}
 
-	if diff := cmp.Diff(want, got); diff != "" {
-		t.Errorf("shuffle songs differ (want -> got):\n%s", diff)
+			got := splitGroups(as.Stdout.String())
+
+			sort.Sort(got)
+			sort.Sort(want)
+
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("shuffle songs differ (want -> got):\n%s", diff)
+			}
+		})
 	}
 }

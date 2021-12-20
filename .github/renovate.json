@@ -15,5 +15,13 @@
     "postUpdateOptions": [
       "gomodTidy"
     ]
-  }
+  },
+  "regexManagers": [
+    {
+      "fileMatch": ["^subprojects/[^/]+\\.wrap$"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: lookupName=(?<lookupName>[^\\s]+?))?(?: versioning=(?<versioning>[a-z-0-9]+?))?\\srevision = (?<currentValue>.+?)\\s"
+      ]
+    }
+  ]
 }
