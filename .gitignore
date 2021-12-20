@@ -11,3 +11,6 @@ build/**
 
 # The default meta binary created by `go build`
 tools/meta/meta
+
+# Subprojects from wrap files
+/subprojects/yaml-cpp/

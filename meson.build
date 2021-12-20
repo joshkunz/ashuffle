@@ -14,6 +14,12 @@ add_global_arguments(
   language : ['c', 'cpp'],
 )
 
+cmake = import('cmake')
+
+cmake_common_args = [
+  '-DCMAKE_CXX_STANDARD=17',
+]
+
 # absl dependencies need to be explicited...
 # It might be possible to use cmake dependencies (e.g. "absl:string"
 # defined in abslTargets.cmake in the future but that does not seem
@@ -41,7 +47,6 @@ absl_libs = [
 
 absl_deps = []
 if not get_option('unsupported_use_system_absl')
-  cmake = import('cmake')
 
   # HACK: absl detects if it's being built in "system" mode, or "subproject"
   # mode depending on the cmake PROJECT_SOURCE_DIR variable. Since meson
@@ -54,8 +59,7 @@ if not get_option('unsupported_use_system_absl')
   # invocation of `project()` to update PROJECT_SOURCE_DIR.
   absl_project_inc = join_paths(meson.current_source_dir(), 'tools/cmake/inject_project_source_dir.cmake')
 
-  absl = cmake.subproject('absl', cmake_options: [
-    '-DCMAKE_CXX_STANDARD=17',
+  absl = cmake.subproject('absl', cmake_options: cmake_common_args + [
     '-DCMAKE_PROJECT_absl_INCLUDE=' + absl_project_inc,
   ])
 
@@ -75,6 +79,11 @@ else
     endif
   endforeach
 endif
+
+yaml_cpp = cmake.subproject('yaml-cpp', cmake_options: cmake_common_args + [
+  '-DYAML_BUILD_SHARED_LIBS=OFF',
+])
+
 libmpdclient = dependency('libmpdclient')
 
 src_inc = include_directories('src')
@@ -108,7 +117,9 @@ libashuffle = static_library(
   'ashuffle',
   sources,
   include_directories: src_inc,
-  dependencies: absl_deps,
+  dependencies: absl_deps + [
+    yaml_cpp.dependency('yaml-cpp'),
+  ],
 )
 
 ashuffle = executable(

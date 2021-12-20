@@ -12,6 +12,7 @@
 #include "args.h"
 #include "rule.h"
 
+#include "t/helper.h"
 #include "t/mpd_fake.h"
 
 #include <gmock/gmock.h>
@@ -19,7 +20,9 @@
 
 using namespace ashuffle;
 
+using ::ashuffle::test_helper::TemporaryFile;
 using ::testing::ElementsAre;
+using ::testing::Eq;
 using ::testing::HasSubstr;
 using ::testing::IsNull;
 using ::testing::Matcher;
@@ -365,6 +368,82 @@ std::vector<ParseFailureParam> constraint_cases = {
 INSTANTIATE_TEST_SUITE_P(Constraint, ParseFailureTest,
                          ValuesIn(constraint_cases));
 
+using ExcludeFromParseFailureParam =
+    std::tuple<std::string_view, Matcher<std::string>>;
+
+class ExcludeFromParseFailureTest
+    : public testing::TestWithParam<ExcludeFromParseFailureParam> {
+   public:
+    std::optional<ParseError> result_;
+
+    std::string_view ExcludeFromContents() { return std::get<0>(GetParam()); }
+
+    Matcher<std::string> ErrorMatcher() { return std::get<1>(GetParam()); }
+
+    void SetUp() override {
+        fake::TagParser tagger({
+            {"artist", MPD_TAG_ARTIST},
+            {"album", MPD_TAG_ALBUM},
+        });
+
+        TemporaryFile tf(ExcludeFromContents());
+
+        std::variant<Options, ParseError> result =
+            Options::Parse(tagger, {"--exclude-from", tf.Path()});
+        if (ParseError *err = std::get_if<ParseError>(&result);
+            err != nullptr) {
+            result_ = *err;
+        }
+    };
+};
+
+TEST_P(ExcludeFromParseFailureTest, ParseFail) {
+    ASSERT_TRUE(result_.has_value());
+    EXPECT_EQ(result_->type, ParseError::Type::kGeneric);
+    EXPECT_THAT(result_->msg, ErrorMatcher());
+}
+
+std::vector<ExcludeFromParseFailureParam> exclude_from_malformed = {
+    {"", HasSubstr("rules key does not contain rule list")},
+    {"rules: null", HasSubstr("rules key does not contain rule list")},
+    {
+        R"(
+        rules:
+            foo: bar
+        )",
+        HasSubstr("rules key does not contain rule list"),
+    },
+    {
+        R"(
+        rules:
+        - artist: blah
+        - "invalid entry"
+        )",
+        testing::AllOf(HasSubstr("error at line 4"),
+                       HasSubstr("rule is not a tag to value mapping")),
+    },
+    {
+        R"(
+        rules:
+        - artist: blah
+          album: bar
+          unknown: quux
+        )",
+        testing::AllOf(HasSubstr("error at line 5"),
+                       HasSubstr("invalid song tag name 'unknown'")),
+    },
+    {
+        R"(
+        rules:
+        - artist: []
+        )",
+        HasSubstr("bad conversion"),
+    },
+};
+
+INSTANTIATE_TEST_SUITE_P(Malformed, ExcludeFromParseFailureTest,
+                         ValuesIn(exclude_from_malformed));
+
 TEST(ParseTest, TestOption) {
     fake::TagParser tagger;
     Options opts = std::get<Options>(
@@ -415,4 +494,39 @@ TEST(ParseTest, VersionExtraOptions) {
 
     ParseError e = std::get<ParseError>(res);
     EXPECT_EQ(e.type, ParseError::Type::kVersion);
+}
+
+TEST(ParseTests, ExcludeFrom) {
+    fake::TagParser tagger({
+        {"artist", MPD_TAG_ARTIST},
+        {"album", MPD_TAG_ALBUM},
+    });
+
+    TemporaryFile rule_file(R"(
+    rules:
+      - artist: foo
+      - album: bar
+      - artist: foo
+        album: bar
+    )");
+
+    std::variant<Options, ParseError> res =
+        Options::Parse(tagger, {"--exclude-from", rule_file.Path()});
+
+    ASSERT_FALSE(std::holds_alternative<ParseError>(res))
+        << "Parse error:" << std::get<ParseError>(res);
+
+    Options opts = std::get<Options>(std::move(res));
+    EXPECT_EQ(opts.ruleset.size(), 3);
+}
+
+TEST(ParseTests, ExcludeFromEmptyRules) {
+    fake::TagParser tagger;
+
+    TemporaryFile rule_file("rules: []");
+
+    std::variant<Options, ParseError> res =
+        Options::Parse(tagger, {"--exclude-from", rule_file.Path()});
+    ASSERT_FALSE(std::holds_alternative<ParseError>(res))
+        << "Parse error:" << std::get<ParseError>(res);
 }

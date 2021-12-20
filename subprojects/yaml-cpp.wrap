@@ -1,0 +1,9 @@
+[wrap-git]
+directory = yaml-cpp
+
+url = https://github.com/jbeder/yaml-cpp.git
+revision = yaml-cpp-0.7.0
+depth = 1
+
+[provide]
+dependency_names = yaml-cpp

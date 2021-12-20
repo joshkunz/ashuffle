@@ -1,21 +1,26 @@
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
 #include <ostream>
 #include <string_view>
+#include <system_error>
 
 #include <absl/strings/numbers.h>
 #include <absl/strings/str_format.h>
 #include <absl/strings/str_join.h>
 #include <absl/strings/str_split.h>
+#include <yaml-cpp/yaml.h>
 
 #include "args.h"
 #include "rule.h"
 
 namespace ashuffle {
 namespace {
+
+namespace fs = ::std::filesystem;
 
 constexpr char kHelpMessage[] =
     "usage: ashuffle [-h] [-n] [-v] [[-e PATTERN ...] ...] [-o NUMBER]\n"
@@ -24,7 +29,11 @@ constexpr char kHelpMessage[] =
     "Optional Arguments:\n"
     "   -h,-?,--help      Display this help message.\n"
     "   -e,--exclude      Specify things to remove from shuffle (think\n"
-    "                     blacklist).\n"
+    "                     blacklist). A PATTERN should follow the exclude\n"
+    "                     flag.\n"
+    "   --exclude-from    Read exclude rules from the given file. Rules\n"
+    "                     should be provided one per-line following the same\n"
+    "                     PATTERN syntax as the '--exclude' flag.\n"
     "   -f,--file         Use MPD URI's found in 'file' instead of using the\n"
     "                     entire MPD library. You can supply `-` instead of a\n"
     "                     filename to retrive URI's from standard in. This\n"
@@ -74,6 +83,7 @@ class Parser {
         kInProgress,
         kDone,
     };
+
     // Consume consumes the given argument and updates the state of the parser.
     // Consume returns the status of the parser, either "In Progress" or
     // Final. Once a final status is reached, future calls to Consume will
@@ -94,9 +104,10 @@ class Parser {
 
    private:
     enum State {
+        kError,        // (final) Error state
+        kExcludeFile,  // Expecting file path to exclude file.
         kFile,         // Expecting file path
         kFinal,        // (final) Final state
-        kError,        // (final) Error state
         kGroup,        // (generic) Expecting tag for group.
         kGroupBegin,   // Expecting first tag for group.
         kHost,         // Expecting hostname
@@ -141,6 +152,10 @@ class Parser {
     // Parse a tweak argument specifically (anything when we're in kTweak
     // state). Return value has the same semantics as ConsumeInternal.
     std::variant<State, ParseError> ParseTweak(std::string_view arg);
+
+    // Load the exclude rules from the file at the given path. Returns
+    // nothing on success, and an ParseError on failure.
+    std::optional<ParseError> LoadExcludeFile(fs::path path);
 };
 
 bool Parser::InGenericState() {
@@ -271,6 +286,60 @@ std::variant<Parser::State, ParseError> Parser::ParseTweak(
     return ParseError(absl::StrFormat("unrecognized tweak '%s'", arg));
 }
 
+std::optional<ParseError> Parser::LoadExcludeFile(fs::path path) {
+    std::error_code error;
+    fs::file_status status = fs::status(path, error);
+    if (error) {
+        std::stringstream message;
+        message << "Failed to check status of: " << path << ": " << error
+                << std::endl;
+        return ParseError(message.str());
+    }
+
+    if (!fs::exists(status)) {
+        return ParseError(absl::StrFormat("Path %s does not exist", path));
+    }
+
+    YAML::Node doc;
+    try {
+        doc = YAML::LoadFile(path);
+    } catch (const YAML::Exception& e) {
+        return ParseError(absl::StrFormat("Cannot load YAML: %s", e.what()));
+    }
+
+    try {
+        const YAML::Node rules = doc["rules"];
+        if (!rules.IsSequence()) {
+            throw YAML::Exception(rules.Mark(),
+                                  "rules key does not contain rule list");
+        }
+        for (const YAML::Node& rule : rules) {
+            if (!rule.IsMap()) {
+                throw YAML::Exception(rule.Mark(),
+                                      "rule is not a tag to value mapping");
+            }
+            ashuffle::Rule out;
+            for (const auto& kv : rule) {
+                auto raw_tag = kv.first.as<std::string>();
+                auto raw_value = kv.second.as<std::string>();
+                std::optional<enum mpd_tag_type> tag =
+                    tag_parser_.Parse(raw_tag);
+                if (!tag.has_value()) {
+                    throw YAML::Exception(
+                        kv.first.Mark(),
+                        absl::StrFormat("invalid song tag name '%s'", raw_tag));
+                }
+                out.AddPattern(*tag, std::move(raw_value));
+            }
+            opts_.ruleset.emplace_back(std::move(out));
+        }
+    } catch (const YAML::Exception& e) {
+        return ParseError(
+            absl::StrFormat("Cannot load rules from %s: %s", path, e.what()));
+    }
+    return std::nullopt;
+}
+
 std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
     std::string_view arg) {
     if (arg == "--help" || arg == "-h" || arg == "-?") {
@@ -326,8 +395,16 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
         if (arg == "--tweak" || arg == "-t") {
             return kTweak;
         }
+        if (arg == "--exclude-from") {
+            return kExcludeFile;
+        }
     }
     switch (state_) {
+        case kExcludeFile:
+            if (auto error = LoadExcludeFile(arg); error.has_value()) {
+                return *error;
+            }
+            return kNone;
         case kTweak:
             return ParseTweak(arg);
         case kFile:
