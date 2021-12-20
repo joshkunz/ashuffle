@@ -7,7 +7,7 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/fhs/gompd v2.0.0+incompatible
 	github.com/google/go-cmp v0.5.6
-	github.com/joshkunz/fakelib v0.0.4
+	github.com/joshkunz/fakelib v0.0.5
 	github.com/joshkunz/massif v0.0.2
 	github.com/martinlindhe/unit v0.0.0-20210313160520-19b60e03648d
 	github.com/montanaflynn/stats v0.6.6
