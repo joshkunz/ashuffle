@@ -135,6 +135,7 @@ sources = files(
   'src/load.cc',
   'src/args.cc',
   'src/getpass.cc',
+  'src/log.cc',
   'src/rule.cc',
   'src/shuffle.cc',
 )
@@ -197,6 +198,7 @@ if get_option('tests').enabled()
     'load': ['t/load_test.cc'],
     'args': ['t/args_test.cc'],
     'ashuffle': ['t/ashuffle_test.cc'],
+    'log': ['t/log_test.cc'],
     'mpd_fake': ['t/mpd_fake_test.cc'],
   }
 
