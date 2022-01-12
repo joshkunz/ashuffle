@@ -1,6 +1,6 @@
-MESON_VERSION="0.54.0"
-GO_VERSION="1.16.2"
-LLVM_RELEASE="10"
+MESON_VERSION="0.60.2"
+GO_VERSION="1.17.6"
+LLVM_RELEASE="12"
 GIMMIE_URL="https://raw.githubusercontent.com/travis-ci/gimme/master/gimme"
 
 CLANG_CC="clang-${LLVM_RELEASE}"
