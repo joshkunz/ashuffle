@@ -14,6 +14,28 @@ add_global_arguments(
   language : ['c', 'cpp'],
 )
 
+# Figure out if a linker option for std::filesystem is needed. Older versions
+# of clang (before Clang 9.0) and GCC (before 9.1) required linking a special
+# "c++fs" library.
+stdfs_deps = []
+
+cxx_compiler = meson.get_compiler('cpp')
+
+stdfs_test = '''
+#include <filesystem>
+int main(void) { return std::filesystem::exists("/foo"); }
+'''
+
+if cxx_compiler.links(stdfs_test, name: 'std::fs links with only stdlib')
+  # then we don't need to do anything.
+elif cxx_compiler.links(stdfs_test, args: ['-lc++fs'], name: 'std::fs links with -lc++fs')
+  stdfs_deps += [declare_dependency(link_args: ['-lc++fs'])]
+elif cxx_compiler.links(stdfs_test, args: ['-lstdc++fs'], name: 'std::fs links with -lstdc++fs')
+  stdfs_deps += [declare_dependency(link_args: ['-lstdc++fs'])]
+else
+  error('Could not auto-detect how to link std::filesystem. Build configuration unsupported')
+endif
+
 cmake = import('cmake')
 
 cmake_common_args = [
@@ -21,7 +43,7 @@ cmake_common_args = [
 ]
 
 # absl dependencies need to be explicited...
-# It might be possible to use cmake dependencies (e.g. "absl:string"
+# It might be possible to use cmake dependencies (e.g. "absl:string")
 # defined in abslTargets.cmake in the future but that does not seem
 # worth the time trying to figure that out.
 absl_libs = [
@@ -47,7 +69,6 @@ absl_libs = [
 
 absl_deps = []
 if not get_option('unsupported_use_system_absl')
-
   # HACK: absl detects if it's being built in "system" mode, or "subproject"
   # mode depending on the cmake PROJECT_SOURCE_DIR variable. Since meson
   # parses the cmake package info in isolation, absl assumes that it is in
@@ -125,7 +146,7 @@ libashuffle = static_library(
 ashuffle = executable(
   'ashuffle',
   executable_sources,
-  dependencies: absl_deps + [libmpdclient],
+  dependencies: stdfs_deps + absl_deps + [libmpdclient],
   link_with: [libashuffle, libversion],
   install: true,
 )
@@ -180,7 +201,7 @@ if get_option('tests').enabled()
       test_sources,
       include_directories : src_inc,
       link_with: libashuffle,
-      dependencies : absl_deps + gtest_deps + [mpdfake_dep],
+      dependencies : stdfs_deps + absl_deps + gtest_deps + [mpdfake_dep],
       override_options : test_options,
     )
     test(test_name, test_exe)
