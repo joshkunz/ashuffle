@@ -31,12 +31,10 @@ jobs:
   unit-test:
     strategy:
       matrix:
-        sanitizer: ["none", "asan", "msan"]
+        sanitizer: ["none", "asan"]
         include:
           - sanitizer: asan
             name_suffix: " (ASAN)"
-          - sanitizer: msan
-            name_suffix: " (MSAN)"
     name: Unit Test${{ matrix.name_suffix }}
     runs-on: ubuntu-latest
     needs: [check-format, check-lint]

@@ -12,9 +12,6 @@ if test "$#" -gt 0; then
         asan)
             SANITIZER=asan
             ;;
-        msan)
-            SANITIZER=msan
-            ;;
         *)
             die "unrecognized mode $1"
     esac
@@ -31,11 +28,6 @@ case "${SANITIZER}" in
     asan)
         env CC="${CLANG_CC}" CXX="${CLANG_CXX}" LDFLAGS="-fsanitize=address" \
             meson -Dtests=enabled -Db_sanitize=address -Db_lundef=false "${BUILD_ROOT}" \
-            || die "couldn't run meson with sanitizer ${SANITIZER}"
-        ;;
-    msan)
-        env CC="${CLANG_CC}" CXX="${CLANG_CXX}" LDFLAGS="-fsanitize=memory" \
-            meson -Dtests=enabled -Db_sanitize=memory -Db_lundef=false "${BUILD_ROOT}" \
             || die "couldn't run meson with sanitizer ${SANITIZER}"
         ;;
     *)
