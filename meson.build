@@ -2,7 +2,7 @@
 project(
   'ashuffle',
   ['c', 'cpp'],
-  version: 'v3.13.1',
+  version: 'v3.13.2',
   default_options: ['cpp_std=c++17', 'warning_level=2']
 )
 
