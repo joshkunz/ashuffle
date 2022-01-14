@@ -1,13 +1,39 @@
-#!/bin/sh
+#!/bin/bash
 
 . "scripts/github/common.sh"
 
 setup
+
+assure_format() {
+    local f="$1"
+    local match="$2"
+
+    if ! [[ -e "$f" ]]; then
+        die "cannot check format of '$f' file does not exist"
+    fi
+
+    local arch="$(readelf -h "$f" | sed -En 's/\s+Machine:\s+(\S.*)$/\1/p')"
+    if [[ $? -ne 0 ]]; then
+        die "failed to fetch ELF machine of file '$f'"
+    fi
+
+    [[ "$arch" =~ "$match" ]]
+    local status=$?
+    if [[ $status -eq 1 ]]; then
+        die "mismatched machine for $f. Got '$arch' wanted $match'" >&2
+    fi
+    return 0
+}
+
 mkdir -p release
 tools/meta/meta release -o release/ashuffle.x86_64-linux-gnu x86_64 || die "couldn't build x86_64"
+assure_format release/ashuffle.x86_64-linux-gnu X86-64
 tools/meta/meta release -o release/ashuffle.aarch64-linux-gnu \
     --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" aarch64 || die "couldn't build aarch64"
+assure_format release/ashuffle.aarch64-linux-gnu AArch64
 tools/meta/meta release -o release/ashuffle.armv7h-linux-gnueabihf \
     --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv7h || die "couldn't build armv7h"
+assure_format release/ashuffle.armv7h-linux-gnueabihf ARM
 tools/meta/meta release -o release/ashuffle.armv6h-linux-gnueabihf \
     --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv6h || die "couldn't build armv6h"
+assure_format release/ashuffle.armv6h-linux-gnueabihf ARM
