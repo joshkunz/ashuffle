@@ -101,9 +101,13 @@ else
   endforeach
 endif
 
-yaml_cpp = cmake.subproject('yaml-cpp', cmake_options: cmake_common_args + [
-  '-DYAML_BUILD_SHARED_LIBS=OFF',
-])
+if not get_option('unsupported_use_system_yamlcpp')
+  yaml_cpp = cmake.subproject('yaml-cpp', cmake_options: cmake_common_args + [
+    '-DYAML_BUILD_SHARED_LIBS=OFF',
+  ]).dependency('yaml-cpp')
+else
+  yaml_cpp = dependency('yaml-cpp')
+endif
 
 libmpdclient = dependency('libmpdclient')
 
@@ -138,9 +142,7 @@ libashuffle = static_library(
   'ashuffle',
   sources,
   include_directories: src_inc,
-  dependencies: absl_deps + [
-    yaml_cpp.dependency('yaml-cpp'),
-  ],
+  dependencies: absl_deps + [yaml_cpp],
 )
 
 ashuffle = executable(
