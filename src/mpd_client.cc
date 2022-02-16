@@ -231,7 +231,9 @@ absl::StatusOr<std::unique_ptr<Song>> SongReaderImpl::Next() {
         return absl::OutOfRangeError("song reader done");
     }
     // Moving out of an optional will re-set it to null.
-    return std::move(song_.value());
+    auto out = std::move(song_.value());
+    song_.reset();
+    return out;
 }
 
 bool SongReaderImpl::Done() {

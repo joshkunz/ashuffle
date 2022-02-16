@@ -10,6 +10,7 @@ import (
 	"meta/commands/libmpdclient"
 	"meta/commands/mpd"
 	"meta/commands/release"
+	"meta/commands/testbuild"
 )
 
 func doLibmpdclient(ctx *cli.Context) error {
@@ -34,6 +35,7 @@ func main() {
 				},
 			},
 			release.Command,
+			testbuild.Command,
 		},
 	}
 	if err := app.Run(os.Args); err != nil {

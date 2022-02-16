@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -29,7 +28,7 @@ import (
 )
 
 const (
-	ashuffleBin = "/ashuffle/build/ashuffle"
+	ashuffleBin = "/ashuffle/ashuffle"
 
 	goldMP3 = "/music.huge/gold.mp3"
 )
@@ -136,36 +135,6 @@ func newLibraryT(t *testing.T) *library.Library {
 }
 
 func TestMain(m *testing.M) {
-	// compile ashuffle
-	origDir, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("failed to getcwd: %v", err)
-	}
-
-	if err := os.Chdir("/ashuffle"); err != nil {
-		log.Fatalf("failed to chdir to /ashuffle: %v", err)
-	}
-
-	fmt.Println("===> Running MESON")
-	mesonCmd := exec.Command("meson", "--buildtype=debugoptimized", "build")
-	mesonCmd.Stdout = os.Stdout
-	mesonCmd.Stderr = os.Stderr
-	if err := mesonCmd.Run(); err != nil {
-		log.Fatalf("failed to run meson for ashuffle: %v", err)
-	}
-
-	fmt.Println("===> Building ashuffle")
-	ninjaCmd := exec.Command("ninja", "-C", "build", "ashuffle")
-	ninjaCmd.Stdout = os.Stdout
-	ninjaCmd.Stderr = os.Stderr
-	if err := ninjaCmd.Run(); err != nil {
-		log.Fatalf("failed to build ashuffle: %v", err)
-	}
-
-	if err := os.Chdir(origDir); err != nil {
-		log.Fatalf("failed to reset workdir: %v", err)
-	}
-
 	lib, err := newLibrary()
 	if err != nil {
 		log.Fatalf("failed to create new library: %v", err)
@@ -252,6 +221,8 @@ func TestShuffleOnce(t *testing.T) {
 
 	// Wait for ashuffle to exit.
 	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
+		t.Logf("stderr: %s", as.Stderr)
+		t.Logf("stdout: %s", as.Stdout)
 		t.Errorf("ashuffle did not shut down cleanly: %v", err)
 	}
 
