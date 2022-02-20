@@ -155,7 +155,10 @@ func (m MPD) Address() (string, string) {
 
 // Shutdown shuts down this MPD instance, and cleans up associated data.
 func (m *MPD) Shutdown() error {
-	defer m.root.Cleanup()
+	if m.root.owned {
+		// Only cleanup the root if it's owned by this MPD instance.
+		defer m.root.Cleanup()
+	}
 	m.cli.Close()
 
 	// Shutdown the server, either via SIGTERM, or by cancelling the
@@ -283,6 +286,10 @@ func (m *MPD) PlayState() State {
 	return StateUnknown
 }
 
+func (m *MPD) Clear() {
+	m.maybeErr(m.cli.Clear())
+}
+
 // A Root represents the state required to run an instance of MPD.
 type Root struct {
 	path     string
@@ -305,6 +312,12 @@ func (r *Root) Cleanup() {
 	r.cleanupOnce.Do(func() {
 		os.RemoveAll(r.path)
 	})
+}
+
+// The root is what actually defines the address, so Root can also provide
+// the address associated with an MPD instance.
+func (r *Root) Address() (string, string) {
+	return r.socket, ""
 }
 
 func (r Root) hasOptions() bool {

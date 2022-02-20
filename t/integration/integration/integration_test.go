@@ -961,3 +961,73 @@ func TestExclude(t *testing.T) {
 		})
 	}
 }
+
+func TestReconnect(t *testing.T) {
+	ctx := context.Background()
+
+	root, err := testmpd.NewRoot(&testmpd.Options{LibraryRoot: "/music"})
+	if err != nil {
+		t.Fatalf("failed to create MPD root: %v", err)
+	}
+	defer root.Cleanup()
+
+	origMPD, err := testmpd.NewWithRoot(ctx, root)
+	if err != nil {
+		t.Fatalf("failed to create original MPD instance: %v", err)
+	}
+
+	as, err := testashuffle.New(ctx, ashuffleBin, &testashuffle.Options{
+		MPDAddress: root,
+	})
+	if err != nil {
+		t.Fatalf("failed to start ashuffle %v", err)
+	}
+
+	// Verify that we started ashuffle, and we connected to MPD successfully.
+
+	// Wait for ashuffle to startup, and start playing a song.
+	tryWaitFor(func() bool { return origMPD.PlayState() == testmpd.StatePlay })
+
+	if state := origMPD.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[before shutdown] mpd.PlayState() = %v, want play", state)
+	}
+
+	// Shutdown MPD, ashuffle should remain running. But we won't actually
+	// know till later.
+	if err := origMPD.Shutdown(); err != nil {
+		t.Fatalf("Failed to shutdown original MPD: %v", err)
+	}
+	if !origMPD.IsOk() {
+		t.Errorf("Original MPD had errors: %+v", origMPD.Errors)
+	}
+
+	// re-start MPD.
+	restartMPD, err := testmpd.NewWithRoot(ctx, root)
+	if err != nil {
+		t.Fatalf("failed to create restart MPD instance: %v", err)
+	}
+
+	// Clear the queue, to force MPD to re-enqueue a song.
+	restartMPD.Clear()
+
+	// Attempt to wait for ashuffle to enqueue a new song.
+	tryWaitFor(func() bool { return restartMPD.PlayState() == testmpd.StatePlay })
+
+	if state := restartMPD.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[after restart] mpd.PlayState() = %v, want play", state)
+	}
+
+	if err := as.Shutdown(testashuffle.ShutdownHard); err != nil {
+		t.Logf("stdout:\n%s", as.Stdout)
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Errorf("ashuffle did not shutdown cleanly: %v", err)
+	}
+
+	if !restartMPD.IsOk() {
+		t.Errorf("restart MPD had errors: %+v", restartMPD.Errors)
+	}
+
+	if err := restartMPD.Shutdown(); err != nil {
+		t.Errorf("restart mpd did not shutdown cleanly: %v", err)
+	}
+}
