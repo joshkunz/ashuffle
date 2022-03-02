@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Check
         run: scripts/github/check-format
   check-lint:
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Lint
         run: scripts/github/lint
   unit-test:
@@ -40,7 +40,7 @@ jobs:
     needs: [check-format, check-lint]
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Unit Test
         env:
           SANITIZER: ${{ matrix.sanitizer }}
@@ -81,7 +81,7 @@ jobs:
     needs: [unit-test]
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Integration Test
         env:
           MPD_VERSION: ${{ matrix.target.mpd_version }}
@@ -95,7 +95,7 @@ jobs:
     needs: [integration-test]
     steps:
       - name: Clone
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Release Build
         run: scripts/github/release
       - name: Deploy
