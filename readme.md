@@ -438,7 +438,8 @@ them, your mileage may vary.
 
   * AUR (Arch linux): [ashuffle-git](https://aur.archlinux.org/packages/ashuffle-git/)
   * Fedora COPR: [`tokariew/ashuffle`](https://copr.fedorainfracloud.org/coprs/tokariew/ashuffle/)
-  * Homebrew (OSX): [`hamuko/mpd/ashuffle`](https://github.com/joshkunz/ashuffle/issues/35#issuecomment-1086713026)
+  * Homebrew (macOS): [`hamuko/mpd/ashuffle`](https://github.com/joshkunz/ashuffle/issues/35#issuecomment-1086713026)
+  * MacPorts (macOS): [`ashuffle`](https://ports.macports.org/port/ashuffle/)
 
 # contact
 
