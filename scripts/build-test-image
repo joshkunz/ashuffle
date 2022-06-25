@@ -8,6 +8,20 @@ function die() {
     exit 1
 }
 
+usage() {
+    cat <<EOF
+usage: $0 [-m <mpd version>] [-l <libmpdclient version>] [-t <tag>] [...]
+
+Arguments:
+    -h, --help                  Display this help text.
+    -m, --mpd-version           Use the given version of MPD.
+    -l, --libmpdclient-version  Use the given version of libmpdclient.
+    -t, --image-tag             Use the given tag for the built image.
+Any remaining arguments ([...]) are passed to docker.
+EOF
+    exit 1
+}
+
 # Use the environment variables by default.
 MPD_VERSION="${MPD_VERSION:-}"
 LIBMPDCLIENT_VERSION="${LIBMPDCLIENT_VERSION:-}"
@@ -16,6 +30,9 @@ IMAGE_TAG="${IMAGE_TAG:-test/mpd:latest}"
 declare -a DOCKER_ARGS
 while test "$#" -gt 0; do
     case "$1" in
+        -h|--help)
+            usage
+            ;;
         -m|--mpd-version)
             MPD_VERSION="$2"
             shift 2
