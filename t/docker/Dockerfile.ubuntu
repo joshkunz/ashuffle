@@ -1,4 +1,4 @@
-FROM ghcr.io/joshkunz/ashuffle-integration-root:v2.2.5
+FROM ghcr.io/joshkunz/ashuffle-integration-root:v2.2.6
 
 COPY /tools/meta/ /opt/meta
 RUN cd /opt/meta && go build
