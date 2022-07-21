@@ -1,6 +1,6 @@
 module ashuffle
 
-go 1.13
+go 1.18
 
 require (
 	github.com/bogem/id3v2 v1.2.0
@@ -12,6 +12,10 @@ require (
 	github.com/martinlindhe/unit v0.0.0-20210313160520-19b60e03648d
 	github.com/montanaflynn/stats v0.6.6
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
+)
+
+require (
+	github.com/hanwen/go-fuse/v2 v2.1.0 // indirect
 	golang.org/x/sys v0.0.0-20211007075335-d3039528d8ac // indirect
 	golang.org/x/text v0.3.7 // indirect
 )
