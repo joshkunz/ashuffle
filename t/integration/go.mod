@@ -11,7 +11,7 @@ require (
 	github.com/joshkunz/massif v0.0.2
 	github.com/martinlindhe/unit v0.0.0-20220817221856-f7b595b5f97e
 	github.com/montanaflynn/stats v0.6.6
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 )
 
 require (
