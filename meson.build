@@ -82,6 +82,9 @@ if not get_option('unsupported_use_system_absl')
 
   absl = cmake.subproject('absl', cmake_options: cmake_common_args + [
     '-DCMAKE_PROJECT_absl_INCLUDE=' + absl_project_inc,
+    # Absl's CMAKE build feels like it is MinGW for some reason when building
+    # under Meson. Explicitly tell CMAKE it is not MinGW.
+    '-DMINGW=false',
   ])
 
   absl_deps = []
