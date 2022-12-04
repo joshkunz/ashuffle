@@ -19,8 +19,8 @@ github.com/joshkunz/massif v0.0.2/go.mod h1:KAmzsWWCPULX/NdP4qb5JYvjdDebq8+zE2oU
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 h1:MtvEpTB6LX3vkb4ax0b5D2DHbNAUsen0Gx5wZoq3lV4=
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=
 github.com/martinlindhe/unit v0.0.0-20210313160520-19b60e03648d/go.mod h1:8QbxAolnDKw/JhUJMU80MRjHjEs0tLwkjZAPrTn+xLA=
-github.com/martinlindhe/unit v0.0.0-20220817221856-f7b595b5f97e h1:9irq8AxmCM4rT4f0U35hXB/rFY/Tb2/YwnMj06EJMzw=
-github.com/martinlindhe/unit v0.0.0-20220817221856-f7b595b5f97e/go.mod h1:8QbxAolnDKw/JhUJMU80MRjHjEs0tLwkjZAPrTn+xLA=
+github.com/martinlindhe/unit v0.0.0-20221119104754-49d25a6e149e h1:NuquHPVsrvgo3RsyYSywLEg/7izltwiLZR7bvUv0jy8=
+github.com/martinlindhe/unit v0.0.0-20221119104754-49d25a6e149e/go.mod h1:8QbxAolnDKw/JhUJMU80MRjHjEs0tLwkjZAPrTn+xLA=
 github.com/montanaflynn/stats v0.6.6 h1:Duep6KMIDpY4Yo11iFsvyqJDyfzLF9+sndUKT+v64GQ=
 github.com/montanaflynn/stats v0.6.6/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

@@ -9,7 +9,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/joshkunz/fakelib v0.0.5
 	github.com/joshkunz/massif v0.0.2
-	github.com/martinlindhe/unit v0.0.0-20220817221856-f7b595b5f97e
+	github.com/martinlindhe/unit v0.0.0-20221119104754-49d25a6e149e
 	github.com/montanaflynn/stats v0.6.6
 	golang.org/x/sync v0.1.0
 )
