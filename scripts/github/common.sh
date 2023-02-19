@@ -1,6 +1,8 @@
+# renovate: datasource=pypi depName=meson
 MESON_VERSION="0.60.2"
-GO_VERSION="1.17.6"
-LLVM_RELEASE="12"
+# renovate: datasource=github-tags depName=golang/go
+GO_VERSION="go1.20.1"
+LLVM_RELEASE="14"
 GIMMIE_URL="https://raw.githubusercontent.com/travis-ci/gimme/master/gimme"
 
 CLANG_CC="clang-${LLVM_RELEASE}"
@@ -15,7 +17,8 @@ die() {
 }
 
 install_go() {
-    goversion="$1"
+    # Sed out the 'go...' prefix.
+    goversion="$(echo "$1" | sed -E 's/^go(.*)/\1/')"
     # Gimmie outputs envrionment variables, so we need to eval them here.
     eval "$(curl -sL "${GIMMIE_URL}" | GIMME_GO_VERSION="${goversion}" bash)"
 }

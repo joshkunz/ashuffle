@@ -121,7 +121,11 @@ func install(ctx *cli.Context) error {
 
 	var proj project.Project
 	if v.Minor < 21 {
-		p, err := project.NewAutomake(ws.Root)
+		p, err := project.NewAutomake(ws.Root, project.AutomakeOptions{
+			// Need to use an old compiler here as well.
+			CCompiler:   "gcc-9",
+			CXXCompiler: "g++-9",
+		})
 		if err != nil {
 			return err
 		}
