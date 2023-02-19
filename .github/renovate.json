@@ -18,9 +18,19 @@
   },
   "regexManagers": [
     {
-      "fileMatch": ["^subprojects/[^/]+\\.wrap$"],
+      "fileMatch": [
+          "^subprojects/[^/]+\\.wrap$"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: lookupName=(?<lookupName>[^\\s]+?))?(?: versioning=(?<versioning>[a-z-0-9]+?))?\\srevision = (?<currentValue>.+?)\\s"
+      ]
+    },
+    {
+      "fileMatch": [
+          "^scripts/github/common\\.sh$"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?) depName=(?<depName>[^\\s]+?)(?: lookupName=(?<lookupName>[^\\s]+?))?(?: versioning=(?<versioning>[a-z-0-9]+?))?\\s[^=]+=\"(?<currentValue>.+?)\"\\s"
       ]
     }
   ]
