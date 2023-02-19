@@ -153,6 +153,7 @@ func NewMeson(dir string, opts ...MesonOptions) (*Meson, error) {
 // Automake represents a project that uses Automake.
 type Automake struct {
 	Root string
+	opts AutomakeOptions
 }
 
 // Make sure Automake implements the Project interface.
@@ -162,11 +163,21 @@ var _ Project = (*Automake)(nil)
 func (a *Automake) Configure(prefix string) error {
 	cleanup := cd(a.Root)
 	defer cleanup()
-	return exec.Command(
+	cmd := exec.Command(
 		"./configure",
 		"--quiet", "--enable-silent-rules", "--disable-documentation",
 		"--prefix="+prefix,
-	).Run()
+	)
+
+	if a.opts.CCompiler != "" {
+		cmd.Env = append(cmd.Environ(), "CC="+a.opts.CCompiler)
+	}
+
+	if a.opts.CXXCompiler != "" {
+		cmd.Env = append(cmd.Environ(), "CXX="+a.opts.CXXCompiler)
+	}
+
+	return cmd.Run()
 }
 
 // Build implements Project.Build for Automake.
@@ -187,10 +198,19 @@ func (a *Automake) Install() error {
 	return exec.Command("make", "-j", "16", "install").Run()
 }
 
+type AutomakeOptions struct {
+	CCompiler, CXXCompiler string
+}
+
 // NewAutomake returns a new Automake project rooted at the given directory.
-func NewAutomake(dir string) (*Automake, error) {
+func NewAutomake(dir string, opts ...AutomakeOptions) (*Automake, error) {
+	var opt AutomakeOptions
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
 	return &Automake{
 		Root: dir,
+		opts: opt,
 	}, nil
 }
 

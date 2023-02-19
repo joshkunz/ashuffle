@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff"
-	mpdc "github.com/fhs/gompd/mpd"
+	mpdc "github.com/fhs/gompd/v2/mpd"
 	"github.com/martinlindhe/unit"
 )
 
