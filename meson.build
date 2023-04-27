@@ -68,6 +68,10 @@ absl_libs = [
 
   # Via Status & Time:
   'absl_cord',
+  'absl_strerror',
+  'absl_crc_internal',
+  'absl_crc_cord_state',
+  'absl_crc32c',
   'absl_cord_internal',
   'absl_cordz_functions',
   'absl_cordz_handle',
@@ -82,6 +86,7 @@ absl_libs = [
   'absl_statusor',
   'absl_symbolize',
   'absl_synchronization',
+  'absl_kernel_timeout_internal',
   'absl_throw_delegate',
   'absl_time_zone',
   'absl_demangle_internal',
