@@ -180,6 +180,8 @@ struct MPDHost {
     }
 };
 
+}  // namespace
+
 std::optional<std::unique_ptr<Loader>> Reloader(mpd::MPD *mpd,
                                                 const Options &options) {
     // Nothing we can do when `--file` is provided. The user is just stuck
@@ -189,8 +191,6 @@ std::optional<std::unique_ptr<Loader>> Reloader(mpd::MPD *mpd,
     }
     return std::make_unique<MPDLoader>(mpd, options.ruleset, options.group_by);
 }
-
-}  // namespace
 
 /* Keep adding songs when the queue runs out */
 absl::Status Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
@@ -273,7 +273,7 @@ absl::Status Loop(mpd::MPD *mpd, ShuffleChain *songs, const Options &options,
 
 absl::StatusOr<std::unique_ptr<mpd::MPD>> Connect(
     const mpd::Dialer &d, const Options &options,
-    std::function<std::string()> &getpass_f) {
+    std::function<std::string()> *getpass_f) {
     /* Attempt to get host from command line if available. Otherwise use
      * MPD_HOST variable if available. Otherwise use 'localhost'. */
     const char *env_host =
@@ -324,11 +324,13 @@ absl::StatusOr<std::unique_ptr<mpd::MPD>> Connect(
                     auth.status().ToString());
         return auth.status();
     }
-    if (!mpd_host.password && !auth->authorized) {
+    if (!mpd_host.password && !auth->authorized && getpass_f != nullptr) {
         // If the user did *not* supply a password, and we are missing a
-        // required command, then try to prompt the user to provide a password.
-        // Once we get/apply a password, try the required commands again...
-        PromptPassword(mpd.get(), getpass_f);
+        // required command, and we're in an interactive mode (where we have
+        // the ability to prompt for a password) then try to prompt the user to
+        // provide a password. Once we get/apply a password, try the required
+        // commands again...
+        PromptPassword(mpd.get(), *getpass_f);
         auth = mpd->CheckCommands(required);
         if (!auth.ok()) {
             Log().Error("Failed to check required commands: %s",

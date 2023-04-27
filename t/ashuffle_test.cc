@@ -450,7 +450,7 @@ TEST_P(ConnectParamTest, ViaEnv) {
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
     absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
-        Connect(dialer, Options(), pass_f);
+        Connect(dialer, Options(), &pass_f);
     ASSERT_OK(result.status()) << "failed to connect to MPD";
 
     EXPECT_THAT(result->get(),
@@ -478,7 +478,7 @@ TEST_P(ConnectParamTest, ViaFlag) {
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
     absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
-        Connect(dialer, opts, pass_f);
+        Connect(dialer, opts, &pass_f);
     ASSERT_OK(result.status()) << "Failed to connect";
 
     EXPECT_THAT(result->get(),
@@ -542,7 +542,7 @@ TEST(ConnectTest, NoPassword) {
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
     absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
-        Connect(dialer, Options(), pass_f);
+        Connect(dialer, Options(), &pass_f);
     ASSERT_OK(result.status()) << "Failed to connect";
 
     EXPECT_THAT(result->get(),
@@ -573,7 +573,7 @@ TEST(ConnectTest, FlagOverridesEnv) {
     FakePasswordProvider *pp = pass_f.target<FakePasswordProvider>();
 
     absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
-        Connect(dialer, opts, pass_f);
+        Connect(dialer, opts, &pass_f);
     ASSERT_OK(result.status()) << "Failed to connect";
 
     EXPECT_EQ(pp->call_count, 0) << "getpass func should not be called";
@@ -599,7 +599,7 @@ TEST(ConnectDeathTest, BadEnvPassword) {
 
     std::function<std::string()> pass_f = FakePasswordProvider();
 
-    EXPECT_EXIT((void)Connect(dialer, Options(), pass_f), ExitedWithCode(1),
+    EXPECT_EXIT((void)Connect(dialer, Options(), &pass_f), ExitedWithCode(1),
                 HasSubstr("required command still not allowed"));
 }
 
@@ -627,7 +627,7 @@ TEST(ConnectDeathTest, EnvPasswordValidWithNoPermissions) {
     // We should terminate after seeing the bad permissions. If we end up
     // re-prompting (and getting a good password), we should succeed, and fail
     // the test.
-    EXPECT_EXIT((void)Connect(dialer, Options(), pass_f), ExitedWithCode(1),
+    EXPECT_EXIT((void)Connect(dialer, Options(), &pass_f), ExitedWithCode(1),
                 HasSubstr("required command still not allowed"));
 }
 
@@ -654,7 +654,7 @@ TEST(ConnectTest, BadPermsOKPrompt) {
     EXPECT_EQ(pp->call_count, 0);
 
     absl::StatusOr<std::unique_ptr<mpd::MPD>> result =
-        Connect(dialer, Options(), pass_f);
+        Connect(dialer, Options(), &pass_f);
     ASSERT_OK(result.status()) << "Failed to connect";
 
     EXPECT_THAT(result->get(),
@@ -684,7 +684,7 @@ TEST(ConnectDeathTest, BadPermsBadPrompt) {
     std::function<std::string()> pass_f =
         FakePasswordProvider("prompt_password");
 
-    EXPECT_EXIT((void)Connect(dialer, Options(), pass_f), ExitedWithCode(1),
+    EXPECT_EXIT((void)Connect(dialer, Options(), &pass_f), ExitedWithCode(1),
                 HasSubstr("required command still not allowed"));
 }
 

@@ -18,9 +18,17 @@ class Log final {
         WriteLog(Level::kInfo, fmt, args...);
     }
 
+    void InfoStr(std::string_view message) {
+        WriteLogStr(Level::kInfo, message);
+    }
+
     template <typename... Args>
     void Error(const absl::FormatSpec<Args...>& fmt, Args... args) {
         WriteLog(Level::kError, fmt, args...);
+    }
+
+    void ErrorStr(std::string_view message) {
+        WriteLogStr(Level::kError, message);
     }
 
    private:
@@ -29,20 +37,18 @@ class Log final {
         kError,
     };
 
+    friend std::ostream& operator<<(std::ostream&, const Level&);
+
+    void WriteLogStr(Level level, std::string_view message) {
+        log::DefaultLogger().Stream()
+            << level << " " << loc_ << ": " << message << std::endl;
+    }
+
     template <typename... Args>
     void WriteLog(Level level, const absl::FormatSpec<Args...>& fmt,
                   Args... args) {
-        const char* level_str = nullptr;
-        switch (level) {
-            case Level::kInfo:
-                level_str = "INFO";
-                break;
-            case Level::kError:
-                level_str = "ERROR";
-                break;
-        }
         log::DefaultLogger().Stream()
-            << level_str << " " << loc_ << ": " << absl::StrFormat(fmt, args...)
+            << level << " " << loc_ << ": " << absl::StrFormat(fmt, args...)
             << std::endl;
     }
 
