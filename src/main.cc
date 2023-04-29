@@ -88,7 +88,12 @@ int main(int argc, const char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    log::SetOutput(std::cerr);
+    if (options.log_file == nullptr) {
+        // By default, log to stderr.
+        log::SetOutput(std::cerr);
+    } else {
+        log::SetOutput(*options.log_file);
+    }
 
     bool disable_reconnect = false;
     std::function<std::string()> pass_f = [&disable_reconnect] {

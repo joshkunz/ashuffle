@@ -28,6 +28,7 @@ constexpr char kHelpMessage[] =
     "\n"
     "Optional Arguments:\n"
     "   -h,-?,--help      Display this help message.\n"
+    "   --by-album        Same as '--group-by album date'.\n"
     "   -e,--exclude      Specify things to remove from shuffle (think\n"
     "                     blacklist). A PATTERN should follow the exclude\n"
     "                     flag.\n"
@@ -39,13 +40,13 @@ constexpr char kHelpMessage[] =
     "                     filename to retrive URI's from standard in. This\n"
     "                     can be used to pipe song URI's from another program\n"
     "                     into ashuffle.\n"
-    "   --by-album        Same as '--group-by album date'.\n"
     "   -g,--group-by     Shuffle songs grouped by the given tags. For\n"
     "                     example 'album' could be used as the tag, and an\n"
     "                     entire album's worth of songs would be queued\n"
     "                     instead of one song at a time.\n"
     "   --host            Specify a hostname or IP address to connect to.\n"
     "                     Defaults to `localhost`.\n"
+    "   --log-file        Path to write log output to. Defaults to stderr.\n"
     "   -n,--no-check     When reading URIs from a file, don't check to\n"
     "                     ensure that the URIs match the given exclude rules.\n"
     "                     This option is most helpful when shuffling songs\n"
@@ -111,6 +112,7 @@ class Parser {
         kGroup,        // (generic) Expecting tag for group.
         kGroupBegin,   // Expecting first tag for group.
         kHost,         // Expecting hostname
+        kLogFile,      // Expecting file path to log file.
         kNone,         // (generic) Default state, and initial state.
         kPort,         // Expecting port
         kQueue,        // Expecting --only value
@@ -413,6 +415,9 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
         if (arg == "--exclude-from") {
             return kExcludeFile;
         }
+        if (arg == "--log-file") {
+            return kLogFile;
+        }
     }
     switch (state_) {
         case kExcludeFile:
@@ -434,6 +439,11 @@ std::variant<Parser::State, ParseError> Parser::ConsumeInternal(
         case kHost:
             opts_.host = arg;
             return kNone;
+        case kLogFile: {
+            std::string filepath(arg);
+            opts_.InternalTakeLog(std::make_unique<std::ofstream>(filepath));
+            return kNone;
+        }
         case kPort:
             if (!absl::SimpleAtoi(arg, &opts_.port)) {
                 return ParseError(

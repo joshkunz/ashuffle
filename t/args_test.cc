@@ -10,6 +10,7 @@
 #include <mpd/tag.h>
 
 #include "args.h"
+#include "gmock/gmock.h"
 #include "rule.h"
 
 #include "t/helper.h"
@@ -40,6 +41,7 @@ TEST(ParseTest, Empty) {
     EXPECT_TRUE(opts.ruleset.empty()) << "there should be no rules by default";
     EXPECT_EQ(opts.queue_only, 0U);
     EXPECT_THAT(opts.file_in, IsNull());
+    EXPECT_THAT(opts.log_file, IsNull());
     EXPECT_TRUE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 0U);
     EXPECT_EQ(opts.host, std::nullopt);
@@ -96,6 +98,7 @@ TEST(ParseTest, Long) {
             "--only", "5",
             "--no-check",
             "--file", "/dev/zero",
+            "--log-file", "/dev/null",
             "--exclude", "artist", "test artist", "artist", "another one",
             "--queue-buffer", "10",
             "--host", "foo",
@@ -113,6 +116,7 @@ TEST(ParseTest, Long) {
     EXPECT_EQ(opts.ruleset.size(), 1U);
     EXPECT_EQ(opts.queue_only, 5U);
     EXPECT_THAT(opts.file_in, NotNull());
+    EXPECT_THAT(opts.log_file, NotNull());
     EXPECT_FALSE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 10U);
     EXPECT_EQ(opts.host, "foo");

@@ -175,6 +175,7 @@ usage: ashuffle [-h] [-n] [-v] [[-e PATTERN ...] ...] [-o NUMBER]
 
 Optional Arguments:
    -h,-?,--help      Display this help message.
+   --by-album        Same as '--group-by album date'.
    -e,--exclude      Specify things to remove from shuffle (think
                      blacklist). A PATTERN should follow the exclude
                      flag.
@@ -186,13 +187,13 @@ Optional Arguments:
                      filename to retrive URI's from standard in. This
                      can be used to pipe song URI's from another program
                      into ashuffle.
-   --by-album        Same as '--group-by album date'.
    -g,--group-by     Shuffle songs grouped by the given tags. For
                      example 'album' could be used as the tag, and an
                      entire album's worth of songs would be queued
                      instead of one song at a time.
    --host            Specify a hostname or IP address to connect to.
                      Defaults to `localhost`.
+   --log-file        Path to write log output to. Defaults to stderr.
    -n,--no-check     When reading URIs from a file, don't check to
                      ensure that the URIs match the given exclude rules.
                      This option is most helpful when shuffling songs
