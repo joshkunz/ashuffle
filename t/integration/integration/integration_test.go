@@ -1030,4 +1030,50 @@ func TestReconnect(t *testing.T) {
 	if err := restartMPD.Shutdown(); err != nil {
 		t.Errorf("restart mpd did not shutdown cleanly: %v", err)
 	}
+
+}
+func TestReconnect_Timeout(t *testing.T) {
+	ctx := context.Background()
+
+	as, mpd := run(ctx, t, runOptions{
+		AshuffleArgs: []string{"--tweak", "reconnect-timeout=1s"},
+	})
+
+	// Wait for ashuffle to startup, and start playing a song.
+	tryWaitFor(func() bool { return mpd.PlayState() == testmpd.StatePlay })
+
+	if state := mpd.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[before shutdown] mpd.PlayState() = %v, want play", state)
+	}
+
+	// Shutdown MPD, ashuffle should remain running. But we won't actually
+	// know till later.
+	if err := mpd.Shutdown(); err != nil {
+		t.Fatalf("Failed to shutdown MPD: %v", err)
+	}
+	if !mpd.IsOk() {
+		t.Errorf("MPD had errors: %+v", mpd.Errors)
+	}
+
+	err := as.Shutdown(testashuffle.ShutdownSoft)
+	if err == nil {
+		t.Logf("stdout:\n%s", as.Stdout)
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Fatalf("ashuffle should have exited with an error, but shutdown cleanly instead")
+	}
+
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("ashuffle shutdown did not produce exit error, produced %#v", err)
+	}
+
+	if got := exitErr.ExitCode(); got != 1 {
+		t.Errorf("ashuffle exited with code %d, want 1 (full err: %v)", got, err)
+	}
+
+	wantMsg := "not reconnect after 1s, aborting"
+	if !strings.Contains(as.Stderr.String(), wantMsg) {
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Errorf("ashuffle stderr does not include %q", wantMsg)
+	}
 }
