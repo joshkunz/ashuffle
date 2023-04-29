@@ -25,11 +25,6 @@
 
 using namespace ashuffle;
 
-// This is the maximum amount of time that ashuffle is allowed to be
-// disconnected from MPD before it exits. This catches cases where the
-// environment changes and it would be impossible for ashuffle to reconnect.
-const absl::Duration kMaxDisconnectedTime = absl::Seconds(10);
-
 // The amount of time to wait between reconnection attempts.
 const absl::Duration kReconnectWait = absl::Milliseconds(250);
 
@@ -175,7 +170,7 @@ int main(int argc, const char* argv[]) {
     }
 
     absl::Time disconnect_begin = absl::Now();
-    while ((absl::Now() - disconnect_begin) < kMaxDisconnectedTime) {
+    while ((absl::Now() - disconnect_begin) < options.tweak.reconnect_timeout) {
         mpd = Connect(*mpd::client::Dialer(), options, kNonInteractiveGetpass);
         if (!mpd.ok()) {
             Log().Error("Failed to reconnect to MPD %s, been waiting %s",
@@ -197,7 +192,7 @@ int main(int argc, const char* argv[]) {
         disconnect_begin = absl::Now();
     }
     Log().Error("Could not reconnect after %s, aborting.",
-                absl::FormatDuration(kMaxDisconnectedTime));
+                absl::FormatDuration(options.tweak.reconnect_timeout));
 
     exit(EXIT_FAILURE);
 }
