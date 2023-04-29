@@ -50,6 +50,7 @@ TEST(ParseTest, Empty) {
     EXPECT_EQ(opts.tweak.play_on_startup, true);
     EXPECT_EQ(opts.tweak.suspend_timeout, absl::ZeroDuration());
     EXPECT_EQ(opts.tweak.exit_on_db_update, false);
+    EXPECT_EQ(opts.tweak.reconnect_timeout, absl::Seconds(10));
 }
 
 TEST(ParseTest, Short) {
@@ -268,6 +269,21 @@ TEST(ParseTest, TweakExitOnDBUpdate) {
     Options opts = std::get<Options>(Options::Parse(
         fake::TagParser(), {"--tweak", "exit-on-db-update=yes"}));
     EXPECT_EQ(opts.tweak.exit_on_db_update, true);
+}
+
+TEST(ParseTest, TweakReconnectTimeout) {
+    std::vector<std::tuple<std::string, absl::Duration>> cases = {
+        {"1s", absl::Seconds(1)},
+        {"1m", absl::Minutes(1)},
+        {"3h", absl::Hours(3)},
+        {"250ms", absl::Milliseconds(250)},
+    };
+
+    for (auto [val, want] : cases) {
+        Options opts = std::get<Options>(Options::Parse(
+            fake::TagParser(), {"--tweak", "reconnect-timeout=" + val}));
+        EXPECT_EQ(opts.tweak.reconnect_timeout, want) << "Case: " << val;
+    }
 }
 
 using ParseFailureParam =

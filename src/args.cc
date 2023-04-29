@@ -272,6 +272,21 @@ std::variant<Parser::State, ParseError> Parser::ParseTweak(
         return kNone;
     }
 
+    if (key == "reconnect-timeout") {
+        if (!absl::ParseDuration(value, &opts_.tweak.reconnect_timeout)) {
+            return ParseError(absl::StrFormat(
+                "reconnect-timeout must be a duration with units "
+                "e.g., 30s ('%s' given)",
+                value));
+        }
+        if (opts_.tweak.reconnect_timeout < absl::ZeroDuration()) {
+            return ParseError(absl::StrFormat(
+                "reconnect-timeout must be a positive duration ('%s' given)",
+                value));
+        }
+        return kNone;
+    }
+
     if (key == "exit-on-db-update") {
         auto v = ParseBool(value);
         if (!v.has_value()) {

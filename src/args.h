@@ -57,6 +57,10 @@ class Options {
         // intented to be used in cases where the user is passing in a
         // list of songs via -f, and they may want to re-generate that list.
         bool exit_on_db_update = false;
+        // Duration to attempt to reconnect to MPD after a disconnection.
+        // After this time, ashuffle will assume it cannot reconnect and
+        // will quit.
+        absl::Duration reconnect_timeout = absl::Seconds(10);
     } tweak = {};
     std::vector<enum mpd_tag_type> group_by = {};
 
