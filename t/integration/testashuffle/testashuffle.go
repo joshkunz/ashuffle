@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -143,6 +144,8 @@ type Options struct {
 	Args              []string
 	EnableHeapProfile bool
 	ShutdownTimeout   time.Duration
+	Stdin             io.Reader
+	Stdout            io.Writer
 }
 
 func New(ctx context.Context, path string, opts *Options) (*Ashuffle, error) {
@@ -169,7 +172,17 @@ func New(ctx context.Context, path string, opts *Options) (*Ashuffle, error) {
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	cmd.Stdout = &stdout
+	if opts != nil && opts.Stdout != nil {
+		// If the user provides their own stdout channel, then tee between
+		// both the buffer, and their channel.
+		cmd.Stdout = io.MultiWriter(opts.Stdout, &stdout)
+	} else {
+		cmd.Stdout = &stdout
+	}
+
+	if opts != nil && opts.Stdin != nil {
+		cmd.Stdin = opts.Stdin
+	}
 
 	shutdownTimeout := maxShutdownWait
 	if opts != nil && opts.ShutdownTimeout != 0 {
