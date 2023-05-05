@@ -35,6 +35,7 @@ class Options {
     std::vector<Rule> ruleset;
     unsigned queue_only = 0;
     std::istream *file_in = nullptr;
+    std::ostream *log_file = nullptr;
     bool check_uris = true;
     unsigned queue_buffer = 0;
     std::optional<std::string> host = {};
@@ -57,6 +58,10 @@ class Options {
         // intented to be used in cases where the user is passing in a
         // list of songs via -f, and they may want to re-generate that list.
         bool exit_on_db_update = false;
+        // Duration to attempt to reconnect to MPD after a disconnection.
+        // After this time, ashuffle will assume it cannot reconnect and
+        // will quit.
+        absl::Duration reconnect_timeout = absl::Seconds(10);
     } tweak = {};
     std::vector<enum mpd_tag_type> group_by = {};
 
@@ -85,12 +90,21 @@ class Options {
         owned_file_ = std::move(is);
     };
 
+    // Same as InternalTakeIstream but for the log file ostream.
+    void InternalTakeLog(std::unique_ptr<std::ostream> &&os) {
+        log_file = os.get();
+        owned_log_file_ = std::move(os);
+    }
+
    private:
     // The owned_file is set if this Options class owns the file_in ptr.
     // The file_in ptr is only *sometimes* owned. For example, the file_in ptr
     // may point to std::cin, which has static lifetime, and is not owned by
     // this object.
     std::unique_ptr<std::istream> owned_file_;
+
+    // Same as above.
+    std::unique_ptr<std::ostream> owned_log_file_;
 };
 
 // Print the help message on the given output stream, and return the input

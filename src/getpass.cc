@@ -20,6 +20,11 @@ void SetEcho(FILE *stream, bool echo_state, bool echo_nl_state) {
     struct termios flags;
     int res = tcgetattr(fileno(stream), &flags);
     if (res != 0) {
+        if (errno == ENOTTY) {
+            // If the output device is not a tty, then we don't need to
+            // worry about the echo.
+            return;
+        }
         perror("SetEcho (tcgetattr)");
         std::exit(1);
     }

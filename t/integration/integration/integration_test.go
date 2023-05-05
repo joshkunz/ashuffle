@@ -1,8 +1,9 @@
 package integration_test
 
 import (
+	"bufio"
+	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -29,7 +30,7 @@ import (
 )
 
 const (
-	ashuffleBin = "/ashuffle/build/ashuffle"
+	ashuffleBin = "/ashuffle/ashuffle"
 
 	goldMP3 = "/music.huge/gold.mp3"
 )
@@ -136,36 +137,6 @@ func newLibraryT(t *testing.T) *library.Library {
 }
 
 func TestMain(m *testing.M) {
-	// compile ashuffle
-	origDir, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("failed to getcwd: %v", err)
-	}
-
-	if err := os.Chdir("/ashuffle"); err != nil {
-		log.Fatalf("failed to chdir to /ashuffle: %v", err)
-	}
-
-	fmt.Println("===> Running MESON")
-	mesonCmd := exec.Command("meson", "--buildtype=debugoptimized", "build")
-	mesonCmd.Stdout = os.Stdout
-	mesonCmd.Stderr = os.Stderr
-	if err := mesonCmd.Run(); err != nil {
-		log.Fatalf("failed to run meson for ashuffle: %v", err)
-	}
-
-	fmt.Println("===> Building ashuffle")
-	ninjaCmd := exec.Command("ninja", "-C", "build", "ashuffle")
-	ninjaCmd.Stdout = os.Stdout
-	ninjaCmd.Stderr = os.Stderr
-	if err := ninjaCmd.Run(); err != nil {
-		log.Fatalf("failed to build ashuffle: %v", err)
-	}
-
-	if err := os.Chdir(origDir); err != nil {
-		log.Fatalf("failed to reset workdir: %v", err)
-	}
-
 	lib, err := newLibrary()
 	if err != nil {
 		log.Fatalf("failed to create new library: %v", err)
@@ -252,6 +223,8 @@ func TestShuffleOnce(t *testing.T) {
 
 	// Wait for ashuffle to exit.
 	if err := as.Shutdown(testashuffle.ShutdownSoft); err != nil {
+		t.Logf("stderr: %s", as.Stderr)
+		t.Logf("stdout: %s", as.Stdout)
 		t.Errorf("ashuffle did not shut down cleanly: %v", err)
 	}
 
@@ -988,5 +961,222 @@ func TestExclude(t *testing.T) {
 				t.Errorf("shuffle songs differ (want -> got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestReconnect(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	root, err := testmpd.NewRoot(&testmpd.Options{LibraryRoot: "/music"})
+	if err != nil {
+		t.Fatalf("failed to create MPD root: %v", err)
+	}
+	defer root.Cleanup()
+
+	origMPD, err := testmpd.NewWithRoot(ctx, root)
+	if err != nil {
+		t.Fatalf("failed to create original MPD instance: %v", err)
+	}
+
+	as, err := testashuffle.New(ctx, ashuffleBin, &testashuffle.Options{
+		MPDAddress: root,
+	})
+	if err != nil {
+		t.Fatalf("failed to start ashuffle %v", err)
+	}
+
+	// Verify that we started ashuffle, and we connected to MPD successfully.
+
+	// Wait for ashuffle to startup, and start playing a song.
+	tryWaitFor(func() bool { return origMPD.PlayState() == testmpd.StatePlay })
+
+	if state := origMPD.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[before shutdown] mpd.PlayState() = %v, want play", state)
+	}
+
+	// Shutdown MPD, ashuffle should remain running. But we won't actually
+	// know till later.
+	if err := origMPD.Shutdown(); err != nil {
+		t.Fatalf("Failed to shutdown original MPD: %v", err)
+	}
+	if !origMPD.IsOk() {
+		t.Errorf("Original MPD had errors: %+v", origMPD.Errors)
+	}
+
+	// re-start MPD.
+	restartMPD, err := testmpd.NewWithRoot(ctx, root)
+	if err != nil {
+		t.Fatalf("failed to create restart MPD instance: %v", err)
+	}
+
+	// Clear the queue, to force MPD to re-enqueue a song.
+	restartMPD.Clear()
+
+	// Attempt to wait for ashuffle to enqueue a new song.
+	tryWaitFor(func() bool { return restartMPD.PlayState() == testmpd.StatePlay })
+
+	if state := restartMPD.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[after restart] mpd.PlayState() = %v, want play", state)
+	}
+
+	if err := as.Shutdown(testashuffle.ShutdownHard); err != nil {
+		t.Logf("stdout:\n%s", as.Stdout)
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Errorf("ashuffle did not shutdown cleanly: %v", err)
+	}
+
+	if !restartMPD.IsOk() {
+		t.Errorf("restart MPD had errors: %+v", restartMPD.Errors)
+	}
+
+	if err := restartMPD.Shutdown(); err != nil {
+		t.Errorf("restart mpd did not shutdown cleanly: %v", err)
+	}
+}
+
+func TestReconnect_Timeout(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	as, mpd := run(ctx, t, runOptions{
+		AshuffleArgs: []string{"--tweak", "reconnect-timeout=1s"},
+	})
+
+	// Wait for ashuffle to startup, and start playing a song.
+	tryWaitFor(func() bool { return mpd.PlayState() == testmpd.StatePlay })
+
+	if state := mpd.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[before shutdown] mpd.PlayState() = %v, want play", state)
+	}
+
+	// Shutdown MPD, ashuffle should remain running. But we won't actually
+	// know till later.
+	if err := mpd.Shutdown(); err != nil {
+		t.Fatalf("Failed to shutdown MPD: %v", err)
+	}
+	if !mpd.IsOk() {
+		t.Errorf("MPD had errors: %+v", mpd.Errors)
+	}
+
+	err := as.Shutdown(testashuffle.ShutdownSoft)
+	if err == nil {
+		t.Logf("stdout:\n%s", as.Stdout)
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Fatalf("ashuffle should have exited with an error, but shutdown cleanly instead")
+	}
+
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("ashuffle shutdown did not produce exit error, produced %#v", err)
+	}
+
+	if got := exitErr.ExitCode(); got != 1 {
+		t.Errorf("ashuffle exited with code %d, want 1 (full err: %v)", got, err)
+	}
+
+	wantMsg := "not reconnect after 1s, aborting"
+	if !strings.Contains(as.Stderr.String(), wantMsg) {
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Errorf("ashuffle stderr does not include %q", wantMsg)
+	}
+}
+
+func TestReconnect_PasswordPrompt(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	mpd, err := testmpd.New(ctx, &testmpd.Options{
+		LibraryRoot:        "/music",
+		DefaultPermissions: []string{"read"},
+		Passwords: []testmpd.Password{
+			{
+				Password:    "super_secret_mpd_password",
+				Permissions: []string{"read", "add", "control", "admin"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create new MPD instance: %v", err)
+	}
+
+	stdinr, stdinw := io.Pipe()
+	stdoutr, stdoutw := io.Pipe()
+	defer stdoutr.Close()
+	defer stdoutw.Close()
+
+	as, err := testashuffle.New(ctx, ashuffleBin, &testashuffle.Options{
+		MPDAddress:      mpd,
+		Args:            []string{"--tweak", "reconnect-timeout=10s"},
+		Stdin:           stdinr,
+		Stdout:          stdoutw,
+		ShutdownTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		t.Fatalf("failed to start ashuffle: %v", err)
+	}
+
+	scanStdout := bufio.NewScanner(stdoutr)
+	scanStdout.Split(func(data []byte, _ bool) (int, []byte, error) {
+		idx := bytes.IndexRune(data, ':')
+		if idx < 0 {
+			return 0, nil, nil
+		}
+		return idx, data[:idx+1], nil
+	})
+	for scanStdout.Scan() {
+		if strings.Contains(scanStdout.Text(), "mpd password:") {
+			break
+		}
+	}
+	if err := scanStdout.Err(); err != nil {
+		t.Fatalf("scanner threw error: %v", err)
+	}
+
+	// Make sure that stdout Pipe doesn't block future writes.
+	go io.Copy(io.Discard, stdoutr)
+
+	// Enter the password.
+	if _, err := io.WriteString(stdinw, "super_secret_mpd_password\n"); err != nil {
+		t.Fatalf("failed to write password to ashuffle stdin: %v", err)
+	}
+
+	// Close out stdin now that we've entered our password.
+	stdinr.Close()
+	stdinw.Close()
+
+	// Wait for ashuffle to startup, and start playing a song.
+	tryWaitFor(func() bool { return mpd.PlayState() == testmpd.StatePlay })
+
+	if state := mpd.PlayState(); state != testmpd.StatePlay {
+		t.Errorf("[before shutdown] mpd.PlayState() = %v, want play", state)
+	}
+
+	// Shutdown MPD, ashuffle should remain running. But we won't actually
+	// know till later. Because we entered the password manually this should
+	// immediately exit ashuffle.
+	if err := mpd.Shutdown(); err != nil {
+		t.Fatalf("Failed to shutdown MPD: %v", err)
+	}
+	if !mpd.IsOk() {
+		t.Errorf("MPD had errors: %+v", mpd.Errors)
+	}
+
+	err = as.Shutdown(testashuffle.ShutdownSoft)
+	if err == nil {
+		t.Logf("stdout:\n%s", as.Stdout)
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Fatalf("ashuffle should have exited with an error, but shutdown cleanly instead")
+	}
+
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Logf("stdout:\n%s", as.Stdout)
+		t.Logf("stderr:\n%s", as.Stderr)
+		t.Fatalf("ashuffle shutdown did not produce exit error, produced %#v", err)
+	}
+
+	if got := exitErr.ExitCode(); got != 1 {
+		t.Errorf("ashuffle exited with code %d, want 1 (full err: %v)", got, err)
 	}
 }

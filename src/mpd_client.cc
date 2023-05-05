@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include <absl/strings/str_format.h>
+#include <absl/strings/str_join.h>
 #include <mpd/capabilities.h>
 #include <mpd/connection.h>
 #include <mpd/database.h>
@@ -18,6 +19,7 @@
 #include <mpd/song.h>
 #include <mpd/status.h>
 
+#include "log.h"
 #include "mpd.h"
 #include "util.h"
 
@@ -142,28 +144,26 @@ class MPDImpl : public MPD {
     MPDImpl& operator=(MPDImpl&&) = default;
 
     ~MPDImpl() override;
-    void Pause() override;
-    void Play() override;
-    void PlayAt(unsigned position) override;
-    std::unique_ptr<Status> CurrentStatus() override;
-    std::unique_ptr<SongReader> ListAll(MetadataOption metadata) override;
-    std::optional<std::unique_ptr<Song>> Search(std::string_view uri) override;
-    IdleEventSet Idle(const IdleEventSet&) override;
-    void Add(const std::string& uri) override;
-    MPD::PasswordStatus ApplyPassword(const std::string& password) override;
-    Authorization CheckCommands(
+    absl::Status Pause() override;
+    absl::Status Play() override;
+    absl::Status PlayAt(unsigned position) override;
+    absl::StatusOr<std::unique_ptr<Status>> CurrentStatus() override;
+    absl::StatusOr<std::unique_ptr<SongReader>> ListAll(
+        MetadataOption metadata) override;
+    absl::StatusOr<std::unique_ptr<Song>> Search(std::string_view uri) override;
+    absl::StatusOr<IdleEventSet> Idle(const IdleEventSet&) override;
+    absl::Status Add(const std::string& uri) override;
+    absl::StatusOr<MPD::PasswordStatus> ApplyPassword(
+        const std::string& password) override;
+    absl::StatusOr<Authorization> CheckCommands(
         const std::vector<std::string_view>& cmds) override;
 
    private:
     friend SongReaderImpl;
     struct mpd_connection* mpd_;
 
-    // Exits the program, printing the current MPD connection error message.
-    void Fail();
-
-    // Checks to see if the MPD connection has an error. If it does, it
-    // calls Fail.
-    void CheckFail();
+    // Returns the current status of the MPD connection as a status.
+    absl::Status ConnectionStatus();
 };
 
 class SongReaderImpl : public SongReader {
@@ -182,7 +182,7 @@ class SongReaderImpl : public SongReader {
     // that type correctly.
     ~SongReaderImpl() override = default;
 
-    std::optional<std::unique_ptr<Song>> Next() override;
+    absl::StatusOr<std::unique_ptr<Song>> Next() override;
     bool Done() override;
 
    private:
@@ -199,23 +199,34 @@ void SongReaderImpl::FetchNext() {
         return;
     }
     struct mpd_song* raw_song = mpd_recv_song(mpd_.mpd_);
+    // Some special error handling for common errors encountered during
+    // the song reader process.
     const enum mpd_error err = mpd_connection_get_error(mpd_.mpd_);
     if (err == MPD_ERROR_CLOSED) {
-        std::cerr
-            << "MPD server closed the connection while getting the list of\n"
-            << "all songs. If MPD error logs say \"Output buffer is full\",\n"
-            << "consider setting max_output_buffer_size to a higher value\n"
-            << "(e.g. 32768) in your MPD config." << std::endl;
+        Log().ErrorStr(absl::StrJoin(
+            {
+                "MPD server closed the connection while getting the list of",
+                "all songs. If MPD error logs say \"Output buffer is full\",",
+                "consider setting max_output_buffer_size to a higher value",
+                "(e.g. 32768) in your MPD config.",
+            },
+            "\n"));
     }
     if (err == MPD_ERROR_MALFORMED) {
-        std::cerr
-            << "libmpdclient received a malformed response from the server.\n"
-            << "This may be because a song's metadata attribute (for example,\n"
-            << "a comment) was longer than 4KiB.\n"
-            << "See https://github.com/joshkunz/ashuffle/issues/89 for\n"
-            << "details or updates." << std::endl;
+        Log().ErrorStr(absl::StrJoin(
+            {
+                "libmpdclient received a malformed response from the server.",
+                "This may be because a song's metadata attribute (for example,",
+                "a comment) was longer than 4KiB.",
+                "See https://github.com/joshkunz/ashuffle/issues/89 for",
+                "details or updates.",
+            },
+            "\n"));
     }
-    mpd_.CheckFail();
+    if (!mpd_.ConnectionStatus().ok()) {
+        song_ = std::nullopt;
+        return;
+    }
     if (raw_song == nullptr) {
         song_ = std::nullopt;
         return;
@@ -223,9 +234,19 @@ void SongReaderImpl::FetchNext() {
     song_ = std::unique_ptr<Song>(new SongImpl(raw_song));
 }
 
-std::optional<std::unique_ptr<Song>> SongReaderImpl::Next() {
+absl::StatusOr<std::unique_ptr<Song>> SongReaderImpl::Next() {
     FetchNext();
-    return std::exchange(song_, std::nullopt);
+    // If an error occured on fetch, then return it.
+    if (auto status = mpd_.ConnectionStatus(); !status.ok()) {
+        return status;
+    }
+    if (!song_.has_value()) {
+        return absl::OutOfRangeError("song reader done");
+    }
+    // Moving out of an optional will re-set it to null.
+    auto out = std::move(song_.value());
+    song_.reset();
+    return out;
 }
 
 bool SongReaderImpl::Done() {
@@ -235,65 +256,96 @@ bool SongReaderImpl::Done() {
 
 MPDImpl::~MPDImpl() { mpd_connection_free(mpd_); }
 
-void MPDImpl::Fail() {
-    assert(mpd_connection_get_error(mpd_) != MPD_ERROR_SUCCESS &&
-           "must be an error present");
-    Die("MPD error: %s", mpd_connection_get_error_message(mpd_));
-}
-
-void MPDImpl::CheckFail() {
-    if (mpd_connection_get_error(mpd_) != MPD_ERROR_SUCCESS) {
-        Fail();
+absl::Status MPDImpl::ConnectionStatus() {
+    enum mpd_error mpd_status = mpd_connection_get_error(mpd_);
+    if (mpd_status == MPD_ERROR_SUCCESS) {
+        return absl::OkStatus();
     }
-}
-
-void MPDImpl::Pause() {
-    if (!mpd_run_pause(mpd_, true)) {
-        Fail();
+    if (mpd_status == MPD_ERROR_SERVER) {
+        enum mpd_server_error mpd_code = mpd_connection_get_server_error(mpd_);
+        absl::StatusCode code;
+        switch (mpd_code) {
+            case MPD_SERVER_ERROR_PASSWORD:
+            case MPD_SERVER_ERROR_PERMISSION:
+                code = absl::StatusCode::kPermissionDenied;
+                break;
+            case MPD_SERVER_ERROR_NO_EXIST:
+                code = absl::StatusCode::kNotFound;
+                break;
+            case MPD_SERVER_ERROR_SYSTEM:
+                code = absl::StatusCode::kInternal;
+                break;
+            default:
+                code = absl::StatusCode::kUnknown;
+        }
+        return absl::Status(
+            code, absl::StrFormat("MPD Server error (%d): %s", mpd_code,
+                                  mpd_connection_get_error_message(mpd_)));
     }
-}
-
-void MPDImpl::Play() {
-    if (!mpd_run_pause(mpd_, false)) {
-        Fail();
+    // It should be a non-server error.
+    absl::StatusCode code;
+    switch (mpd_status) {
+        case MPD_ERROR_CLOSED:
+            code = absl::StatusCode::kUnavailable;
+            break;
+        case MPD_ERROR_TIMEOUT:
+            code = absl::StatusCode::kDeadlineExceeded;
+            break;
+        default:
+            code = absl::StatusCode::kInternal;
     }
+    return absl::Status(
+        code, absl::StrFormat("MPD Error (%d): %s", mpd_status,
+                              mpd_connection_get_error_message(mpd_)));
 }
 
-void MPDImpl::PlayAt(unsigned position) {
-    if (!mpd_run_play_pos(mpd_, position)) {
-        Fail();
-    }
+absl::Status MPDImpl::Pause() {
+    mpd_run_pause(mpd_, true);
+    return ConnectionStatus();
 }
 
-std::unique_ptr<SongReader> MPDImpl::ListAll(MPD::MetadataOption metadata) {
+absl::Status MPDImpl::Play() {
+    mpd_run_pause(mpd_, false);
+    return ConnectionStatus();
+}
+
+absl::Status MPDImpl::PlayAt(unsigned position) {
+    mpd_run_play_pos(mpd_, position);
+    return ConnectionStatus();
+}
+
+absl::StatusOr<std::unique_ptr<SongReader>> MPDImpl::ListAll(
+    MPD::MetadataOption metadata) {
     switch (metadata) {
         case MPD::MetadataOption::kInclude:
             if (!mpd_send_list_all_meta(mpd_, NULL)) {
-                Fail();
+                return ConnectionStatus();
             }
             break;
         case MPD::MetadataOption::kOmit:
             if (!mpd_send_list_all(mpd_, NULL)) {
-                Fail();
+                return ConnectionStatus();
             }
             break;
     }
     return std::unique_ptr<SongReader>(new SongReaderImpl(*this));
 }
 
-std::optional<std::unique_ptr<Song>> MPDImpl::Search(std::string_view uri) {
+absl::StatusOr<std::unique_ptr<Song>> MPDImpl::Search(std::string_view uri) {
     // Copy to ensure URI buffer is null-terminated.
     std::string uri_copy(uri);
     mpd_search_db_songs(mpd_, true);
     mpd_search_add_uri_constraint(mpd_, MPD_OPERATOR_DEFAULT, uri_copy.data());
     if (!mpd_search_commit(mpd_)) {
-        Fail();
+        return ConnectionStatus();
     }
 
     struct mpd_song* raw_song = mpd_recv_song(mpd_);
-    CheckFail();
+    if (auto status = ConnectionStatus(); !status.ok()) {
+        return status;
+    }
     if (raw_song == nullptr) {
-        return std::nullopt;
+        return absl::NotFoundError(absl::StrFormat("uri %s not found", uri));
     }
     std::unique_ptr<Song> song = std::unique_ptr<Song>(new SongImpl(raw_song));
 
@@ -303,47 +355,49 @@ std::optional<std::unique_ptr<Song>> MPDImpl::Search(std::string_view uri) {
     raw_song = mpd_recv_song(mpd_);
     assert(raw_song == nullptr &&
            "search by URI should only ever find  one song");
-    return std::optional<std::unique_ptr<Song>>(std::move(song));
+    return std::unique_ptr<Song>(std::move(song));
 }
 
-IdleEventSet MPDImpl::Idle(const IdleEventSet& events) {
+absl::StatusOr<IdleEventSet> MPDImpl::Idle(const IdleEventSet& events) {
     enum mpd_idle occured = mpd_run_idle_mask(mpd_, events.Enum());
-    CheckFail();
+    if (auto status = ConnectionStatus(); !status.ok()) {
+        return status;
+    }
     return {static_cast<int>(occured)};
 }
 
-void MPDImpl::Add(const std::string& uri) {
-    if (!mpd_run_add(mpd_, uri.data())) {
-        Fail();
-    }
+absl::Status MPDImpl::Add(const std::string& uri) {
+    mpd_run_add(mpd_, uri.data());
+    return ConnectionStatus();
 }
 
-std::unique_ptr<Status> MPDImpl::CurrentStatus() {
+absl::StatusOr<std::unique_ptr<Status>> MPDImpl::CurrentStatus() {
     struct mpd_status* status = mpd_run_status(mpd_);
     if (status == nullptr) {
-        Fail();
+        return ConnectionStatus();
     }
     return std::unique_ptr<Status>(new StatusImpl(status));
 }
 
-MPD::PasswordStatus MPDImpl::ApplyPassword(const std::string& password) {
+absl::StatusOr<MPD::PasswordStatus> MPDImpl::ApplyPassword(
+    const std::string& password) {
     mpd_run_password(mpd_, password.data());
     const enum mpd_error err = mpd_connection_get_error(mpd_);
     if (err == MPD_ERROR_SUCCESS) {
         return MPD::PasswordStatus::kAccepted;
     }
     if (err != MPD_ERROR_SERVER) {
-        Fail();
+        return ConnectionStatus();
     }
     enum mpd_server_error serr = mpd_connection_get_server_error(mpd_);
     if (serr != MPD_SERVER_ERROR_PASSWORD) {
-        Fail();
+        return ConnectionStatus();
     }
     mpd_connection_clear_error(mpd_);
     return MPD::PasswordStatus::kRejected;
 }
 
-Authorization MPDImpl::CheckCommands(
+absl::StatusOr<Authorization> MPDImpl::CheckCommands(
     const std::vector<std::string_view>& cmds) {
     Authorization result;
     if (cmds.size() < 1) {
@@ -356,7 +410,9 @@ Authorization MPDImpl::CheckCommands(
     // Fetch a list of the commands we're not allowed to run. In most
     // installs, this should be empty.
     if (!mpd_send_disallowed_commands(mpd_)) {
-        CheckFail();
+        if (auto status = ConnectionStatus(); !status.ok()) {
+            return status;
+        }
     }
 
     std::vector<std::string> disallowed;
@@ -366,7 +422,9 @@ Authorization MPDImpl::CheckCommands(
         mpd_return_pair(mpd_, command_pair);
         command_pair = mpd_recv_command_pair(mpd_);
     }
-    CheckFail();
+    if (auto status = ConnectionStatus(); !status.ok()) {
+        return status;
+    }
 
     for (std::string_view cmd : cmds) {
         if (std::find(disallowed.begin(), disallowed.end(), cmd) !=
@@ -387,23 +445,25 @@ class DialerImpl : public Dialer {
     // with the given timeout. On success a variant with a unique_ptr to
     // an MPD instance is returned. On failure, a string is returned with
     // a human-readable description of the error.
-    Dialer::result Dial(
+    absl::StatusOr<std::unique_ptr<MPD>> Dial(
         const Address&,
-        unsigned timeout_ms = Dialer::kDefaultTimeout) const override;
+        absl::Duration timeout = Dialer::kDefaultTimeout) const override;
 };
 
-Dialer::result DialerImpl::Dial(const Address& addr,
-                                unsigned timeout_ms) const {
+absl::StatusOr<std::unique_ptr<MPD>> DialerImpl::Dial(
+    const Address& addr, absl::Duration timeout) const {
+    unsigned timeout_ms =
+        static_cast<unsigned>(absl::ToInt64Milliseconds(timeout));
     /* Create a new connection to mpd */
     struct mpd_connection* mpd =
         mpd_connection_new(addr.host.data(), addr.port, timeout_ms);
     if (mpd == nullptr) {
-        return "could not connect to mpd: out of memory";
+        return absl::ResourceExhaustedError("out of memory");
     }
     if (mpd_connection_get_error(mpd) != MPD_ERROR_SUCCESS) {
-        return absl::StrFormat("could not connect to mpd at %s:%u: %s",
-                               addr.host, addr.port,
-                               mpd_connection_get_error_message(mpd));
+        return absl::UnavailableError(
+            absl::StrFormat("could not connect to mpd at %s:%u: %s", addr.host,
+                            addr.port, mpd_connection_get_error_message(mpd)));
     }
     return std::unique_ptr<MPD>(new MPDImpl(mpd));
 }

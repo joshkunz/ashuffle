@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"syscall"
 	"text/template"
 	"time"
@@ -135,7 +136,7 @@ type MPD struct {
 	// Stderr is a buffer that contains the standard error of the MPD process.
 	Stderr *bytes.Buffer
 
-	root       root
+	root       Root
 	cmd        *exec.Cmd
 	cli        *mpdc.Client
 	cancelFunc func()
@@ -154,7 +155,10 @@ func (m MPD) Address() (string, string) {
 
 // Shutdown shuts down this MPD instance, and cleans up associated data.
 func (m *MPD) Shutdown() error {
-	defer m.root.cleanup()
+	if m.root.owned {
+		// Only cleanup the root if it's owned by this MPD instance.
+		defer m.root.Cleanup()
+	}
 	m.cli.Close()
 
 	// Shutdown the server, either via SIGTERM, or by cancelling the
@@ -282,17 +286,47 @@ func (m *MPD) PlayState() State {
 	return StateUnknown
 }
 
-type root struct {
+func (m *MPD) Clear() {
+	m.maybeErr(m.cli.Clear())
+}
+
+// A Root represents the state required to run an instance of MPD.
+type Root struct {
 	path     string
 	socket   string
 	confPath string
+	options  *Options
+
+	// Set to true if this root is owned by the MPD instance. If set to
+	// false it will not be cleaned up when the MPD instance is destroyed.
+	owned bool
+
+	cleanupOnce sync.Once
 }
 
-func (r root) cleanup() {
-	os.RemoveAll(r.path)
+// Cleanup any state associated with this root. Should be called when
+// the root is no longer needed.
+func (r *Root) Cleanup() {
+	// We only want to do this once per-root. Future cleanups should be
+	// no-ops.
+	r.cleanupOnce.Do(func() {
+		os.RemoveAll(r.path)
+	})
 }
 
-func buildRoot(opts *Options) (*root, error) {
+// The root is what actually defines the address, so Root can also provide
+// the address associated with an MPD instance.
+func (r *Root) Address() (string, string) {
+	return r.socket, ""
+}
+
+func (r Root) hasOptions() bool {
+	return r.options != nil
+}
+
+// Create a new Root. The caller is expected to call Root.Cleanup when its
+// done using the root.
+func NewRoot(opts *Options) (*Root, error) {
 	rootPath, err := ioutil.TempDir(os.TempDir(), "mpd-harness")
 	if err != nil {
 		return nil, err
@@ -309,35 +343,49 @@ func buildRoot(opts *Options) (*root, error) {
 		return nil, err
 	}
 	conf.Close()
-	return &root{
+	return &Root{
 		path:     rootPath,
 		socket:   mpdSocket,
 		confPath: confPath,
+		options:  opts,
 	}, nil
+}
+
+func New(ctx context.Context, opts *Options) (*MPD, error) {
+	root, err := NewRoot(opts)
+	if err != nil {
+		return nil, err
+	}
+	// We created this root, so we take ownership of its lifecycle.
+	root.owned = true
+	return NewWithRoot(ctx, root)
 }
 
 // New creates a new MPD instance with the given options. If `opts' is nil,
 // then default options will be used. If a new MPD instance cannot be created,
 // an error is returned.
-func New(ctx context.Context, opts *Options) (*MPD, error) {
-	root, err := buildRoot(opts)
-	if err != nil {
-		return nil, err
-	}
-
+func NewWithRoot(ctx context.Context, root *Root) (*MPD, error) {
 	mpdCtx, mpdCancel := context.WithCancel(ctx)
 	stdout := bytes.Buffer{}
 	stderr := bytes.Buffer{}
 	mpdBin := "mpd"
-	if opts != nil && opts.BinPath != "" {
-		mpdBin = opts.BinPath
+	if root.hasOptions() && root.options.BinPath != "" {
+		mpdBin = root.options.BinPath
 	}
 	cmd := exec.CommandContext(mpdCtx, mpdBin, "--no-daemon", "--stderr", root.confPath)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	if err := cmd.Start(); err != nil {
+
+	earlyExitCleanup := func() {
 		mpdCancel()
-		root.cleanup()
+		// We only cleanup the root if we own it.
+		if root.owned {
+			root.Cleanup()
+		}
+	}
+
+	if err := cmd.Start(); err != nil {
+		earlyExitCleanup()
 		return nil, err
 	}
 
@@ -348,7 +396,7 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 	connectBackoff := backoff.WithContext(backoff.NewConstantBackOff(mpdConnectBackoff), connectCtx)
 
 	var cli *mpdc.Client
-	err = backoff.Retry(func() error {
+	err := backoff.Retry(func() error {
 		onceCli, err := mpdc.Dial("unix", root.socket)
 		if err != nil {
 			return err
@@ -357,22 +405,16 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 		return nil
 	}, connectBackoff)
 	if err != nil {
-		mpdCancel()
+		earlyExitCleanup()
 		return nil, fmt.Errorf("failed to connect to mpd at %s: %v", root.socket, err)
 	}
 	if cli == nil {
 		panic("backoff did not return an error. This should not happen.")
 	}
 
-	if err != nil {
-		mpdCancel()
-		root.cleanup()
-		return nil, err
-	}
-
 	updateTimeout := mpdUpdateDBMax
-	if opts != nil && opts.UpdateDBTimeout != 0 {
-		updateTimeout = opts.UpdateDBTimeout
+	if root.hasOptions() && root.options.UpdateDBTimeout != 0 {
+		updateTimeout = root.options.UpdateDBTimeout
 	}
 
 	updateCtx, cancel := context.WithTimeout(ctx, updateTimeout)
@@ -390,8 +432,7 @@ func New(ctx context.Context, opts *Options) (*MPD, error) {
 
 	}, updateBackoff)
 	if err != nil {
-		mpdCancel()
-		root.cleanup()
+		earlyExitCleanup()
 		return nil, fmt.Errorf("failed to wait for MPD db to update: %v", err)
 	}
 

@@ -155,6 +155,7 @@ tweaks, and their meanings:
 | ---- | ------ | ------- | ----------- |
 | `exit-on-db-update` | Boolean | `no` | If set to a true value, then ashuffle will exit when the MPD database is updated. This can be useful when used in conjunction with the `-f -` option, as it allows you to re-start ashuffle with a new music list. |
 | `play-on-startup` | Boolean | `yes` | If set to a true value, ashuffle starts playing music if MPD is paused, stopped, or the queue is empty on startup. If set to false, then ashuffle will not enqueue any music until a song is enqueued for the first time. |
+| `reconnect-timeout` | Duration `> 0` | `10s` | Configures the amount of time ashuffle will spend attempting to reconnect to MPD after a temporary disconnection. After this amount of time, ashuffle will give up attempting to reconnect and quit. |
 | `suspend-timeout` | Duration `> 0` | `0ms` | Enables "suspend" mode, which may be useful to users that use ashuffe in a workflow where they clear their queue. In this mode, if the queue is cleared while ashuffle is running, ashuffle will wait for `suspend-timeout`. If songs were added to the queue during that period of time (i.e., the queue is no longer empty), then ashuffle suspends itself, and will not add any songs to the queue (even if the queue runs out) until the queue is cleared again, at which point normal operations resume. This was add to support use-cases like the one given in issue #13, where a music player had a "play album" mode that would clear the queue, and then play an album. See below for the duration format. |
 | `window-size` | Integer `>=1` | `7` | Sets the size of the "window" used for the shuffle algorithm. See the section on the [shuffle algorithm](#shuffle-algorithm) for more details. In-short: Lower numbers mean more frequent repeats, and higher numbers mean less frequent repeats. |
 
@@ -174,6 +175,7 @@ usage: ashuffle [-h] [-n] [-v] [[-e PATTERN ...] ...] [-o NUMBER]
 
 Optional Arguments:
    -h,-?,--help      Display this help message.
+   --by-album        Same as '--group-by album date'.
    -e,--exclude      Specify things to remove from shuffle (think
                      blacklist). A PATTERN should follow the exclude
                      flag.
@@ -185,13 +187,13 @@ Optional Arguments:
                      filename to retrive URI's from standard in. This
                      can be used to pipe song URI's from another program
                      into ashuffle.
-   --by-album        Same as '--group-by album date'.
    -g,--group-by     Shuffle songs grouped by the given tags. For
                      example 'album' could be used as the tag, and an
                      entire album's worth of songs would be queued
                      instead of one song at a time.
    --host            Specify a hostname or IP address to connect to.
                      Defaults to `localhost`.
+   --log-file        Path to write log output to. Defaults to stderr.
    -n,--no-check     When reading URIs from a file, don't check to
                      ensure that the URIs match the given exclude rules.
                      This option is most helpful when shuffling songs
@@ -358,14 +360,14 @@ requests are welcome.
 
 ## installing from source
 
-For platforms without a binary release, you'll have to build from source. 
+For platforms without a binary release, you'll have to build from source.
 ashuffle is designed to have a small number of dependencies, and we try to
 keep the build relatively straightforward. That said, you will need a
 relatively recent C++ compiler. Clang 7+, or GCC 8+ should work.
 
 If you have any trouble building ashuffle, please file an issue on Github,
 or email the ashuffle users group. Make sure to your compiler version, meson
-version, the commands you tried to execute, and any errors that were produced. 
+version, the commands you tried to execute, and any errors that were produced.
 
 ### dependencies
 
@@ -391,7 +393,7 @@ debian-based distributions (including ubuntu) it can be installed like so:
 
 ashuffle relies on git submodules to track libraries it depends on. These
 libraries are not distributed in the source tarballs provided by Github,
-so you need to use git to get ashuffle when building from source. 
+so you need to use git to get ashuffle when building from source.
 
 Start by cloning ashuffle:
 

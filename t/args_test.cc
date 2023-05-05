@@ -10,6 +10,7 @@
 #include <mpd/tag.h>
 
 #include "args.h"
+#include "gmock/gmock.h"
 #include "rule.h"
 
 #include "t/helper.h"
@@ -40,6 +41,7 @@ TEST(ParseTest, Empty) {
     EXPECT_TRUE(opts.ruleset.empty()) << "there should be no rules by default";
     EXPECT_EQ(opts.queue_only, 0U);
     EXPECT_THAT(opts.file_in, IsNull());
+    EXPECT_THAT(opts.log_file, IsNull());
     EXPECT_TRUE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 0U);
     EXPECT_EQ(opts.host, std::nullopt);
@@ -50,6 +52,7 @@ TEST(ParseTest, Empty) {
     EXPECT_EQ(opts.tweak.play_on_startup, true);
     EXPECT_EQ(opts.tweak.suspend_timeout, absl::ZeroDuration());
     EXPECT_EQ(opts.tweak.exit_on_db_update, false);
+    EXPECT_EQ(opts.tweak.reconnect_timeout, absl::Seconds(10));
 }
 
 TEST(ParseTest, Short) {
@@ -95,6 +98,7 @@ TEST(ParseTest, Long) {
             "--only", "5",
             "--no-check",
             "--file", "/dev/zero",
+            "--log-file", "/dev/null",
             "--exclude", "artist", "test artist", "artist", "another one",
             "--queue-buffer", "10",
             "--host", "foo",
@@ -112,6 +116,7 @@ TEST(ParseTest, Long) {
     EXPECT_EQ(opts.ruleset.size(), 1U);
     EXPECT_EQ(opts.queue_only, 5U);
     EXPECT_THAT(opts.file_in, NotNull());
+    EXPECT_THAT(opts.log_file, NotNull());
     EXPECT_FALSE(opts.check_uris);
     EXPECT_EQ(opts.queue_buffer, 10U);
     EXPECT_EQ(opts.host, "foo");
@@ -268,6 +273,21 @@ TEST(ParseTest, TweakExitOnDBUpdate) {
     Options opts = std::get<Options>(Options::Parse(
         fake::TagParser(), {"--tweak", "exit-on-db-update=yes"}));
     EXPECT_EQ(opts.tweak.exit_on_db_update, true);
+}
+
+TEST(ParseTest, TweakReconnectTimeout) {
+    std::vector<std::tuple<std::string, absl::Duration>> cases = {
+        {"1s", absl::Seconds(1)},
+        {"1m", absl::Minutes(1)},
+        {"3h", absl::Hours(3)},
+        {"250ms", absl::Milliseconds(250)},
+    };
+
+    for (auto [val, want] : cases) {
+        Options opts = std::get<Options>(Options::Parse(
+            fake::TagParser(), {"--tweak", "reconnect-timeout=" + val}));
+        EXPECT_EQ(opts.tweak.reconnect_timeout, want) << "Case: " << val;
+    }
 }
 
 using ParseFailureParam =

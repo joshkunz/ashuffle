@@ -5,6 +5,7 @@
 #include <mpd/tag.h>
 
 #include "t/mpd_fake.h"
+#include "t/test_asserts.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -27,15 +28,16 @@ TEST(MPD, ListAllMetadataOmit) {
         mpd.db.push_back(song);
     }
 
-    std::unique_ptr<mpd::SongReader> reader =
+    absl::StatusOr<std::unique_ptr<mpd::SongReader>> reader_or =
         mpd.ListAll(fake::MPD::MetadataOption::kOmit);
+    ASSERT_OK(reader_or.status()) << "failed to list all";
+    std::unique_ptr<mpd::SongReader> reader = std::move(reader_or.value());
 
     ASSERT_FALSE(reader->Done()) << "The reader should have at least one song";
 
     while (!reader->Done()) {
         auto song = reader->Next();
-        ASSERT_TRUE(song.has_value())
-            << "Song returned from Next should be set";
+        ASSERT_OK(song.status()) << "Song returned from Next should be set";
         EXPECT_EQ((*song)->Tag(MPD_TAG_ALBUM), std::nullopt)
             << "Song should not have an album tag set";
     }

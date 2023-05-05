@@ -79,6 +79,8 @@ func (m MesonBuildType) flag() string {
 	return "--buildtype=" + m.String()
 }
 
+type Env map[string]string
+
 type MesonOptions struct {
 	// BuildType the build type (essentially optimization level) to perform.
 	BuildType MesonBuildType
@@ -88,6 +90,9 @@ type MesonOptions struct {
 	// Extra provides additional flags that should be provided to meson as
 	// part of the configure step.
 	Extra []string
+	// Environment contains additional environment variables that will be
+	// supplied to meson during the configuration step.
+	Environment Env
 }
 
 // Meson represents a meson project.
@@ -110,6 +115,11 @@ func (m *Meson) Configure(dest string) error {
 		".", m.opts.BuildDirectory,
 		m.opts.BuildType.flag(),
 	)
+	env := os.Environ()
+	for k, v := range m.opts.Environment {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
+	cmd.Env = env
 	if dest != "" {
 		cmd.Args = append(cmd.Args, "--prefix="+dest)
 	}
