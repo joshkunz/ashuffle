@@ -123,7 +123,7 @@ else
   # note that the system's absl needs to be compiled for C++17 standard
   # or final link will fail.
   foreach lib : absl_libs
-    dep = cpp.find_library(lib)
+    dep = dependency(lib)
     if dep.found()
       absl_deps += dep
     endif
