@@ -5,6 +5,7 @@ package crosstool
 import (
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -259,11 +260,31 @@ func installLibCXX(cpu CPU, sysroot string, opts Options, into *workspace.Worksp
 	return project.Install(abiProject, into.Root)
 }
 
+func fixupRaspbian(sys *workspace.Workspace) error {
+	// The rapbian root we're using has an absolute symlink to libm.so. This
+	// causes issues when we use libm, because lld will try to link against
+	// libm.a instead which won't work, because we're doing a static build.
+	// So, we need to fix the symlink.
+
+	// First delete the old symlink.
+	if err := os.Remove(sys.Path("usr/lib/arm-linux-gnueabihf/libm.so")); err != nil {
+		return err
+	}
+
+	// Then setup the correct symlink.
+	return os.Symlink(
+		sys.Path("lib/arm-linux-gnueabihf/libm.so.6"),
+		sys.Path("usr/lib/arm-linux-gnueabihf/libm.so"),
+	)
+}
+
 func fetchSysroot(cpu CPU) (*workspace.Workspace, error) {
 	sys, err := workspace.New(workspace.NoCD)
 	if err != nil {
 		return nil, err
 	}
+
+	var fixup func(*workspace.Workspace) error
 
 	var root fetch.RemoteArchive
 	switch cpu {
@@ -271,12 +292,20 @@ func fetchSysroot(cpu CPU) (*workspace.Workspace, error) {
 		root = ubuntuAArch64Root
 	case CortexA7, ARM1176JZF_S:
 		root = raspbianRoot
+		fixup = fixupRaspbian
 	}
 
 	if err := root.FetchTo(sys.Root); err != nil {
 		sys.Cleanup()
 		return nil, err
 	}
+
+	if fixup != nil {
+		if err := fixup(sys); err != nil {
+			return nil, err
+		}
+	}
+
 	return sys, nil
 }
 
