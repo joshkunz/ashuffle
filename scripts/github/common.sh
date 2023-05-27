@@ -1,5 +1,5 @@
 # renovate: datasource=pypi depName=meson
-MESON_VERSION="1.1.0"
+MESON_VERSION="1.1.1"
 # renovate: datasource=github-tags depName=golang/go
 GO_VERSION="go1.20.1"
 LLVM_RELEASE="14"
