@@ -3,7 +3,7 @@ module ashuffle
 go 1.19
 
 require (
-	github.com/bogem/id3v2 v1.2.0
+	github.com/bogem/id3v2/v2 v2.1.4
 	github.com/bogem/id3v2/v2 v2.1.4
 	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/fhs/gompd/v2 v2.3.0
