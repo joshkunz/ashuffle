@@ -19,7 +19,7 @@ import (
 	"ashuffle/testashuffle"
 	"ashuffle/testmpd"
 
-	"github.com/bogem/id3v2"
+	"github.com/bogem/id3v2/v2"
 	"github.com/google/go-cmp/cmp"
 	"github.com/joshkunz/fakelib/filesystem"
 	"github.com/joshkunz/fakelib/library"
