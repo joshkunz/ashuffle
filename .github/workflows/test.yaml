@@ -102,15 +102,16 @@ jobs:
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref }}
         run: |
-          tag="${{ github.ref }}"
           # Cut off the "refs/tags" prefix.
-          tag="${tag#"refs/tags/"}"
-          hub release create \
+          tag="${RELEASE_TAG#"refs/tags/"}"
+          gh release create \
             --draft \
-            --message "${tag}" \
-            --attach release/ashuffle.x86_64-linux-gnu \
-            --attach release/ashuffle.aarch64-linux-gnu \
-            --attach release/ashuffle.armv7h-linux-gnueabihf \
-            --attach release/ashuffle.armv6h-linux-gnueabihf \
-            "${tag}"
+            --title "${tag}" \
+            --generate-notes \
+            "${tag}" \
+            release/ashuffle.x86_64-linux-gnu \
+            release/ashuffle.aarch64-linux-gnu \
+            release/ashuffle.armv7h-linux-gnueabihf \
+            release/ashuffle.armv6h-linux-gnueabihf
