@@ -172,7 +172,7 @@ libashuffle = static_library(
   'ashuffle',
   sources,
   include_directories: src_inc,
-  dependencies: absl_deps + [yaml_cpp],
+  dependencies: absl_deps + [yaml_cpp, libmpdclient],
 )
 
 ashuffle = executable(
