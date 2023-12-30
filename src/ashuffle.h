@@ -22,7 +22,7 @@ namespace ashuffle {
 namespace {
 
 // A getpass_f value that can be used in non-interactive mode.
-std::function<std::string()>* kNonInteractiveGetpass = nullptr;
+[[maybe_unused]] std::function<std::string()>* kNonInteractiveGetpass = nullptr;
 
 }  // namespace
 
