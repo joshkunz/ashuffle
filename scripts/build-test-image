@@ -17,6 +17,8 @@ Arguments:
     -m, --mpd-version           Use the given version of MPD.
     -l, --libmpdclient-version  Use the given version of libmpdclient.
     -t, --image-tag             Use the given tag for the built image.
+    --for-github-workflow       Only output properties to step output file.
+                                Used as part of the github workflow.
 Any remaining arguments ([...]) are passed to docker.
 EOF
     exit 1
@@ -44,6 +46,10 @@ while test "$#" -gt 0; do
         -t|--image-tag)
             IMAGE_TAG="$2"
             shift 2
+            ;;
+        --for-github-workflow)
+            IMAGE_BASE="github-workflows"
+            shift
             ;;
         *)
             DOCKER_ARGS+=( "$1" )
@@ -91,9 +97,16 @@ case "${IMAGE_BASE}" in
         docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
             -t "${IMAGE_TAG}" -f ./t/docker/Dockerfile.alpine .
         ;;
+    github-workflows)
+        echo "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" >> "${GITHUB_OUTPUT}"
+        echo "MPD_VERSION=${MPD_VERSION}" >> "${GITHUB_OUTPUT}"
+        echo "STAGE_DIR=${STAGE_DIR}" >> "${GITHUB_OUTPUT}"
+        ;;
     *)
         die "invalid image base: ${IMAGE_BASE}"
 esac
 
-rm -r "${STAGE_DIR}"
-rmdir --ignore-fail-on-non-empty "${TEMPDIR}"
+if [[ "${IMAGE_BASE}" != "github-workflows" ]]; then
+    rm -r "${STAGE_DIR}"
+    rmdir --ignore-fail-on-non-empty "${TEMPDIR}"
+fi

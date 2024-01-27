@@ -11,14 +11,22 @@ tagname="test/ashuffle:run_${run_id}"
 tty="-t"
 build_extra=()
 run_extra=()
+nobuild="false"
 
 while test $# -gt 0; do
     case "$1" in
         --no_tty)
             tty=""
             ;;
+        --no_build_use_image=*)
+            nobuild="true"
+            tagname="${1#"--no_build_use_image="}"
+            ;;
         --build.*)
             build_extra+=( "--${1#"--build."}" )
+            ;;
+        --build_bare.*)
+            build_extra+=( "${1#"--build_bare."}" )
             ;;
         *)
             run_extra+=( "$1" )
@@ -27,9 +35,11 @@ while test $# -gt 0; do
     shift
 done
 
-./scripts/build-test-image \
-    --image-tag "${tagname}" \
-    "${build_extra[@]}" || die "couldn't build test image"
+if [[ "${nobuild}" != "true" ]]; then
+    ./scripts/build-test-image \
+        --image-tag "${tagname}" \
+        "${build_extra[@]}" || die "couldn't build test image"
+fi
 
 exec docker run \
     --name "ashuffle_integration_run_${run_id}" \
