@@ -31,8 +31,6 @@ import (
 
 const (
 	ashuffleBin = "/ashuffle/ashuffle"
-
-	goldMP3 = "/music.huge/gold.mp3"
 )
 
 const (
@@ -94,7 +92,7 @@ type runOptions struct {
 func run(ctx context.Context, t *testing.T, opts runOptions) (*testashuffle.Ashuffle, *testmpd.MPD) {
 	t.Helper()
 	if opts.Library == "" {
-		opts.Library = "/music"
+		opts.Library = "/music.default"
 	}
 	mpd, err := testmpd.New(ctx, &testmpd.Options{LibraryRoot: opts.Library})
 	if err != nil {
@@ -118,12 +116,7 @@ func run(ctx context.Context, t *testing.T, opts runOptions) (*testashuffle.Ashu
 }
 
 func newLibrary() (*library.Library, error) {
-	goldF, err := os.Open(goldMP3)
-	if err != nil {
-		return nil, err
-	}
-
-	return library.New(goldF)
+	return library.New(library.EmbeddedGoldMP3())
 }
 
 func newLibraryT(t *testing.T) *library.Library {
@@ -141,13 +134,35 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatalf("failed to create new library: %v", err)
 	}
-	lib.Tracks = 20_000
+	lib.Tracks = 5
+	lib.Tagger = literalTagger{
+		{Artist: "Alpha", Album: "Beta", Title: "A"},
+		{Artist: "Planets", Album: "Earth", Title: "A"},
+		{Artist: "Planets", Album: "Mars", Title: "A"},
+		{Artist: "Direction", Album: "North", Title: "North"},
+		{Artist: "Direction", Album: "North", Title: "South"},
+	}.Tag
+
+	if err := os.Mkdir("/music.default", os.ModePerm); err != nil {
+		log.Fatalf("failed to create library dir: %v", err)
+	}
+
+	srv, err := filesystem.Mount(lib, "/music.default", nil)
+	if err != nil {
+		log.Fatalf("failed to mount default lib: %v", err)
+	}
+
+	lib20k, err := newLibrary()
+	if err != nil {
+		log.Fatalf("failed to create new library: %v", err)
+	}
+	lib20k.Tracks = 20_000
 
 	if err := os.Mkdir("/music.20k", os.ModePerm); err != nil {
 		log.Fatalf("failed to create /music.20k: %v", err)
 	}
 
-	srv, err := filesystem.Mount(lib, "/music.20k", nil)
+	srv20k, err := filesystem.Mount(lib20k, "/music.20k", nil)
 	if err != nil {
 		log.Fatalf("failed to mount library: %v", err)
 	}
@@ -155,6 +170,7 @@ func TestMain(m *testing.M) {
 	ret := m.Run()
 
 	srv.Unmount()
+	srv20k.Unmount()
 	os.Exit(ret)
 }
 
@@ -331,24 +347,23 @@ func TestFromFile(t *testing.T) {
 	}{
 		{
 			desc:    "With excludes",
-			library: "/music",
+			library: "/music.default",
 			flags: []string{
-				"--exclude", "artist", "tours",
-				// The real album name is "Traveller's Guide", partial match should
+				"--exclude", "artist", "direction",
+				// The real album name is "Earth", partial match should
 				// work.
-				"--exclude", "artist", "jahzzar", "album", "traveller",
+				"--exclude", "artist", "planets", "album", "ear",
 			},
 			input: []string{
-				"BoxCat_Games_-_10_-_Epic_Song.mp3",
-				"Broke_For_Free_-_01_-_Night_Owl.mp3",
-				"Jahzzar_-_05_-_Siesta.mp3",
-				"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3",
-				"Tours_-_01_-_Enthusiast.mp3",
+				"Alpha/Beta/A.mp3",
+				"Planets/Earth/A.mp3",
+				"Planets/Mars/A.mp3",
+				"Direction/North/North.mp3",
+				"Direction/North/South.mp3",
 			},
 			want: Groups{
-				{"BoxCat_Games_-_10_-_Epic_Song.mp3"},
-				{"Broke_For_Free_-_01_-_Night_Owl.mp3"},
-				{"Monk_Turner__Fascinoma_-_01_-_Its_Your_Birthday.mp3"},
+				{"Alpha/Beta/A.mp3"},
+				{"Planets/Mars/A.mp3"},
 			},
 		},
 		{
@@ -456,7 +471,7 @@ func TestPassword(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	mpd, err := testmpd.New(ctx, &testmpd.Options{
-		LibraryRoot:        "/music",
+		LibraryRoot:        "/music.default",
 		DefaultPermissions: []string{"read"},
 		Passwords: []testmpd.Password{
 			{
@@ -968,7 +983,7 @@ func TestReconnect(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	root, err := testmpd.NewRoot(&testmpd.Options{LibraryRoot: "/music"})
+	root, err := testmpd.NewRoot(&testmpd.Options{LibraryRoot: "/music.default"})
 	if err != nil {
 		t.Fatalf("failed to create MPD root: %v", err)
 	}
@@ -1087,7 +1102,7 @@ func TestReconnect_PasswordPrompt(t *testing.T) {
 	ctx := context.Background()
 
 	mpd, err := testmpd.New(ctx, &testmpd.Options{
-		LibraryRoot:        "/music",
+		LibraryRoot:        "/music.default",
 		DefaultPermissions: []string{"read"},
 		Passwords: []testmpd.Password{
 			{

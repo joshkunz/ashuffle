@@ -9,10 +9,10 @@ github.com/fhs/gompd/v2 v2.3.0/go.mod h1:nNdZtcpD5VpmzZbRl5rV6RhxeMmAWTxEsSIMBkm
 github.com/google/go-cmp v0.5.6/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/hanwen/go-fuse/v2 v2.4.0 h1:12OhD7CkXXQdvxG2osIdBQLdXh+nmLXY9unkUIe/xaU=
-github.com/hanwen/go-fuse/v2 v2.4.0/go.mod h1:xKwi1cF7nXAOBCXujD5ie0ZKsxc8GGSA1rlMJc+8IJs=
-github.com/joshkunz/fakelib v0.0.7 h1:bp4WQLRD7Au5UemiOa32P1cSI8fTdvgJmblarnqWuAo=
-github.com/joshkunz/fakelib v0.0.7/go.mod h1:P1y/rltRgdMolHMCfa92NZvk8BXDvUlvZVIFzu5Fjdc=
+github.com/hanwen/go-fuse/v2 v2.4.2 h1:ujevavwvGMg4s1TTSGWqid0q7WHk0XC8EOzHtygnt9E=
+github.com/hanwen/go-fuse/v2 v2.4.2/go.mod h1:xKwi1cF7nXAOBCXujD5ie0ZKsxc8GGSA1rlMJc+8IJs=
+github.com/joshkunz/fakelib v0.0.8 h1:lG7XYuWMrO6424y+A2i5yfNFXD79RNUzx2TmeEgAPss=
+github.com/joshkunz/fakelib v0.0.8/go.mod h1:eTCUQIky5u4bwepQMOg4KJ8fstFDICSPz6YKAUTHbCI=
 github.com/joshkunz/massif v0.0.2 h1:eyFmmVDxMSIVBJ/OOHZaiTy1ofZqH1B4vs30N4a6ctE=
 github.com/joshkunz/massif v0.0.2/go.mod h1:KAmzsWWCPULX/NdP4qb5JYvjdDebq8+zE2oUwEajO0E=
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 h1:MtvEpTB6LX3vkb4ax0b5D2DHbNAUsen0Gx5wZoq3lV4=
