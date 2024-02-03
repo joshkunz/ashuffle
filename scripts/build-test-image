@@ -1,6 +1,5 @@
 #!/bin/bash
 
-TEMPDIR="./tmp"
 IMAGE_BASE=ubuntu
 
 function die() {
@@ -60,24 +59,6 @@ done
 
 cd $(git rev-parse --show-toplevel)
 
-mkdir "${TEMPDIR}"
-STAGE_DIR=$(mktemp -p "${TEMPDIR}" --directory)
-if test ! -d "${STAGE_DIR}"; then
-    rm -r "${TEMPDIR}"
-    die "Failed to create staging directory"
-fi
-
-function repo_files() {
-    # Why on earth git does not use the standard exlude rules for ls-files is
-    # beyond me.
-    # Note: We need the sort -u here because files may be repeated if they are
-    # modified in the repo.
-    git ls-files --exclude-standard -cmo | sort -u
-}
-
-echo "Building ashuffle archive..."
-tar -cf "${STAGE_DIR}/ashuffle-archive.tar" --files-from=<( repo_files )
-
 case "${IMAGE_BASE}" in
     ubuntu)
         args=( "${DOCKER_ARGS[@]}" )
@@ -87,15 +68,8 @@ case "${IMAGE_BASE}" in
         if test -n "${LIBMPDCLIENT_VERSION}"; then
             args+=( "--build-arg" "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" )
         fi
-        docker build "${args[@]}" --build-arg "STAGE_DIR=${STAGE_DIR}" \
+        docker build "${args[@]}" \
             -t "${IMAGE_TAG}" -f ./t/docker/Dockerfile.ubuntu .
-        ;;
-    alpine)
-        if test -n "${MPD_VERSION}" || test -n "${LIBMPDCLIENT_VERSION}"; then
-            die "alpine does not support setting mpd/libmpdclient version"
-        fi
-        docker build --build-arg "STAGE_DIR=${STAGE_DIR}" \
-            -t "${IMAGE_TAG}" -f ./t/docker/Dockerfile.alpine .
         ;;
     github-workflows)
         echo "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" >> "${GITHUB_OUTPUT}"
@@ -105,8 +79,3 @@ case "${IMAGE_BASE}" in
     *)
         die "invalid image base: ${IMAGE_BASE}"
 esac
-
-if [[ "${IMAGE_BASE}" != "github-workflows" ]]; then
-    rm -r "${STAGE_DIR}"
-    rmdir --ignore-fail-on-non-empty "${TEMPDIR}"
-fi
