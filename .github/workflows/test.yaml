@@ -98,7 +98,8 @@ jobs:
           LIBMPDCLIENT_VERSION: ${{ matrix.target.libmpdclient_version }}
         run: |
           git submodule update --init --recursive
-          scripts/build-test-image --for-github-workflow
+          # produces the outputs used in the subseqent step
+          scripts/github/resolve-versions
       - name: Build Integration Test Container
         uses: docker/build-push-action@v5
         with:
@@ -107,7 +108,6 @@ jobs:
           build-args: |
             LIBMPDCLIENT_VERSION=${{ steps.stage.outputs.LIBMPDCLIENT_VERSION }}
             MPD_VERSION=${{ steps.stage.outputs.MPD_VERSION }}
-            STAGE_DIR=${{ steps.stage.outputs.STAGE_DIR }}
           tags: test/ashuffle:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IMAGE_BASE=ubuntu
+set -euo pipefail
 
 function die() {
     echo "$@" >&2
@@ -16,7 +16,6 @@ Arguments:
     -m, --mpd-version           Use the given version of MPD.
     -l, --libmpdclient-version  Use the given version of libmpdclient.
     -t, --image-tag             Use the given tag for the built image.
-    --for-github-workflow       Only output properties to step output file.
                                 Used as part of the github workflow.
 Any remaining arguments ([...]) are passed to docker.
 EOF
@@ -46,10 +45,6 @@ while test "$#" -gt 0; do
             IMAGE_TAG="$2"
             shift 2
             ;;
-        --for-github-workflow)
-            IMAGE_BASE="github-workflows"
-            shift
-            ;;
         *)
             DOCKER_ARGS+=( "$1" )
             shift
@@ -59,23 +54,12 @@ done
 
 cd $(git rev-parse --show-toplevel)
 
-case "${IMAGE_BASE}" in
-    ubuntu)
-        args=( "${DOCKER_ARGS[@]}" )
-        if test -n "${MPD_VERSION}"; then
-            args+=( "--build-arg" "MPD_VERSION=${MPD_VERSION}" )
-        fi
-        if test -n "${LIBMPDCLIENT_VERSION}"; then
-            args+=( "--build-arg" "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" )
-        fi
-        docker build "${args[@]}" \
-            -t "${IMAGE_TAG}" -f ./t/docker/Dockerfile.ubuntu .
-        ;;
-    github-workflows)
-        echo "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" >> "${GITHUB_OUTPUT}"
-        echo "MPD_VERSION=${MPD_VERSION}" >> "${GITHUB_OUTPUT}"
-        echo "STAGE_DIR=${STAGE_DIR}" >> "${GITHUB_OUTPUT}"
-        ;;
-    *)
-        die "invalid image base: ${IMAGE_BASE}"
-esac
+args=( "${DOCKER_ARGS[@]}" )
+if test -n "${MPD_VERSION}"; then
+    args+=( "--build-arg" "MPD_VERSION=${MPD_VERSION}" )
+fi
+if test -n "${LIBMPDCLIENT_VERSION}"; then
+    args+=( "--build-arg" "LIBMPDCLIENT_VERSION=${LIBMPDCLIENT_VERSION}" )
+fi
+docker build "${args[@]}" \
+    -t "${IMAGE_TAG}" -f ./t/docker/Dockerfile.ubuntu .
