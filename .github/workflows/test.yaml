@@ -44,6 +44,56 @@ jobs:
         env:
           SANITIZER: ${{ matrix.sanitizer }}
         run: scripts/github/unit-test
+  build-integration-test-images:
+    strategy:
+      matrix:
+        target:
+          - name: "Latest"
+            libmpdclient_version: "latest"
+            mpd_version: "latest"
+          - name: "Bionic"
+            libmpdclient_version: "2.11"
+            mpd_version: "0.20.18"
+          - name: "Focal"
+            libmpdclient_version: "2.18"
+            mpd_version: "0.21.20"
+          - name: "Impish"
+            libmpdclient_version: "2.19"
+            mpd_version: "0.22.6"
+    name: "Build ${{ matrix.target.name }} Integration Test Container"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      # This whole little song and dance is pretty annoying. Ideally I could
+      # just use ./scripts/run-integration and be done with it, but to get
+      # caching, I need to use the build-push-action. This is because gha
+      # only exposes the necessary values to the node runtime, not via a script
+      # consumable mechanism. There is a bug out for this, so hopefully this
+      # can all be deleted eventually: https://github.com/actions/runner/issues/3046
+      #
+      # We still need to run "build-test-image" here to do the little tarring
+      # step. Maybe I can delete that, and just go straight to build-push-action?
+      - name: Stage Build
+        id: stage
+        env:
+          MPD_VERSION: ${{ matrix.target.mpd_version }}
+          LIBMPDCLIENT_VERSION: ${{ matrix.target.libmpdclient_version }}
+        run: |
+          git submodule update --init --recursive
+          # produces the outputs used in the subseqent step
+          scripts/github/resolve-versions
+      - name: Build Integration Test Container
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: t/docker/Dockerfile.ubuntu
+          build-args: |
+            LIBMPDCLIENT_VERSION=${{ steps.stage.outputs.LIBMPDCLIENT_VERSION }}
+            MPD_VERSION=${{ steps.stage.outputs.MPD_VERSION }}
+          tags: test/ashuffle:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
   integration-test:
     strategy:
       matrix:
@@ -77,8 +127,10 @@ jobs:
             args: "-run 'TestFastStartup/from.mpd,.group-by'"
     name: "Integration Test (${{ matrix.target.name }}): ${{ matrix.test_group.name }}"
     runs-on: ubuntu-latest
-    needs: [check-format, check-lint, unit-test]
+    needs: [check-format, check-lint, unit-test, build-integration-test-images]
     steps:
+      # this is a replay of the build-container steps, but since those ran
+      # previously, this should be fully cached.
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
       # This whole little song and dance is pretty annoying. Ideally I could
@@ -111,6 +163,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           load: true
+      # This is the actual new work, running the actual test.
       - name: Run Test
         run: |
           scripts/run-integration \
