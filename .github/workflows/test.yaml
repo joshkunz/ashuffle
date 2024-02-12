@@ -64,6 +64,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+          cache-dependency-path: tools/meta/go.sum
       - uses: docker/setup-buildx-action@v3
       # This whole little song and dance is pretty annoying. Ideally I could
       # just use ./scripts/run-integration and be done with it, but to get
@@ -132,6 +136,10 @@ jobs:
       # this is a replay of the build-container steps, but since those ran
       # previously, this should be fully cached.
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
+          cache-dependency-path: tools/meta/go.sum
       - uses: docker/setup-buildx-action@v3
       # This whole little song and dance is pretty annoying. Ideally I could
       # just use ./scripts/run-integration and be done with it, but to get

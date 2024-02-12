@@ -4,7 +4,6 @@ set -euo pipefail
 
 . "scripts/github/common.sh"
 
-install_go
 build_meta
 
-tools/meta/meta resolve-versions --mpd "${MPD_VERSION}" --libmpdclient "${LIBMPDCLIENT_VERSION}" >> "${GITHUB_OUTPUT}"
+"${RUNNER_TEMP}/meta" resolve-versions --mpd "${MPD_VERSION}" --libmpdclient "${LIBMPDCLIENT_VERSION}" >> "${GITHUB_OUTPUT}"
