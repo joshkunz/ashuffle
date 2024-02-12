@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: 'stable'
           cache-dependency-path: tools/meta/go.sum
@@ -136,7 +136,7 @@ jobs:
       # this is a replay of the build-container steps, but since those ran
       # previously, this should be fully cached.
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: 'stable'
           cache-dependency-path: tools/meta/go.sum
