@@ -191,7 +191,7 @@ jobs:
           - arch: "armv6h"
             triple: "armv6h-linux-gnueabihf"
           - arch: "armv7h"
-            triple: "armv7h"
+            triple: "armv7h-linux-gnueabihf"
     steps:
       - name: Clone
         uses: actions/checkout@v4
