@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 . "scripts/github/common.sh"
 
 build_meta
@@ -31,14 +33,18 @@ meta() {
 }
 
 mkdir -p release
-meta release -o release/ashuffle.x86_64-linux-gnu x86_64 || die "couldn't build x86_64"
-assure_format release/ashuffle.x86_64-linux-gnu X86-64
+meta release -o release/ashuffle.x86_64-linux-gnu x86_64 &
 meta release -o release/ashuffle.aarch64-linux-gnu \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" aarch64 || die "couldn't build aarch64"
-assure_format release/ashuffle.aarch64-linux-gnu AArch64
+    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" aarch64 &
 meta release -o release/ashuffle.armv7h-linux-gnueabihf \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv7h || die "couldn't build armv7h"
-assure_format release/ashuffle.armv7h-linux-gnueabihf ARM
+    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv7h &
 meta release -o release/ashuffle.armv6h-linux-gnueabihf \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv6h || die "couldn't build armv6h"
+    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv6h &
+
+# Wait for all the builds to complete.
+wait
+
+assure_format release/ashuffle.x86_64-linux-gnu X86-64
+assure_format release/ashuffle.aarch64-linux-gnu AArch64
+assure_format release/ashuffle.armv7h-linux-gnueabihf ARM
 assure_format release/ashuffle.armv6h-linux-gnueabihf ARM

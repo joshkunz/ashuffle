@@ -18,7 +18,7 @@ build_meta() {
 }
 
 setup() {
-    if test -n "${IN_DEBUG_MODE}"; then
+    if test -n "${IN_DEBUG_MODE:-}"; then
         return 0
     fi
     sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y && \
