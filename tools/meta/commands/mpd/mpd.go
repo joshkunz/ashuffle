@@ -13,24 +13,9 @@ import (
 	"meta/exec"
 	"meta/fetch"
 	"meta/project"
-	"meta/semver"
+	"meta/versions/mpdver"
 	"meta/workspace"
 )
-
-const gitURL = "https://github.com/MusicPlayerDaemon/MPD.git"
-
-type version semver.Version
-
-func (v version) String() string {
-	if v.Patch == 0 {
-		return fmt.Sprintf("%d.%d", v.Major, v.Minor)
-	}
-	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
-}
-
-func (v version) ReleaseURL() string {
-	return fmt.Sprintf("http://www.musicpd.org/download/mpd/%d.%d/mpd-%s.tar.xz", v.Major, v.Minor, v)
-}
 
 func applyPatches(dir string) error {
 	patches, err := filepath.Glob(filepath.Join(dir, "*.patch"))
@@ -55,11 +40,6 @@ func applyPatches(dir string) error {
 	return nil
 }
 
-func parseVersion(s string) (version, error) {
-	parsed, err := semver.Parse(s)
-	return version(parsed), err
-}
-
 func install(ctx *cli.Context) error {
 	// Not being able to fined a patch root is only a problem for older
 	// releases, and we'll only do those once in a while. The majority of
@@ -80,20 +60,9 @@ func install(ctx *cli.Context) error {
 	}
 	defer ws.Cleanup()
 
-	var v version
-	if ver := ctx.String("version"); ver == "latest" {
-		log.Printf("version == latest, looking up latest version")
-		latest, err := fetch.GitLatest(gitURL)
-		if err != nil {
-			return err
-		}
-		v = version(latest)
-	} else {
-		version, err := parseVersion(ver)
-		if err != nil {
-			return err
-		}
-		v = version
+	v, err := mpdver.Resolve(ctx.String("version"))
+	if err != nil {
+		return err
 	}
 
 	if v.Major != 0 {

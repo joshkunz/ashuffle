@@ -1,7 +1,10 @@
 #!/bin/bash
 
+set -euo pipefail
+
 . "scripts/github/common.sh"
 
+build_meta
 setup
 
 assure_format() {
@@ -25,15 +28,34 @@ assure_format() {
     return 0
 }
 
-mkdir -p release
-tools/meta/meta release -o release/ashuffle.x86_64-linux-gnu x86_64 || die "couldn't build x86_64"
-assure_format release/ashuffle.x86_64-linux-gnu X86-64
-tools/meta/meta release -o release/ashuffle.aarch64-linux-gnu \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" aarch64 || die "couldn't build aarch64"
-assure_format release/ashuffle.aarch64-linux-gnu AArch64
-tools/meta/meta release -o release/ashuffle.armv7h-linux-gnueabihf \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv7h || die "couldn't build armv7h"
-assure_format release/ashuffle.armv7h-linux-gnueabihf ARM
-tools/meta/meta release -o release/ashuffle.armv6h-linux-gnueabihf \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv6h || die "couldn't build armv6h"
-assure_format release/ashuffle.armv6h-linux-gnueabihf ARM
+OUT="$1"
+ARCH="$2"
+
+cross_args=()
+check_arch=""
+case "${ARCH}" in
+    x86_64)
+        check_arch="X86-64"
+        ;;
+    aarch64)
+        check_arch="AArch64"
+        cross_args=(
+            --cross_cc="${CLANG_CC}"
+            --cross_cxx="${CLANG_CXX}"
+        )
+        ;;
+    arm*)
+        check_arch="ARM"
+        cross_args=(
+            --cross_cc="${CLANG_CC}"
+            --cross_cxx="${CLANG_CXX}"
+        )
+        ;;
+    *)
+        die "unrecognized arch ${ARCH}"
+        ;;
+esac
+
+"${RUNNER_TEMP}/meta" release -o "${OUT}" "${cross_args[@]}" "${ARCH}"
+
+assure_format "${OUT}" "${check_arch}"

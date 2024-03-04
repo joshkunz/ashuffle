@@ -10,6 +10,7 @@ import (
 	"meta/commands/libmpdclient"
 	"meta/commands/mpd"
 	"meta/commands/release"
+	"meta/commands/resolveversions"
 	"meta/commands/testbuild"
 )
 
@@ -34,6 +35,7 @@ func main() {
 					mpd.Command,
 				},
 			},
+			resolveversions.Command,
 			release.Command,
 			testbuild.Command,
 		},

@@ -183,9 +183,16 @@ ashuffle = executable(
   install: true,
 )
 
-clang_tidy = run_target('ashuffle-clang-tidy',
-  command : files('scripts/run-clang-tidy') + sources + executable_sources
-)
+fs = import('fs')
+
+if fs.exists('scripts/run-clang-tidy')
+  # In the integration test container, we don't supply this script for caching
+  # reasons, but this fails the build. So we make this target conditional
+  # on the script being present.
+  clang_tidy = run_target('ashuffle-clang-tidy',
+    command : files('scripts/run-clang-tidy') + sources + executable_sources
+  )
+endif # clang-tidy
 
 if get_option('tests').enabled()
 

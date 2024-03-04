@@ -14,29 +14,9 @@ import (
 	"meta/exec"
 	"meta/fetch"
 	"meta/project"
-	"meta/semver"
+	"meta/versions/libmpdclientver"
 	"meta/workspace"
 )
-
-const gitURL = "https://github.com/MusicPlayerDaemon/libmpdclient.git"
-
-type version semver.Version
-
-func (v version) String() string {
-	return fmt.Sprintf("%d.%d", v.Major, v.Minor)
-}
-
-func (v version) ReleaseURL() string {
-	return fmt.Sprintf("https://www.musicpd.org/download/libmpdclient/%d/libmpdclient-%s.tar.xz", v.Major, v)
-}
-
-func parseVersion(v string) (version, error) {
-	parsed, err := semver.Parse(v)
-	if err != nil {
-		return version(semver.Version{}), err
-	}
-	return version(parsed), nil
-}
 
 func install(ctx *cli.Context) error {
 	ws, err := workspace.New()
@@ -45,21 +25,11 @@ func install(ctx *cli.Context) error {
 	}
 	defer ws.Cleanup()
 
-	var v version
-	if sv := ctx.String("version"); sv == "latest" {
-		log.Printf("version == latest, searching for latest version")
-		latest, err := fetch.GitLatest(gitURL)
-		if err != nil {
-			return err
-		}
-		v = version(latest)
-	} else {
-		parsed, err := parseVersion(sv)
-		if err != nil {
-			return err
-		}
-		v = parsed
+	v, err := libmpdclientver.Resolve(ctx.String("version"))
+	if err != nil {
+		return err
 	}
+
 	log.Printf("Using libmpdclient version %s", v)
 
 	if v.Major != 2 {

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -euo pipefail
+
+. "scripts/github/common.sh"
+
+build_meta
+
+"${RUNNER_TEMP}/meta" resolve-versions --mpd "${MPD_VERSION}" --libmpdclient "${LIBMPDCLIENT_VERSION}" >> "${GITHUB_OUTPUT}"

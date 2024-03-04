@@ -37,7 +37,6 @@ jobs:
             name_suffix: " (ASAN)"
     name: Unit Test${{ matrix.name_suffix }}
     runs-on: ubuntu-latest
-    needs: [check-format, check-lint]
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -45,6 +44,60 @@ jobs:
         env:
           SANITIZER: ${{ matrix.sanitizer }}
         run: scripts/github/unit-test
+  build-integration-test-images:
+    strategy:
+      matrix:
+        target:
+          - name: "Latest"
+            libmpdclient_version: "latest"
+            mpd_version: "latest"
+          - name: "Bionic"
+            libmpdclient_version: "2.11"
+            mpd_version: "0.20.18"
+          - name: "Focal"
+            libmpdclient_version: "2.18"
+            mpd_version: "0.21.20"
+          - name: "Impish"
+            libmpdclient_version: "2.19"
+            mpd_version: "0.22.6"
+    name: "Build ${{ matrix.target.name }} Integration Test Container"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache-dependency-path: tools/meta/go.sum
+      - uses: docker/setup-buildx-action@v3
+      # This whole little song and dance is pretty annoying. Ideally I could
+      # just use ./scripts/run-integration and be done with it, but to get
+      # caching, I need to use the build-push-action. This is because gha
+      # only exposes the necessary values to the node runtime, not via a script
+      # consumable mechanism. There is a bug out for this, so hopefully this
+      # can all be deleted eventually: https://github.com/actions/runner/issues/3046
+      #
+      # We still need to run "build-test-image" here to do the little tarring
+      # step. Maybe I can delete that, and just go straight to build-push-action?
+      - name: Stage Build
+        id: stage
+        env:
+          MPD_VERSION: ${{ matrix.target.mpd_version }}
+          LIBMPDCLIENT_VERSION: ${{ matrix.target.libmpdclient_version }}
+        run: |
+          git submodule update --init --recursive
+          # produces the outputs used in the subseqent step
+          scripts/github/resolve-versions
+      - name: Build Integration Test Container
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: t/docker/Dockerfile.ubuntu
+          build-args: |
+            LIBMPDCLIENT_VERSION=${{ steps.stage.outputs.LIBMPDCLIENT_VERSION }}
+            MPD_VERSION=${{ steps.stage.outputs.MPD_VERSION }}
+          tags: test/ashuffle:latest
+          cache-from: type=gha,scope=${{ matrix.target.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target.name }}
   integration-test:
     strategy:
       matrix:
@@ -78,28 +131,90 @@ jobs:
             args: "-run 'TestFastStartup/from.mpd,.group-by'"
     name: "Integration Test (${{ matrix.target.name }}): ${{ matrix.test_group.name }}"
     runs-on: ubuntu-latest
-    needs: [unit-test]
+    needs: [check-format, check-lint, unit-test, build-integration-test-images]
     steps:
-      - name: Clone
-        uses: actions/checkout@v4
-      - name: Integration Test
+      # this is a replay of the build-container steps, but since those ran
+      # previously, this should be fully cached.
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          cache-dependency-path: tools/meta/go.sum
+      - uses: docker/setup-buildx-action@v3
+      # This whole little song and dance is pretty annoying. Ideally I could
+      # just use ./scripts/run-integration and be done with it, but to get
+      # caching, I need to use the build-push-action. This is because gha
+      # only exposes the necessary values to the node runtime, not via a script
+      # consumable mechanism. There is a bug out for this, so hopefully this
+      # can all be deleted eventually: https://github.com/actions/runner/issues/3046
+      #
+      # We still need to run "build-test-image" here to do the little tarring
+      # step. Maybe I can delete that, and just go straight to build-push-action?
+      - name: Stage Build
+        id: stage
         env:
           MPD_VERSION: ${{ matrix.target.mpd_version }}
           LIBMPDCLIENT_VERSION: ${{ matrix.target.libmpdclient_version }}
         run: |
           git submodule update --init --recursive
-          scripts/run-integration --no_tty ${{ matrix.test_group.args }}
+          # produces the outputs used in the subseqent step
+          scripts/github/resolve-versions
+      - name: Build Integration Test Container
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: t/docker/Dockerfile.ubuntu
+          build-args: |
+            LIBMPDCLIENT_VERSION=${{ steps.stage.outputs.LIBMPDCLIENT_VERSION }}
+            MPD_VERSION=${{ steps.stage.outputs.MPD_VERSION }}
+          tags: test/ashuffle:latest
+          cache-from: type=gha,scope=${{ matrix.target.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target.name }}
+          load: true
+      # This is the actual new work, running the actual test.
+      - name: Run Test
+        run: |
+          scripts/run-integration \
+          --no_build_use_image=test/ashuffle:latest \
+          --no_tty ${{ matrix.test_group.args }}
   release-build:
-    name: Release Build
+    name: Release Build (${{ matrix.target.arch }})
     runs-on: ubuntu-latest
-    needs: [integration-test]
+    needs: [check-format, check-lint, unit-test]
+    strategy:
+      matrix:
+        target:
+          - arch: "x86_64"
+            triple: "x86_64-linux-gnu"
+          - arch: "aarch64"
+            triple: "aarch64-linux-gnu"
+          - arch: "armv6h"
+            triple: "armv6h-linux-gnueabihf"
+          - arch: "armv7h"
+            triple: "armv7h"
     steps:
       - name: Clone
         uses: actions/checkout@v4
       - name: Release Build
-        run: scripts/github/release
+        run: scripts/github/release ashuffle.${{ matrix.target.triple }} ${{ matrix.target.arch }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ashuffle.${{ matrix.target.triple }}
+          path: ashuffle.${{ matrix.target.triple }}
+          if-no-files-found: error
+          retention-days: 7
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [release-build, integration-test]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download Builds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "ashuffle.*"
       - name: Deploy
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.ref }}
@@ -111,7 +226,7 @@ jobs:
             --title "${tag}" \
             --generate-notes \
             "${tag}" \
-            release/ashuffle.x86_64-linux-gnu \
-            release/ashuffle.aarch64-linux-gnu \
-            release/ashuffle.armv7h-linux-gnueabihf \
-            release/ashuffle.armv6h-linux-gnueabihf
+            ashuffle.x86_64-linux-gnu \
+            ashuffle.aarch64-linux-gnu \
+            ashuffle.armv7h-linux-gnueabihf \
+            ashuffle.armv6h-linux-gnueabihf
