@@ -28,23 +28,34 @@ assure_format() {
     return 0
 }
 
-meta() {
-    "${RUNNER_TEMP}/meta" "$@"
-}
+OUT="$1"
+ARCH="$2"
 
-mkdir -p release
-meta release -o release/ashuffle.x86_64-linux-gnu x86_64 &
-meta release -o release/ashuffle.aarch64-linux-gnu \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" aarch64 &
-meta release -o release/ashuffle.armv7h-linux-gnueabihf \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv7h &
-meta release -o release/ashuffle.armv6h-linux-gnueabihf \
-    --cross_cc="${CLANG_CC}" --cross_cxx="${CLANG_CXX}" armv6h &
+cross_args=()
+check_arch=""
+case "${ARCH}" in
+    x86_64)
+        check_arch="X86-64"
+        ;;
+    aarch64)
+        check_arch="AArch64"
+        cross_args=(
+            --cross_cc="${CLANG_CC}"
+            --cross_cxx="${CLANG_CXX}"
+        )
+        ;;
+    arm*)
+        check_arch="ARM"
+        cross_args=(
+            --cross_cc="${CLANG_CC}"
+            --cross_cxx="${CLANG_CXX}"
+        )
+        ;;
+    *)
+        die "unrecognized arch ${ARCH}"
+        ;;
+esac
 
-# Wait for all the builds to complete.
-wait
+"${RUNNER_TEMP}/meta" release -o "${OUT}" "${cross_args[@]}" "${ARCH}"
 
-assure_format release/ashuffle.x86_64-linux-gnu X86-64
-assure_format release/ashuffle.aarch64-linux-gnu AArch64
-assure_format release/ashuffle.armv7h-linux-gnueabihf ARM
-assure_format release/ashuffle.armv6h-linux-gnueabihf ARM
+assure_format "${OUT}" "${check_arch}"
