@@ -215,11 +215,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: "ashuffle.*"
+          # Download files into the destination path, not separate directories.
+          merge-multiple: true
       - name: Deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ github.ref }}
         run: |
+          find .
           # Cut off the "refs/tags" prefix.
           tag="${RELEASE_TAG#"refs/tags/"}"
           gh release create \
