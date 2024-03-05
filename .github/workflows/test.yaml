@@ -169,7 +169,6 @@ jobs:
             MPD_VERSION=${{ steps.stage.outputs.MPD_VERSION }}
           tags: test/ashuffle:latest
           cache-from: type=gha,scope=${{ matrix.target.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.target.name }}
           load: true
       # This is the actual new work, running the actual test.
       - name: Run Test
