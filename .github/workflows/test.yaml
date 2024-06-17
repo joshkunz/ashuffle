@@ -88,7 +88,7 @@ jobs:
           # produces the outputs used in the subseqent step
           scripts/github/resolve-versions
       - name: Build Integration Test Container
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: t/docker/Dockerfile.ubuntu
@@ -160,7 +160,7 @@ jobs:
           # produces the outputs used in the subseqent step
           scripts/github/resolve-versions
       - name: Build Integration Test Container
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: t/docker/Dockerfile.ubuntu
