@@ -21,17 +21,30 @@ setup() {
     if test -n "${IN_DEBUG_MODE:-}"; then
         return 0
     fi
+    target_arch="$1"
+
+
+    declare -a deb_packages
+    deb_packages=(
+        "${CLANG_CC}"
+        "${CLANG_FORMAT}"
+        "${CLANG_TIDY}"
+        cmake
+        "${LLD}"
+        ninja-build
+        patchelf
+        python3
+        python3-pip
+        python3-setuptools
+        python3-wheel
+    )
+    if [[ "${target_arch}" = "x86_64" ]]; then
+        deb_packages+=( libmpdclient-dev )
+    fi
+
     sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y && \
         sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            "${CLANG_CC}" \
-            "${CLANG_FORMAT}" \
-            "${CLANG_TIDY}" \
-            cmake \
-            libmpdclient-dev \
-            "${LLD}" \
-            ninja-build \
-            patchelf \
-            python3 python3-pip python3-setuptools python3-wheel \
+        "${deb_packages[@]}"
     || die "couldn't apt-get required packages"
     sudo pip3 install meson=="${MESON_VERSION}" || die "couldn't install meson"
 }

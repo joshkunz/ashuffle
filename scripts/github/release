@@ -4,9 +4,6 @@ set -euo pipefail
 
 . "scripts/github/common.sh"
 
-build_meta
-setup
-
 assure_format() {
     local f="$1"
     local match="$2"
@@ -30,6 +27,9 @@ assure_format() {
 
 OUT="$1"
 ARCH="$2"
+
+build_meta
+setup "${ARCH}"
 
 cross_args=()
 check_arch=""
