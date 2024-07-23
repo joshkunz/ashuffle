@@ -122,11 +122,12 @@ var crossfileTmpl = template.Must(
 			// meson will not be able to find them. We just re-use the
 			// system versions, since we don't need any special arch-specific
 			// handing.
-			"pkgconfig = '{{ .PkgConfig }}'",
+			"pkg-config = '{{ .PkgConfig }}'",
 			"cmake = '{{ .CMake }}'",
 			"",
 			"[properties]",
 			"sys_root = '{{ .Root }}'",
+			"pkg_config_libdir = '{{ .Root }}/lib/pkgconfig'",
 			"",
 			"[cmake]",
 			"CMAKE_C_COMPILER = '{{ .CC }}'",
