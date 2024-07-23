@@ -18,13 +18,9 @@ build_meta() {
 }
 
 setup() {
-    if test -n "${IN_DEBUG_MODE:-}"; then
-        return 0
-    fi
     target_arch="$1"
 
-
-    declare -a deb_packages
+    declare -l -a deb_packages
     deb_packages=(
         "${CLANG_CC}"
         "${CLANG_FORMAT}"
@@ -42,9 +38,14 @@ setup() {
         deb_packages+=( libmpdclient-dev )
     fi
 
+    if test -n "${IN_DEBUG_MODE:-}"; then
+        echo apt install "${deb_packages[@]}"
+        return 0
+    fi
+
     sudo env DEBIAN_FRONTEND=noninteractive apt-get update -y && \
         sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        "${deb_packages[@]}"
+        "${deb_packages[@]}" \
     || die "couldn't apt-get required packages"
     sudo pip3 install meson=="${MESON_VERSION}" || die "couldn't install meson"
 }
