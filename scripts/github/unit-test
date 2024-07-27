@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 BUILD_ROOT=build
 
@@ -17,7 +17,7 @@ if test "$#" -gt 0; then
     esac
 fi
 
-setup
+setup "$(uname -m)"
 
 echo "Running with sanitizer ${SANITIZER}"
 case "${SANITIZER}" in

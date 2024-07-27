@@ -2,7 +2,7 @@
 
 . "scripts/github/common.sh"
 
-setup
+setup "$(uname -m)"
 
 exec env \
     CLANG_FORMAT="${CLANG_FORMAT}" \
