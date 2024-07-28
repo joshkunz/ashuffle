@@ -1,0 +1,54 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Josh Kunz <josh@kunz.xyz>
+Date: Sun, 28 Jul 2024 10:12:12 -0700
+Subject: Support newer C++ stdlibs
+
+* Adds import for std::exchange
+* Adds import for uint64_t
+* Adds import for runtime_error
+---
+ src/fs/io/FileReader.hxx  | 2 ++
+ src/input/InputStream.hxx | 1 +
+ src/player/Thread.cxx     | 1 +
+ 3 files changed, 4 insertions(+)
+
+diff --git a/src/fs/io/FileReader.hxx b/src/fs/io/FileReader.hxx
+index f5fa4ec69..01c809b04 100644
+--- a/src/fs/io/FileReader.hxx
++++ b/src/fs/io/FileReader.hxx
+@@ -24,6 +24,8 @@
+ #include "fs/AllocatedPath.hxx"
+ #include "util/Compiler.h"
+ 
++#include <cstdint>
++
+ #ifdef _WIN32
+ #include <windows.h>
+ #else
+diff --git a/src/input/InputStream.hxx b/src/input/InputStream.hxx
+index 4d012e91a..ac8b18e2a 100644
+--- a/src/input/InputStream.hxx
++++ b/src/input/InputStream.hxx
+@@ -27,6 +27,7 @@
+ 
+ #include <string>
+ #include <memory>
++#include <utility>
+ 
+ #include <assert.h>
+ 
+diff --git a/src/player/Thread.cxx b/src/player/Thread.cxx
+index 64a502e6d..8c3951343 100644
+--- a/src/player/Thread.cxx
++++ b/src/player/Thread.cxx
+@@ -53,6 +53,7 @@
+ 
+ #include <exception>
+ #include <memory>
++#include <stdexcept>
+ 
+ #include <string.h>
+ 
+-- 
+2.43.0
+
