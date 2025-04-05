@@ -90,6 +90,9 @@ absl_libs = [
   'absl_throw_delegate',
   'absl_time_zone',
   'absl_utf8_for_code_point',
+
+  # Via Log
+  'absl_leak_check',
 ]
 
 absl_deps = []
