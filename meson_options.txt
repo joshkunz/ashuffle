@@ -1,4 +1,4 @@
 option('tests', type : 'feature', value : 'disabled')
-option('unsupported_use_system_absl', type : 'boolean', value : 'false')
-option('unsupported_use_system_gtest', type : 'boolean', value : 'false')
-option('unsupported_use_system_yamlcpp', type : 'boolean', value : 'false')
+option('unsupported_use_system_absl', type : 'boolean', value : false)
+option('unsupported_use_system_gtest', type : 'boolean', value : false)
+option('unsupported_use_system_yamlcpp', type : 'boolean', value : false)
