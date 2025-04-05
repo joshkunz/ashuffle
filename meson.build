@@ -38,10 +38,6 @@ endif
 
 cmake = import('cmake')
 
-cmake_common_args = [
-  '-DCMAKE_CXX_STANDARD=17',
-]
-
 # absl dependencies need to be explicited...
 # It might be possible to use cmake dependencies (e.g. "absl:string")
 # defined in abslTargets.cmake in the future but that does not seem
@@ -109,12 +105,22 @@ if not get_option('unsupported_use_system_absl')
   # invocation of `project()` to update PROJECT_SOURCE_DIR.
   absl_project_inc = join_paths(meson.current_source_dir(), 'tools/cmake/inject_project_source_dir.cmake')
 
-  absl = cmake.subproject('absl', cmake_options: cmake_common_args + [
-    '-DCMAKE_PROJECT_absl_INCLUDE=' + absl_project_inc,
+  absl_opts = cmake.subproject_options()
+  absl_opts.add_cmake_defines({
+    'CMAKE_CXX_STANDARD': '17',
+    # See above.
+    'CMAKE_PROJECT_absl_INCLUDE': absl_project_inc,
     # Absl's CMAKE build feels like it is MinGW for some reason when building
     # under Meson. Explicitly tell CMAKE it is not MinGW.
-    '-DMINGW=false',
-  ])
+    'MINGW': 'false',
+    # Use new linker policy to avoid warnings.
+    'CMAKE_POLICY_DEFAULT_CMP0156': 'NEW',
+    'CMAKE_POLICY_DEFAULT_CMP0179': 'NEW',
+    # Use new language version policy to avoid warnings.
+    'CMAKE_POLICY_DEFAULT_CMP0128': 'NEW',
+  })
+
+  absl = cmake.subproject('absl', options: absl_opts)
 
   absl_deps = []
   foreach lib : absl_libs
@@ -134,9 +140,16 @@ else
 endif
 
 if not get_option('unsupported_use_system_yamlcpp')
-  yaml_cpp = cmake.subproject('yaml-cpp', cmake_options: cmake_common_args + [
-    '-DYAML_BUILD_SHARED_LIBS=OFF',
-  ]).dependency('yaml-cpp')
+  yaml_cpp_opts = cmake.subproject_options()
+  yaml_cpp_opts.add_cmake_defines({
+    'CMAKE_CXX_STANDARD': '17',
+    'YAML_BUILD_SHARED_LIBS': 'OFF',
+    # Use new linker policy to avoid warnings.
+    'CMAKE_POLICY_DEFAULT_CMP0156': 'NEW',
+    'CMAKE_POLICY_DEFAULT_CMP0179': 'NEW',
+  })
+
+  yaml_cpp = cmake.subproject('yaml-cpp', options: yaml_cpp_opts).dependency('yaml-cpp')
 else
   yaml_cpp = dependency('yaml-cpp')
 endif
@@ -200,11 +213,17 @@ endif # clang-tidy
 if get_option('tests').enabled()
 
   if not get_option('unsupported_use_system_gtest')
-    googletest = cmake.subproject('googletest', cmake_options: [
-      '-DBUILD_GMOCK=ON',
-      '-DCMAKE_CXX_STANDARD=17',
-      '-DINSTALL_GTEST=OFF',
-    ])
+    googletest_opts = cmake.subproject_options()
+    googletest_opts.add_cmake_defines({
+      'BUILD_GMOCK': 'ON',
+      'CMAKE_CXX_STANDARD': '17',
+      'INSTALL_GTEST': 'OFF',
+      # Use new linker policy to avoid warnings.
+      'CMAKE_POLICY_DEFAULT_CMP0156': 'NEW',
+      'CMAKE_POLICY_DEFAULT_CMP0179': 'NEW',
+    })
+
+    googletest = cmake.subproject('googletest', options: googletest_opts)
 
     gtest_deps = [
       dependency('threads'),
