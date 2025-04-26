@@ -1,20 +1,21 @@
 package resolveversions
 
 import (
+	"context"
 	"fmt"
 	"meta/versions/libmpdclientver"
 	"meta/versions/mpdver"
 	"sort"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
-func resolve(cliCtx *cli.Context) error {
+func resolve(ctx context.Context, cmd *cli.Command) error {
 	var out []string
 
 	{
-		v, err := mpdver.Resolve(cliCtx.String("mpd"))
+		v, err := mpdver.Resolve(cmd.String("mpd"))
 		if err != nil {
 			return err
 		}
@@ -22,7 +23,7 @@ func resolve(cliCtx *cli.Context) error {
 	}
 
 	{
-		v, err := libmpdclientver.Resolve(cliCtx.String("libmpdclient"))
+		v, err := libmpdclientver.Resolve(cmd.String("libmpdclient"))
 		if err != nil {
 			return err
 		}

@@ -1,11 +1,11 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
 	"os"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"meta/commands/libmpdclient"
 	"meta/commands/mpd"
@@ -14,23 +14,13 @@ import (
 	"meta/commands/testbuild"
 )
 
-func doLibmpdclient(ctx *cli.Context) error {
-	fmt.Printf("blah libmpdclient\n")
-	return nil
-}
-
-func doMPD(ctx *cli.Context) error {
-	fmt.Printf("blah mpd\n")
-	return nil
-}
-
 func main() {
 	log.SetOutput(os.Stderr)
-	app := &cli.App{
+	app := &cli.Command{
 		Commands: []*cli.Command{
 			{
 				Name: "install",
-				Subcommands: []*cli.Command{
+				Commands: []*cli.Command{
 					libmpdclient.Command,
 					mpd.Command,
 				},
@@ -40,7 +30,7 @@ func main() {
 			testbuild.Command,
 		},
 	}
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -3,13 +3,14 @@
 package libmpdclient
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"meta/exec"
 	"meta/fetch"
@@ -18,14 +19,14 @@ import (
 	"meta/workspace"
 )
 
-func install(ctx *cli.Context) error {
+func install(ctx context.Context, cmd *cli.Command) error {
 	ws, err := workspace.New()
 	if err != nil {
 		return fmt.Errorf("workspace: %v", err)
 	}
 	defer ws.Cleanup()
 
-	v, err := libmpdclientver.Resolve(ctx.String("version"))
+	v, err := libmpdclientver.Resolve(cmd.String("version"))
 	if err != nil {
 		return err
 	}
@@ -55,7 +56,7 @@ func install(ctx *cli.Context) error {
 
 	var proj project.Project
 	if v.Minor < 12 {
-		if ctx.String("cross_file") != "" {
+		if cmd.String("cross_file") != "" {
 			return errors.New("cross compilation via --cross_file not supported with this version of libmpdclient")
 		}
 		p, err := project.NewAutomake(ws.Root)
@@ -65,7 +66,7 @@ func install(ctx *cli.Context) error {
 		proj = p
 	} else {
 		var opts project.MesonOptions
-		if cf := ctx.String("cross_file"); cf != "" {
+		if cf := cmd.String("cross_file"); cf != "" {
 			opts.Extra = append(opts.Extra, "--cross-file", cf)
 		}
 		p, err := project.NewMeson(ws.Root, opts)
@@ -74,7 +75,7 @@ func install(ctx *cli.Context) error {
 		}
 		proj = p
 	}
-	return project.Install(proj, ctx.String("prefix"))
+	return project.Install(proj, cmd.String("prefix"))
 }
 
 var Command = &cli.Command{
