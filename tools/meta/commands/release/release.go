@@ -64,9 +64,9 @@ func releaseCross(ctx context.Context, cmd *cli.Command, out string, cpu crossto
 		flag := fmt.Sprintf("--version=%s", ver)
 		libmpdclientArgs = append(libmpdclientArgs, flag)
 	}
-    // XXX: In v3, this results in an infinite loop, likely because "release"
-    // becomes its own parent. Not exactly sure what context is _supposed_
-    // to be used here.
+	// XXX: In v3, this results in an infinite loop, likely because "release"
+	// becomes its own parent. Not exactly sure what context is _supposed_
+	// to be used here.
 	if err := cmd.Root().Run(context.TODO(), libmpdclientArgs); err != nil {
 		return fmt.Errorf("failed to build libmpdclient: %w", err)
 	}
