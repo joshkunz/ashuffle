@@ -1,18 +1,19 @@
 package testbuild
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"meta/fileutil"
 	"meta/project"
 	"meta/workspace"
 )
 
-func testbuild(ctx *cli.Context) error {
-	out := ctx.String("output")
+func testbuild(ctx context.Context, cmd *cli.Command) error {
+	out := cmd.String("output")
 	if out == "" {
 		o, err := filepath.Abs("./ashuffle")
 		if err != nil {

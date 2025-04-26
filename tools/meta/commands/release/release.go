@@ -1,14 +1,14 @@
 package release
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"meta/crosstool"
 	"meta/fileutil"
@@ -17,7 +17,7 @@ import (
 )
 
 func crossFile(crosstool *crosstool.Crosstool) (string, error) {
-	cf, err := ioutil.TempFile("", "cross-"+crosstool.CPU.Triple().Architecture+"-*.txt")
+	cf, err := os.CreateTemp("", "cross-"+crosstool.CPU.Triple().Architecture+"-*.txt")
 	if err != nil {
 		return "", err
 	}
@@ -32,15 +32,15 @@ func crossFile(crosstool *crosstool.Crosstool) (string, error) {
 	return cf.Name(), nil
 }
 
-func releaseCross(ctx *cli.Context, out string, cpu crosstool.CPU) error {
+func releaseCross(ctx context.Context, cmd *cli.Command, out string, cpu crosstool.CPU) error {
 	src, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
 	crosstool, err := crosstool.For(cpu, crosstool.Options{
-		CC:  ctx.String("cross_cc"),
-		CXX: ctx.String("cross_cxx"),
+		CC:  cmd.String("cross_cc"),
+		CXX: cmd.String("cross_cxx"),
 	})
 	if err != nil {
 		return err
@@ -60,12 +60,12 @@ func releaseCross(ctx *cli.Context, out string, cpu crosstool.CPU) error {
 		// when building ashuffle.
 		fmt.Sprintf("--prefix=%s", crosstool.Root),
 	}
-	if ver := ctx.String("libmpdclient_version"); ver != "" {
+	if ver := cmd.String("libmpdclient_version"); ver != "" {
 		flag := fmt.Sprintf("--version=%s", ver)
 		libmpdclientArgs = append(libmpdclientArgs, flag)
 	}
-	if err := ctx.App.Run(libmpdclientArgs); err != nil {
-		fmt.Errorf("failed to build libmpdclient: %w", err)
+	if err := cmd.Root().Run(ctx, libmpdclientArgs); err != nil {
+		return fmt.Errorf("failed to build libmpdclient: %w", err)
 	}
 
 	build, err := workspace.New(workspace.NoCD)
@@ -133,12 +133,12 @@ func releasex86(out string) error {
 	return fileutil.Copy(build.Path("ashuffle"), out)
 }
 
-func release(ctx *cli.Context) error {
-	if !ctx.Args().Present() {
+func release(ctx context.Context, cmd *cli.Command) error {
+	if !cmd.Args().Present() {
 		return errors.New("an architecture (`ARCH`) must be provided")
 	}
 
-	out := ctx.String("output")
+	out := cmd.String("output")
 	if out == "" {
 		o, err := filepath.Abs("./ashuffle")
 		if err != nil {
@@ -147,24 +147,24 @@ func release(ctx *cli.Context) error {
 		out = o
 	}
 
-	arch := ctx.Args().First()
+	arch := cmd.Args().First()
 	switch arch {
 	case "x86_64":
 		return releasex86(out)
 	case "aarch64":
 		// Processors used on 3B+ support this arch, but RPi OS does not.
 		// These are probably OK defaults for aarch64 though.
-		return releaseCross(ctx, out, crosstool.CortexA53)
+		return releaseCross(ctx, cmd, out, crosstool.CortexA53)
 	case "armv7h":
 		// Used on Raspberry Pi 2B+. Should also work for newer
 		// chips running 32-bit RPi OS.
-		return releaseCross(ctx, out, crosstool.CortexA7)
+		return releaseCross(ctx, cmd, out, crosstool.CortexA7)
 	case "armv6h":
 		// Used on Raspberry Pi 0/1.
-		return releaseCross(ctx, out, crosstool.ARM1176JZF_S)
+		return releaseCross(ctx, cmd, out, crosstool.ARM1176JZF_S)
 	}
 
-	return fmt.Errorf("architecture %q not supported", ctx.Args().First())
+	return fmt.Errorf("architecture %q not supported", cmd.Args().First())
 }
 
 var Command = &cli.Command{

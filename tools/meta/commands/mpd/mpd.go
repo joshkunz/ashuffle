@@ -1,6 +1,7 @@
 package mpd
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -8,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 
 	"meta/exec"
 	"meta/fetch"
@@ -41,13 +42,13 @@ func applyPatches(dir string) error {
 	return nil
 }
 
-func install(ctx *cli.Context) error {
+func install(ctx context.Context, cmd *cli.Command) error {
 	// Note: We do this first, so we can get the path before workspace.New()
 	// moves us.
 	var patchRoot string
-	patchRoot, err := filepath.Abs(ctx.String("patch_root"))
+	patchRoot, err := filepath.Abs(cmd.String("patch_root"))
 	if err != nil {
-		return fmt.Errorf("failed to find patch root %q: %w", ctx.String("patch_root"), err)
+		return fmt.Errorf("failed to find patch root %q: %w", cmd.String("patch_root"), err)
 	}
 	// Make sure we actually have a patch root.
 	if patchRoot == "" {
@@ -60,7 +61,7 @@ func install(ctx *cli.Context) error {
 	}
 	defer ws.Cleanup()
 
-	v, err := mpdver.Resolve(ctx.String("version"))
+	v, err := mpdver.Resolve(cmd.String("version"))
 	if err != nil {
 		return err
 	}
@@ -103,7 +104,7 @@ func install(ctx *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	return project.Install(proj, ctx.String("prefix"))
+	return project.Install(proj, cmd.String("prefix"))
 }
 
 var Command = &cli.Command{
