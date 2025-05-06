@@ -1,5 +1,5 @@
 # renovate: datasource=pypi depName=meson
-MESON_VERSION="1.7.2"
+MESON_VERSION="1.8.0"
 LLVM_RELEASE="14"
 
 CLANG_CC="clang-${LLVM_RELEASE}"
