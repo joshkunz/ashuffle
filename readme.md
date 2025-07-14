@@ -372,22 +372,29 @@ version, the commands you tried to execute, and any errors that were produced.
 ### dependencies
 
 The only dependency is 'libmpdclient' which, you can probably
-install via your package manager. For example on debian based
-distributions (like ubunutu) use:
-
-    sudo apt-get install libmpdclient-dev
-
-or on OS X using brew:
-
-    brew install libmpdclient
-
+install via your package manager.
 ashuffle is built using `ninja`, and the meson build system, you can obtain meson
 by following the instruction's on
 [meson's site](https://mesonbuild.com/Getting-meson.html). Meson version
-`>=0.54.0` is required. Ninja is available on most distributions. On
-debian-based distributions (including ubuntu) it can be installed like so:
+`>=0.54.0` is required. Ninja is available on most distributions.
 
-    sudo apt-get install ninja-build
+### Debian based distributions
+
+On debian based distributions (like ubunutu) install dependencies with:
+
+    sudo apt-get install libmpdclient-dev ninja-build
+
+### macOS
+
+On macOS install dependencies with Homebrew:
+
+    brew install libmpdclient ninja meson cmake pkgconf
+
+### FreeBSD
+
+On FreeBSD install dependencies with pkg:
+
+    pkg install libmpdclient ninja meson cmake pkgconf
 
 ### building
 
