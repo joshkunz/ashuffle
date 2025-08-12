@@ -2,7 +2,7 @@ module ashuffle
 
 go 1.23.0
 
-toolchain go1.24.5
+toolchain go1.25.0
 
 require (
 	github.com/bogem/id3v2/v2 v2.1.4
