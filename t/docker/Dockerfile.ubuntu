@@ -31,7 +31,7 @@ RUN python3 -m venv /meson-venv && \
 COPY /t/docker/install_go.sh /opt/helpers/
 
 # renovate: datasource=github-tags depName=golang/go
-ENV GO_VERSION=go1.21.6
+ENV GO_VERSION=go1.25.3
 RUN /opt/helpers/install_go.sh ${GO_VERSION}
 
 COPY /tools/meta/ /opt/meta
