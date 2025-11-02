@@ -19,7 +19,7 @@ import (
 var (
 	raspbianRoot = fetch.RemoteArchive{
 		URL:    "https://storage.googleapis.com/ashuffle-data/raspbian-armhf-trixie.tar.xz",
-		SHA256: "64af252aed817429e760cd3aa10f8b54713e678828f65fca8a1a76afe495ac61",
+		SHA256: "13d5958eb72a7979f43e9419681f19af9e0847fc4a322b2d180d3e9f953b5d96",
 		Format: fetch.TarXz,
 		ExtraOptions: []string{
 			"--exclude=./dev/*",
