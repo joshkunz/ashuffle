@@ -18,7 +18,7 @@ import (
 
 var (
 	raspbianRoot = fetch.RemoteArchive{
-		URL:    "http://downloads.raspberrypi.org/raspbian_lite/archive/2019-04-09-22:48/root.tar.xz",
+		URL:    "https://storage.googleapis.com/ashuffle-data/raspbian-armhf-trixie.tar.xz",
 		SHA256: "64af252aed817429e760cd3aa10f8b54713e678828f65fca8a1a76afe495ac61",
 		Format: fetch.TarXz,
 		ExtraOptions: []string{
