@@ -197,7 +197,7 @@ jobs:
       - name: Release Build
         run: scripts/github/release ashuffle.${{ matrix.target.triple }} ${{ matrix.target.arch }}
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ashuffle.${{ matrix.target.triple }}
           path: ashuffle.${{ matrix.target.triple }}
@@ -212,7 +212,7 @@ jobs:
       - name: Clone
         uses: actions/checkout@v5
       - name: Download Builds
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           pattern: "ashuffle.*"
           # Download files into the destination path, not separate directories.
