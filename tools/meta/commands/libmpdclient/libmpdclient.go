@@ -41,11 +41,12 @@ func install(ctx context.Context, cmd *cli.Command) error {
 		return fmt.Errorf("version %s not supported", v)
 	}
 
-	if err := fetch.URL(v.ReleaseURL(), "libmpdclient.tar.xz"); err != nil {
+	target := "libmpdclient.tar.gz"
+	if err := fetch.URL(v.ReleaseURL(), target); err != nil {
 		return err
 	}
 
-	tar := exec.Command("tar", "-xJ", "--strip-components=1", "-f", "libmpdclient.tar.xz")
+	tar := exec.CommandContext(ctx, "tar", "-xz", "--strip-components=1", "-f", target)
 	if err := tar.Run(); err != nil {
 		return errors.New("failed to unpack")
 	}

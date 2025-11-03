@@ -22,7 +22,7 @@ func (v Version) String() string {
 
 // ReleaseURL returns the release URL for this version of libmpdclient.
 func (v Version) ReleaseURL() string {
-	return fmt.Sprintf("https://www.musicpd.org/download/libmpdclient/%d/libmpdclient-%s.tar.xz", v.Major, v)
+	return fmt.Sprintf("https://github.com/MusicPlayerDaemon/libmpdclient/archive/refs/tags/v%s.tar.gz", v)
 }
 
 // Parse parses a given version string into a version.

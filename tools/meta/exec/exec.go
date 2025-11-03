@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/exec"
@@ -19,11 +20,15 @@ func (c *Cmd) Run() error {
 	return c.Cmd.Run()
 }
 
-func Command(path string, args ...string) *Cmd {
-	c := exec.Command(path, args...)
+func CommandContext(ctx context.Context, path string, args ...string) *Cmd {
+	c := exec.CommandContext(ctx, path, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return &Cmd{Cmd: c}
+}
+
+func Command(path string, args ...string) *Cmd {
+	return CommandContext(context.Background(), path, args...)
 }
 
 func Silent(path string, args ...string) *Cmd {
