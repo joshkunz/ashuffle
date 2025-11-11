@@ -833,7 +833,7 @@ func TestLongMetaLines(t *testing.T) {
 	lib := newLibraryT(t)
 	lib.Tracks = 1000
 
-	t.Logf(strings.Join([]string{
+	t.Log(strings.Join([]string{
 		"Installing tagger that adds a Publisher tag with more than 4KiB",
 		"of text on the 500th song in the library. This should trigger an",
 		"MPD server error when extended metadata from that song is read due to",
