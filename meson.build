@@ -45,6 +45,7 @@ cmake = import('cmake')
 absl_libs = [
   # Via Base:
   'absl_raw_logging_internal',
+  'absl_borrowed_fixup_buffer',
 
   # Via Strings:
   'absl_int128',
@@ -55,7 +56,6 @@ absl_libs = [
   # Via Hash:
   'absl_hash',
   'absl_city',
-  'absl_low_level_hash',
 
   # Via Time:
   'absl_time',
