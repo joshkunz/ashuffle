@@ -125,8 +125,6 @@ if not get_option('unsupported_use_system_absl')
 
   absl = cmake.subproject('absl', options: absl_opts)
 
-  message('CMake targets:\n - ' + '\n - '.join(absl.target_list()))
-
   absl_deps = []
   foreach lib : absl_libs
     absl_deps += absl.dependency(lib)
