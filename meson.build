@@ -45,6 +45,7 @@ cmake = import('cmake')
 absl_libs = [
   # Via Base:
   'absl_raw_logging_internal',
+  'absl_borrowed_fixup_buffer',
 
   # Via Strings:
   'absl_int128',
@@ -55,7 +56,6 @@ absl_libs = [
   # Via Hash:
   'absl_hash',
   'absl_city',
-  'absl_low_level_hash',
 
   # Via Time:
   'absl_time',
@@ -124,6 +124,8 @@ if not get_option('unsupported_use_system_absl')
   })
 
   absl = cmake.subproject('absl', options: absl_opts)
+
+  message('CMake targets:\n - ' + '\n - '.join(absl.target_list()))
 
   absl_deps = []
   foreach lib : absl_libs

@@ -2,8 +2,7 @@
 directory = yaml-cpp
 
 url = https://github.com/jbeder/yaml-cpp.git
-# rennovate: datasource=github-tags depName=jbeder/yaml-cpp versioning=semver-coerced
-revision = yaml-cpp-0.7.0
+revision = a83cd31548b19d50f3f983b069dceb4f4d50756d
 depth = 1
 
 [provide]
