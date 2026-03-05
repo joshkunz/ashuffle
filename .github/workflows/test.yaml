@@ -68,7 +68,7 @@ jobs:
         with:
           go-version: 'stable'
           cache-dependency-path: tools/meta/go.sum
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       # This whole little song and dance is pretty annoying. Ideally I could
       # just use ./scripts/run-integration and be done with it, but to get
       # caching, I need to use the build-push-action. This is because gha
@@ -140,7 +140,7 @@ jobs:
         with:
           go-version: 'stable'
           cache-dependency-path: tools/meta/go.sum
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       # This whole little song and dance is pretty annoying. Ideally I could
       # just use ./scripts/run-integration and be done with it, but to get
       # caching, I need to use the build-push-action. This is because gha
