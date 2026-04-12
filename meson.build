@@ -38,63 +38,6 @@ endif
 
 cmake = import('cmake')
 
-# absl dependencies need to be explicited...
-# It might be possible to use cmake dependencies (e.g. "absl:string")
-# defined in abslTargets.cmake in the future but that does not seem
-# worth the time trying to figure that out.
-absl_libs = [
-  # Via Base:
-  'absl_raw_logging_internal',
-  'absl_borrowed_fixup_buffer',
-
-  # Via Strings:
-  'absl_int128',
-  'absl_str_format_internal',
-  'absl_strings_internal',
-  'absl_strings',
-
-  # Via Hash:
-  'absl_hash',
-  'absl_city',
-
-  # Via Time:
-  'absl_time',
-  'absl_base',
-  'absl_spinlock_wait',
-
-  # Via Status & Time:
-  'absl_cord',
-  'absl_cord_internal',
-  'absl_cordz_functions',
-  'absl_cordz_handle',
-  'absl_cordz_info',
-  'absl_cordz_update_tracker',
-  'absl_crc32c',
-  'absl_crc_cord_state',
-  'absl_crc_cpu_detect',
-  'absl_crc_internal',
-  'absl_debugging_internal',
-  'absl_decode_rust_punycode',
-  'absl_demangle_internal',
-  'absl_demangle_rust',
-  'absl_exponential_biased',
-  'absl_graphcycles_internal',
-  'absl_kernel_timeout_internal',
-  'absl_malloc_internal',
-  'absl_stacktrace',
-  'absl_status',
-  'absl_statusor',
-  'absl_strerror',
-  'absl_symbolize',
-  'absl_synchronization',
-  'absl_throw_delegate',
-  'absl_time_zone',
-  'absl_utf8_for_code_point',
-
-  # Via Log
-  'absl_leak_check',
-]
-
 absl_deps = []
 if not get_option('unsupported_use_system_absl')
   # HACK: absl detects if it's being built in "system" mode, or "subproject"
@@ -125,9 +68,24 @@ if not get_option('unsupported_use_system_absl')
 
   absl = cmake.subproject('absl', options: absl_opts)
 
-  absl_deps = []
-  foreach lib : absl_libs
-    absl_deps += absl.dependency(lib)
+  # Use target_list() instead of a hand-maintained list so this doesn't need
+  # updating when absl adds or removes internal targets. Static linking means
+  # the linker only pulls in symbols that are actually referenced, so unused
+  # targets don't affect binary size.
+  foreach t : absl.target_list()
+    # cmake auto-generates CTest dashboard targets (Experimental, Nightly,
+    # Continuous, etc.) that appear in target_list() as custom_targets. These
+    # don't support dependency(), so filter to absl_ prefixed targets only.
+    if not t.startswith('absl_')
+      continue
+    endif
+    # absl defines some test-only libraries (e.g. absl_*_test_util) that are
+    # not needed at runtime and may not build correctly outside absl's own
+    # test suite.
+    if t.contains('_test')
+      continue
+    endif
+    absl_deps += absl.dependency(t)
   endforeach
 else
   cpp = meson.get_compiler('cpp')
