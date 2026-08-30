@@ -18,8 +18,8 @@ github.com/joshkunz/massif v0.0.2/go.mod h1:KAmzsWWCPULX/NdP4qb5JYvjdDebq8+zE2oU
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348 h1:MtvEpTB6LX3vkb4ax0b5D2DHbNAUsen0Gx5wZoq3lV4=
 github.com/kylelemons/godebug v0.0.0-20170820004349-d65d576e9348/go.mod h1:B69LEHPfb2qLo0BaaOLcbitczOKLWTsrBG9LczfCD4k=
 github.com/martinlindhe/unit v0.0.0-20210313160520-19b60e03648d/go.mod h1:8QbxAolnDKw/JhUJMU80MRjHjEs0tLwkjZAPrTn+xLA=
-github.com/martinlindhe/unit v0.0.0-20230420213220-4adfd7d0a0d6 h1:muzoir7BEy+lDPqdROr57IjJBP7OydzCg0VDhZtdG+w=
-github.com/martinlindhe/unit v0.0.0-20230420213220-4adfd7d0a0d6/go.mod h1:8QbxAolnDKw/JhUJMU80MRjHjEs0tLwkjZAPrTn+xLA=
+github.com/martinlindhe/unit v0.0.0-20260805114624-07488d1da8d9 h1:DvKfwfN/+hYVwMUGSt/sK7CJYxUaZBUdQJ30xlnGyIg=
+github.com/martinlindhe/unit v0.0.0-20260805114624-07488d1da8d9/go.mod h1:8QbxAolnDKw/JhUJMU80MRjHjEs0tLwkjZAPrTn+xLA=
 github.com/moby/sys/mountinfo v0.6.2 h1:BzJjoreD5BMFNmD9Rus6gdd1pLuecOFPt8wC+Vygl78=
 github.com/moby/sys/mountinfo v0.6.2/go.mod h1:IJb6JQeOklcdMU9F5xQ8ZALD+CUr5VlGpwtX+VE0rpI=
 github.com/montanaflynn/stats v0.9.0 h1:tsBJ0RXwph9BmAuFoCmqGv6e8xa0MENQ8m0ptKq29mQ=
