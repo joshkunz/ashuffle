@@ -2,7 +2,7 @@ module ashuffle
 
 go 1.25.0
 
-toolchain go1.26.2
+toolchain go1.27.1
 
 require (
 	github.com/bogem/id3v2/v2 v2.1.4
@@ -12,8 +12,8 @@ require (
 	github.com/joshkunz/fakelib v0.0.8
 	github.com/joshkunz/massif v0.0.2
 	github.com/martinlindhe/unit v0.0.0-20230420213220-4adfd7d0a0d6
-	github.com/montanaflynn/stats v0.9.0
-	golang.org/x/sync v0.20.0
+	github.com/montanaflynn/stats v0.12.5
+	golang.org/x/sync v0.22.0
 )
 
 require (
