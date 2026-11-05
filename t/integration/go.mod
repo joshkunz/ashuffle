@@ -11,7 +11,7 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/joshkunz/fakelib v0.0.8
 	github.com/joshkunz/massif v0.0.2
-	github.com/martinlindhe/unit v0.0.0-20230420213220-4adfd7d0a0d6
+	github.com/martinlindhe/unit v0.0.0-20261006175143-1ad5ae96e924
 	github.com/montanaflynn/stats v0.9.0
 	golang.org/x/sync v0.20.0
 )
